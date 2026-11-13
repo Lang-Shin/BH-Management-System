@@ -16,11 +16,11 @@ The application was initialized directly in the repository. The original README 
 
 ### Keep state small and explicit
 
-`PrototypeData` contains rooms, tenants, invoices, and payments. Monetary values use integer centavos, date-only values use ISO strings, and status/method fields use literal unions. There is no `any` in application code.
+`PrototypeAppState` contains tenants, rooms, dated assignments, meters/readings/rates, billing periods, category charges, payments, explicit allocations, tenant credits, receipt snapshots, and audit events. The existing internal `PrototypeData` payload name aliases this state. Monetary values use integer centavos, date-only values use ISO strings, and status/method fields use literal unions. There is no `any` in application code. See [domain foundation notes](domain-foundation.md) for relationships and confirmed billing requirements.
 
 Context with `useReducer` is sufficient for a 30-tenant demonstration. State-changing actions are limited to tenant notes, empty-room maintenance, and reset. Search terms, filters, dialog selections, and navigation state are ephemeral component state rather than persisted domain data.
 
-`domain/calculations/summary.ts` derives usable capacity, occupancy, invoice balances, and collection totals from shared records. Date-sensitive calculations take an explicit ISO reporting date, keeping domain logic independent of demo fixtures and the system clock. Avoid storing duplicated totals or maintaining an unrelated set of dashboard figures. An occupied room cannot be set to maintenance; the reducer enforces this even if a future UI dispatches an invalid action.
+`domain/calculations/summary.ts` derives usable capacity, dated occupancy, category balances/statuses, credit remaining, and collection totals from shared records. Date-sensitive calculations take an explicit ISO reporting date. Charges billed for a period, payments allocated to those charges, and cash received during that period’s dates are deliberately distinct measures. No financial transition actions exist. An occupied room cannot be set to maintenance; the reducer enforces this even if a future UI dispatches an invalid action.
 
 ### Feature ownership and dependency direction
 
@@ -38,7 +38,7 @@ Feature pages depend on the state hook and domain functions; the provider depend
 
 `data/repositories/local-storage-repository.ts` owns storage access, the storage key, and version envelope. It delegates runtime validation to `domain/validation/prototype-data.ts`, which checks field shapes, literal values, dates, unique IDs, references, room capacity, and payment totals before restoring a saved snapshot. The single type assertion follows explicit field validation; no unchecked JSON is exposed to components.
 
-Invalid data falls back to fixtures without automatically overwriting the original saved value. Reset explicitly permits replacing it. Both reads and writes catch storage exceptions. This is prototype persistence, not a production data store. Version 1 does not migrate other versions; incompatible versions show the recovery message.
+Invalid data falls back to fixtures without automatically overwriting the original saved value. Reset explicitly permits replacing it. Both reads and writes catch storage exceptions. This is prototype persistence, not a production data store. The expanded model uses schema version 2 under the retained `bhms:prototype:v1` key. Version 1 and other incompatible envelopes show the recovery message and are not automatically migrated or overwritten.
 
 `PrototypeRepository` exposes asynchronous `load()` and `save(data)` methods. Loading returns a typed snapshot, optional warning, and permission to persist; saving returns an optional warning. The localStorage adapter implements this interface now. The provider shows a loading state while awaiting hydration, handles rejected loads with a recoverable error screen, and serializes saves so older snapshots cannot finish after newer ones. Failed saves preserve the in-memory session and display a warning. Cleanup guards prevent stale promise results from updating an unmounted provider. React Strict Mode remains enabled. No artificial loading delays or mock network calls are used.
 
@@ -59,9 +59,11 @@ Tailwind 4 uses its Vite plugin and CSS-first theme. There is no Tailwind 3 conf
 - Six destinations are Dashboard, Tenants, Rooms, Billing, Payments & Receipts, and Reports & Settings. Existing `/payments` and `/reports` URLs remain stable. Receipt generation is described as future scope; settings show read-only demo defaults rather than introducing configuration workflows.
 - Fictional property name: Maple House; display currency: PHP.
 - Fixed sample date: November 13, 2026, keeping overdue/upcoming examples deterministic.
-- Each bed has a sample monthly rent of PHP 3,500, and invoices contain a sample PHP 450 utility amount. No utility-allocation policy has been implemented.
-- Sample totals: PHP 86,900 billed, PHP 71,100 collected, and PHP 15,800 outstanding. Two invoices are overdue; two are upcoming.
-- “Collection rate” means sample amount collected divided by sample amount billed. It is not profit or a financial statement.
+- There are 10 fictional tenants (9 active and 1 moved out), 6 rooms, 2 sample billing periods, 23 category charges, and 10 sample payments. Occupancy initially uses 9 of 11 usable beds, with 2 additional beds under maintenance.
+- Rent agreements are PHP 3,500 for active sample assignments and PHP 3,000 for the moved-out historical assignment. These are agreed sample amounts, not a permanent monthly/per-bed policy.
+- November charges total PHP 33,086.00, with PHP 16,300.00 allocated and PHP 16,786.00 outstanding. November cash received is PHP 20,044.00, including prior-period collections and an unapplied PHP 500.00 advance.
+- Water charges and the optional washing machine charge are manual examples. Electricity readings and effective-dated rates are historical fixtures; no meter ownership or shared-room allocation policy has been implemented.
+- No collection ratio or financial total is fabricated independently of the shared records.
 
 These assumptions should be confirmed with the landlord before designing complete workflows.
 
@@ -71,7 +73,7 @@ Completed on the implementation environment:
 
 - `npm run build`: passed, including strict TypeScript compilation and production bundling.
 - `npm run lint`: passed with zero warnings.
-- `npm test`: **17 tests passed** across three suites, covering state/persistence, application navigation, reporting-date rules, asynchronous repository injection, serialized saves, and load/save failure handling.
+- `npm test`: **37 tests passed** across three suites. Tests cover state/persistence, application navigation, reporting-date rules, independent category payment status, credit/receipt/assignment consistency, applied-rate preservation, authorized reading history, asynchronous repository injection, serialized saves, and load/save failure handling.
 - `npm audit --omit=dev`: zero runtime dependency vulnerabilities at implementation time.
 - Full dependency audit reported 10 moderate development-tooling advisories related to transitive `minimatch` versions in ESLint/typescript-eslint. No forced major-version updates or unverified overrides were applied. Recheck these when updating tooling.
 - Headless Chromium smoke test at widths **320, 390, 768, 1366, and 1920 pixels**: all six routes rendered with no page-level horizontal overflow. Mobile/tablet drawer navigation passed.

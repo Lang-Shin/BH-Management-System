@@ -60,12 +60,35 @@ describe('admin workspace integration', () => {
     const dialog = screen.getByRole('dialog', { name: 'Reset the demo workspace?' })
     await user.click(within(dialog).getByRole('button', { name: 'Reset demo' }))
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 1)
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 2)
   })
 
   it('handles unknown deep links with a route back home', async () => {
     renderApp('/missing-page')
     expect(await screen.findByText('This page has no room here')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to dashboard' })).toHaveAttribute('href', '/dashboard')
+  })
+
+  it('shows category applicability separately from unpaid status and can switch sample periods', async () => {
+    const user = userEvent.setup()
+    renderApp('/billing')
+    const matrix = await screen.findByRole('region', { name: 'Fictional per-category billing status matrix' })
+    const alex = within(matrix).getByRole('row', { name: /Alex Rivera/ })
+    expect(within(alex).getByText('Not applicable')).toBeInTheDocument()
+    expect(within(alex).getByText('Partially paid')).toBeInTheDocument()
+    const taylor = within(matrix).getByRole('row', { name: /Taylor Reyes/ })
+    expect(within(taylor).getAllByText('Unpaid')).toHaveLength(2)
+    await user.selectOptions(screen.getByLabelText('Billing period'), 'period-oct')
+    expect(within(matrix).getByRole('row', { name: /Quinn Mendoza/ })).toBeInTheDocument()
+    expect(within(matrix).queryByRole('row', { name: /Alex Rivera/ })).not.toBeInTheDocument()
+    expect(screen.getByText('Historical sample rate')).toBeInTheDocument()
+  })
+
+  it('marks financial workflows as placeholders without payment or receipt action buttons', async () => {
+    renderApp('/payments')
+    expect(await screen.findByText('Payment recording and full payments')).toBeInTheDocument()
+    expect(screen.getByText('Prototype placeholders · Not implemented')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Fictional advance payment credits' })).toHaveTextContent('₱500.00')
+    expect(screen.queryByRole('button', { name: /record payment|issue receipt|allocate|correct payment/i })).not.toBeInTheDocument()
   })
 })

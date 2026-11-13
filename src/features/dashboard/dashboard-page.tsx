@@ -1,42 +1,41 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, Users, BedDouble, Wallet, CircleAlert, DoorOpen, ReceiptText } from 'lucide-react'
+import { CircleAlert, ReceiptText, Wallet, Banknote, ArrowRight } from 'lucide-react'
 import { PageHeader, StatCard } from '@/components/shared/page'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { StatusBadge } from '@/components/shared/status-badge'
-import { EmptyState } from '@/components/shared/states'
+import { DataTable } from '@/components/shared/data-table'
+import { PaymentHistoryTable } from '@/components/shared/payment-history-table'
 import { usePrototype } from '@/hooks/use-prototype'
-import { invoiceBalance, invoiceStatus, selectSummary } from '@/domain/calculations/summary'
-import { DEMO_DATE } from '@/data/fixtures/demo'
-import { formatMoney } from '@/lib/format'
+import { chargeBalance, issuedCharges, selectSummary } from '@/domain/calculations/summary'
+import { DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
+import { formatDate, formatMoney } from '@/lib/format'
+import { CATEGORY_LABELS } from '@/lib/labels'
 
 export default function Dashboard() {
   const { data } = usePrototype()
-  const summary = selectSummary(data, DEMO_DATE)
-  const outstanding = data.invoices.filter(invoice => invoiceBalance(data, invoice) > 0)
+  const summary = selectSummary(data, DEMO_DATE, DEMO_PERIOD)
+  const upcoming = issuedCharges(data, DEMO_DATE).filter(c => c.dueDate >= DEMO_DATE && chargeBalance(data, c, DEMO_DATE) > 0)
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+  const recent = data.payments.filter(p => p.state === 'RECORDED' && p.paidOn <= DEMO_DATE).sort((a, b) => b.paidOn.localeCompare(a.paidOn)).slice(0, 5)
+
   return <>
-    <PageHeader title="A clear view of your boarding house." description="Welcome to Maple House. Here’s a snapshot of the people, spaces, and sample records that keep it running." action={<Button variant="outline" asChild><Link to="/rooms"><DoorOpen />Explore rooms</Link></Button>} />
-    <section aria-label="Property overview" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <StatCard label="Active tenants" value={summary.tenants} detail="Fictional residents across 8 rooms" icon={Users} />
-      <StatCard label="Available beds" value={summary.availableBeds} detail={`${summary.capacity} usable beds · excludes maintenance`} icon={BedDouble} />
-      <StatCard label="Sample collections" value={formatMoney(summary.collected)} detail="November 2026 · demonstration figures" icon={Wallet} />
-      <StatCard label="Outstanding balance" value={formatMoney(summary.outstanding)} detail={`${summary.overdue} sample invoices past their due date`} icon={CircleAlert} />
+    <PageHeader title="A clear view of your boarding house." description="Fictional November 2026 overview, as of November 13. All figures come from the shared charges, payments, and allocations." />
+    <section aria-label="Financial overview" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <StatCard label="November charges" value={formatMoney(summary.billed)} detail="Issued charges for the sample billing period" icon={ReceiptText} />
+      <StatCard label="Applied to November charges" value={formatMoney(summary.applied)} detail="Explicit allocations; excludes unapplied advances" icon={Banknote} />
+      <StatCard label="Cash received in November" value={formatMoney(summary.received)} detail="Includes prior-period payments and advances" icon={Wallet} />
+      <StatCard label="November outstanding" value={formatMoney(summary.outstanding)} detail={`${summary.overdue} overdue charges · remaining due dates below`} icon={CircleAlert} />
     </section>
-    <div className="mt-6 grid items-start gap-6 xl:grid-cols-[1.5fr_1fr]">
-      <Card className="shadow-none"><CardHeader className="flex-row items-start justify-between gap-3"><div><CardTitle>Room occupancy</CardTitle><CardDescription className="mt-2">A little space to grow.</CardDescription></div><span className="text-2xl font-semibold text-primary">{summary.occupancy}%</span></CardHeader><CardContent>
-        <div role="meter" aria-label="Usable bed occupancy" aria-valuemin={0} aria-valuemax={100} aria-valuenow={summary.occupancy} className="h-3 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${summary.occupancy}%` }} /></div>
-        <div className="mt-3 flex justify-between text-xs text-muted-foreground"><span>{summary.tenants} occupied beds</span><span>{summary.availableBeds} available beds</span></div>
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">{data.rooms.map(room => {
-          const count = data.tenants.filter(tenant => tenant.roomId === room.id).length
-          return <Link to="/rooms" key={room.id} className="rounded-lg border bg-muted/30 p-3 transition-colors hover:border-primary/50 hover:bg-accent"><DoorOpen className="mb-2 size-4 text-primary" aria-hidden="true" /><p className="text-sm font-semibold">Room {room.name}</p><p className="mt-1 text-xs text-muted-foreground">{room.status === 'maintenance' ? 'Maintenance' : `${count} / ${room.capacity} beds`}</p></Link>
-        })}</div>
-        <p className="mt-5 text-xs leading-relaxed text-muted-foreground">30 beds in total. Rooms under maintenance are excluded from usable capacity.</p>
-      </CardContent></Card>
-      <Card className="shadow-none"><CardHeader><CardTitle>Balances to keep an eye on</CardTitle><CardDescription>Sample records as of November 13, 2026.</CardDescription></CardHeader><CardContent>
-        {outstanding.length === 0 ? <EmptyState title="All caught up" description="There are no outstanding sample balances." /> : <ul className="divide-y">{outstanding.map(invoice => <li key={invoice.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0"><div><p className="text-sm font-medium">{data.tenants.find(tenant => tenant.id === invoice.tenantId)?.name}</p><div className="mt-1.5"><StatusBadge status={invoiceStatus(data, invoice, DEMO_DATE)} /></div></div><p className="text-sm font-semibold tabular-nums">{formatMoney(invoiceBalance(data, invoice))}</p></li>)}</ul>}
-        <Button variant="outline" className="mt-5 w-full" asChild><Link to="/billing">View sample billing <ArrowRight /></Link></Button>
-      </CardContent></Card>
+    <div className="my-6 grid gap-6 md:grid-cols-2">
+      <Card className="shadow-none"><CardHeader><CardTitle>Payment status summary</CardTitle><CardDescription>Per-category charge status, derived from allocations.</CardDescription></CardHeader><CardContent><dl className="grid grid-cols-3 gap-3 text-center">{[{ label: 'Paid', value: summary.paid }, { label: 'Partially paid', value: summary.partial }, { label: 'Unpaid', value: summary.unpaid }].map(item => <div key={item.label} className="rounded-lg bg-muted p-3"><dt className="text-xs text-muted-foreground">{item.label}</dt><dd className="mt-2 text-2xl font-semibold">{item.value}</dd></div>)}</dl><p className="mt-4 text-sm text-muted-foreground">Unapplied tenant credit: <strong className="text-foreground">{formatMoney(summary.credit)}</strong>. Credit does not automatically settle a charge.</p></CardContent></Card>
+      <Card className="shadow-none"><CardHeader><CardTitle>Property occupancy</CardTitle><CardDescription>{summary.tenants} active fictional tenants · {data.tenants.filter(t => t.status === 'MOVED_OUT').length} moved-out example</CardDescription></CardHeader><CardContent><p className="text-3xl font-semibold text-primary">{summary.occupancy}%</p><p className="mt-3 text-sm text-muted-foreground">{summary.occupiedBeds} occupied / {summary.capacity} usable beds · {summary.availableBeds} available. Maintenance rooms are excluded.</p><Button variant="outline" className="mt-5" asChild><Link to="/rooms">Explore rooms <ArrowRight /></Link></Button></CardContent></Card>
     </div>
-    <section className="mt-6 rounded-xl border bg-card p-6 sm:flex sm:items-center sm:justify-between sm:gap-6"><div className="flex items-start gap-4"><span className="rounded-xl bg-accent p-3 text-primary"><ReceiptText className="size-5" aria-hidden="true" /></span><div><h2 className="font-semibold">Your next step: explore the workspace</h2><p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">Browse tenants, save a sample note, or change an empty room’s maintenance status. Your demo changes stay here when you reload.</p></div></div><Button asChild className="mt-5 shrink-0 sm:mt-0"><Link to="/tenants">Meet the tenants <ArrowRight /></Link></Button></section>
+    <section aria-labelledby="recent-payments"><div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 id="recent-payments" className="text-lg font-semibold">Recent payments</h2><Button variant="outline" asChild><Link to="/payments">All sample payments <ArrowRight /></Link></Button></div><PaymentHistoryTable data={data} payments={recent} caption="Five most recent fictional payments" /></section>
+    <section aria-labelledby="upcoming-dues" className="mt-7"><h2 id="upcoming-dues" className="mb-2 text-lg font-semibold">Upcoming due dates</h2><p className="mb-4 text-sm text-muted-foreground">Next {Math.min(6, upcoming.length)} of {upcoming.length} outstanding sample charges due on or after {formatDate(DEMO_DATE)}.</p><DataTable rows={upcoming.slice(0, 6)} caption="Upcoming fictional charge due dates" columns={[
+      { key: 'tenant', label: 'Tenant', render: c => data.tenants.find(t => t.id === c.tenantId)?.name },
+      { key: 'category', label: 'Category', render: c => CATEGORY_LABELS[c.category] },
+      { key: 'due', label: 'Due date', render: c => formatDate(c.dueDate) },
+      { key: 'balance', label: 'Outstanding', render: c => formatMoney(chargeBalance(data, c, DEMO_DATE)) },
+    ]} /></section>
   </>
 }

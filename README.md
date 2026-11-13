@@ -29,12 +29,12 @@ npm run preview    # Serve the built application locally
 
 | Route | Foundation capability |
 | --- | --- |
-| `/dashboard` | Linked property overview, occupancy, and sample balances |
-| `/tenants` | Search by name/email/room, open a profile, save a demo note |
-| `/rooms` | Filter rooms, view occupancy, toggle maintenance on empty rooms |
-| `/billing` | Read-only sample invoices with an outstanding-only filter |
-| `/payments` | Payments & Receipts: sample register, method totals, and receipt scope |
-| `/reports` | Reports & Settings: derived summaries and read-only demo defaults |
+| `/dashboard` | Financial overview, category payment status, recent payments, upcoming due dates, occupancy |
+| `/tenants` | Search, fictional profiles, assignment history, tenant/account statuses, demo notes |
+| `/rooms` | Shared/private room directory, dated occupancy, configuration preview, empty-room maintenance toggle |
+| `/billing` | Period selection, rent/electricity/water/optional washing charges, category status matrix, due dates, meter/rate history |
+| `/payments` | Read-only payment allocations, partial-payment examples, advance credit, sample receipt snapshots |
+| `/reports` | Sample monthly collection reports, billing policies, audit log, export/backup/recovery placeholders |
 
 - Fixed desktop sidebar and accessible mobile/tablet navigation drawer.
 - Responsive cards and horizontally scrollable data tables.
@@ -45,11 +45,15 @@ npm run preview    # Serve the built application locally
 
 ### Demo data and persistence
 
-**Maple House**, its 22 tenants, 10 three-bed rooms, 22 invoices, and 18 payments are fictional. Emails use `example.com`. The sample snapshot is **November 13, 2026**, and sample amounts use **PHP**. These are demonstration assumptions, not confirmed client requirements.
+**Maple House** and all records are fictional: **10 tenants** (9 active, 1 moved out), **6 rooms**, 2 sample billing periods, 23 category charges, 10 payments, explicit allocations, an advance credit, and sample receipt references. Emails use `example.com`; phone strings are deliberately non-dialable demo numbers, and addresses use fictional Demo City locations. The snapshot is **November 13, 2026**, and amounts use **PHP with two decimal places**.
 
-Initially, one empty room is under maintenance: 30 total beds, 27 usable beds, 22 occupied, and 5 available. Changing an empty room’s status updates occupancy across modules. Notes are limited to 500 characters. Occupied rooms cannot be placed under maintenance.
+Initially there are 13 total beds, 11 usable beds, 9 occupied, and 2 available. Shared rooms include full and partially occupied examples; one private room is empty after a tenant moved out, and another room is under maintenance. Changing an empty room’s maintenance status updates occupancy without removing assignment history. Notes are limited to 500 characters.
 
-State is shared through React Context and `useReducer`, and persisted in `localStorage` under **`bhms:prototype:v1`**, with a versioned envelope and runtime validation. Saved notes and room changes survive reloads. Reset replaces only this app’s saved demo state. Unreadable, malformed, or unsupported saved data produces a visible warning and fresh in-memory fixtures; the saved value is preserved until an explicit reset. Storage write failures keep the current session usable and show a warning.
+State is shared through React Context and `useReducer`, and persisted in `localStorage` under the existing key **`bhms:prototype:v1`**, now with **schema version 2** in its envelope. The key is retained so older snapshots are detected rather than silently abandoned. Version 1 snapshots are preserved and show a recovery message; use **Reset demo** to explicitly replace them. Runtime validation checks shapes, references, currency precision, occupancy, charge/payment allocation limits, credits, receipts, and correction links. Storage failures preserve the current in-memory session and show a warning.
+
+**November sample totals:** PHP 33,086.00 billed, PHP 16,300.00 explicitly applied to those charges, and PHP 16,786.00 outstanding. PHP 20,044.00 was received during November, including PHP 3,244.00 against October charges and PHP 500.00 in unapplied advance credit. These are distinct measures derived from the same shared records.
+
+The confirmed electricity example is represented as **300 → 312 kWh × PHP 13.00 = PHP 156.00**. Issued charges preserve their readings and applied rate. Billing-cycle policy, meter ownership, shared-room allocation, and fractional-consumption rounding remain unconfirmed. Unimplemented workflows are static, explicitly labeled placeholders rather than fake action buttons. See [domain foundation notes](docs/domain-foundation.md).
 
 Use fictional information only. This is a single-browser, single-workspace prototype. There is no backend, authentication, multi-user synchronization, production database, payment integration, receipt generation, or accounting engine. Multiple open tabs use their own in-memory state and the last successful storage write wins.
 

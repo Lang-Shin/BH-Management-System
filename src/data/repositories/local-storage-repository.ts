@@ -3,7 +3,8 @@ import { isPrototypeData, isRecord } from '@/domain/validation/prototype-data'
 import type { PrototypeRepository } from './prototype-repository'
 
 export const STORAGE_KEY = 'bhms:prototype:v1'
-const SCHEMA_VERSION = 1
+// Keep the key so old snapshots trigger explicit recovery rather than vanish.
+const SCHEMA_VERSION = 2
 
 export const localStorageRepository: PrototypeRepository = {
   async load() {

@@ -1,33 +1,66 @@
-import type { Invoice, PrototypeData } from '@/domain/types/models'
+import type { Charge, ChargeStatus, PrototypeAppState, RoomAssignment, TenantCredit } from '@/domain/types/models'
 
-export function invoiceTotal(invoice: Invoice): number {
-  return invoice.rentCents + invoice.utilitiesCents
+export function activeAssignments(data: PrototypeAppState, asOf: string): RoomAssignment[] {
+  return data.roomAssignments.filter(a => a.startDate <= asOf && (a.endDate === null || a.endDate >= asOf))
 }
 
-export function invoiceBalance(data: PrototypeData, invoice: Invoice): number {
-  const paid = data.payments.filter(payment => payment.invoiceId === invoice.id)
-    .reduce((sum, payment) => sum + payment.amountCents, 0)
-  return Math.max(0, invoiceTotal(invoice) - paid)
+export function roomOccupants(data: PrototypeAppState, roomId: string, asOf: string) {
+  const ids = new Set(activeAssignments(data, asOf).filter(a => a.roomId === roomId).map(a => a.tenantId))
+  return data.tenants.filter(t => ids.has(t.id))
 }
 
-export function invoiceStatus(data: PrototypeData, invoice: Invoice, asOf: string): 'Paid' | 'Overdue' | 'Upcoming' {
-  if (invoiceBalance(data, invoice) === 0) return 'Paid'
-  return invoice.dueDate < asOf ? 'Overdue' : 'Upcoming'
+export function chargePaid(data: PrototypeAppState, chargeId: string, asOf: string): number {
+  return data.paymentAllocations.filter(a => a.chargeId === chargeId && a.state === 'ACTIVE' && a.allocatedOn <= asOf
+    && data.payments.some(p => p.id === a.paymentId && p.state === 'RECORDED' && p.paidOn <= asOf))
+    .reduce((sum, a) => sum + a.amountCents, 0)
 }
 
-export function selectSummary(data: PrototypeData, asOf: string) {
-  const capacity = data.rooms.filter(room => room.status === 'available')
-    .reduce((total, room) => total + room.capacity, 0)
-  const billed = data.invoices.reduce((sum, invoice) => sum + invoiceTotal(invoice), 0)
-  const outstanding = data.invoices.reduce((sum, invoice) => sum + invoiceBalance(data, invoice), 0)
+export function chargeBalance(data: PrototypeAppState, charge: Charge, asOf: string): number {
+  return charge.state === 'VOIDED' ? 0 : charge.amountCents - chargePaid(data, charge.id, asOf)
+}
+
+export function chargeStatus(data: PrototypeAppState, charge: Charge, asOf: string): ChargeStatus {
+  const paid = chargePaid(data, charge.id, asOf)
+  return paid === 0 ? 'UNPAID' : paid < charge.amountCents ? 'PARTIALLY_PAID' : 'PAID'
+}
+
+export function creditRemaining(data: PrototypeAppState, credit: TenantCredit, asOf: string): number {
+  if (credit.createdOn > asOf || !data.payments.some(p => p.id === credit.sourcePaymentId && p.state === 'RECORDED' && p.paidOn <= asOf)) return 0
+  return credit.amountCents - data.paymentAllocations.filter(a => a.creditId === credit.id && a.state === 'ACTIVE' && a.allocatedOn <= asOf)
+    .reduce((sum, a) => sum + a.amountCents, 0)
+}
+
+export function issuedCharges(data: PrototypeAppState, asOf: string, periodId?: string) {
+  return data.charges.filter(c => c.state === 'ISSUED' && c.issuedOn <= asOf && (!periodId || c.billingPeriodId === periodId))
+}
+
+export function tenantAccount(data: PrototypeAppState, tenantId: string, asOf: string) {
+  const charges = issuedCharges(data, asOf).filter(c => c.tenantId === tenantId)
+  const balance = charges.reduce((sum, c) => sum + chargeBalance(data, c, asOf), 0)
+  const credit = data.tenantCredits.filter(c => c.tenantId === tenantId).reduce((sum, c) => sum + creditRemaining(data, c, asOf), 0)
+  const overdue = charges.some(c => c.dueDate < asOf && chargeBalance(data, c, asOf) > 0)
+  return { balance, credit, status: overdue ? 'Overdue' : balance > 0 ? 'Outstanding' : credit > 0 ? 'Credit available' : 'Clear' }
+}
+
+/** Billing-period charges and cash received during that period are distinct. */
+export function selectSummary(data: PrototypeAppState, asOf: string, periodId?: string) {
+  const assignments = activeAssignments(data, asOf)
+  const capacity = data.rooms.filter(r => r.status === 'available').reduce((sum, r) => sum + r.capacity, 0)
+  const charges = issuedCharges(data, asOf, periodId)
+  const billed = charges.reduce((sum, c) => sum + c.amountCents, 0)
+  const applied = charges.reduce((sum, c) => sum + chargePaid(data, c.id, asOf), 0)
+  const period = data.billingPeriods.find(p => p.id === periodId)
+  const received = data.payments.filter(p => p.state === 'RECORDED' && p.paidOn <= asOf
+    && (!period || (p.paidOn >= period.startDate && p.paidOn <= period.endDate))).reduce((sum, p) => sum + p.amountCents, 0)
   return {
-    tenants: data.tenants.length,
-    capacity,
-    availableBeds: capacity - data.tenants.length,
-    occupancy: capacity ? Math.round(data.tenants.length / capacity * 100) : 0,
-    billed,
-    collected: billed - outstanding,
-    outstanding,
-    overdue: data.invoices.filter(invoice => invoiceStatus(data, invoice, asOf) === 'Overdue').length,
+    tenants: data.tenants.filter(t => t.status === 'ACTIVE').length,
+    capacity, occupiedBeds: assignments.length, availableBeds: capacity - assignments.length,
+    occupancy: capacity ? Math.round(assignments.length / capacity * 100) : 0,
+    billed, applied, received, outstanding: billed - applied,
+    credit: data.tenantCredits.reduce((sum, c) => sum + creditRemaining(data, c, asOf), 0),
+    overdue: charges.filter(c => c.dueDate < asOf && chargeBalance(data, c, asOf) > 0).length,
+    paid: charges.filter(c => chargeStatus(data, c, asOf) === 'PAID').length,
+    partial: charges.filter(c => chargeStatus(data, c, asOf) === 'PARTIALLY_PAID').length,
+    unpaid: charges.filter(c => chargeStatus(data, c, asOf) === 'UNPAID').length,
   }
 }

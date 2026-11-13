@@ -23,7 +23,7 @@ describe('repository injection boundary', () => {
     expect(screen.getByRole('status', { name: 'Loading module' })).toBeInTheDocument()
     expect(save).not.toHaveBeenCalled()
     await act(async () => resolveLoad({ data: createDemoData(), warning: null, canPersist: true }))
-    expect(await screen.findByText('22 residents loaded')).toBeInTheDocument()
+    expect(await screen.findByText('10 residents loaded')).toBeInTheDocument()
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
     await userEvent.setup().click(screen.getByRole('button', { name: 'Change note' }))
     expect(save).toHaveBeenCalledTimes(1)
@@ -50,7 +50,7 @@ describe('repository injection boundary', () => {
       save: vi.fn().mockRejectedValue(new Error('Unavailable')),
     }
     render(<PrototypeProvider repository={repository}><Consumer /></PrototypeProvider>)
-    expect(await screen.findByText('22 residents loaded')).toBeInTheDocument()
+    expect(await screen.findByText('10 residents loaded')).toBeInTheDocument()
     expect(await screen.findByRole('alert')).toHaveTextContent('Demo changes could not be saved')
   })
 })

@@ -9,6 +9,8 @@ import { usePrototype } from '@/hooks/use-prototype'
 import { cn } from '@/lib/utils'
 import { LoadingState } from '@/components/shared/states'
 import { navigation } from '@/app/router/navigation'
+import { DEMO_DATE } from '@/data/fixtures/demo'
+import { formatDate } from '@/lib/format'
 
 function Brand() {
   return <div className="flex items-start gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white"><Building2 className="size-6" aria-hidden="true" /></div><div className="min-w-0"><p className="text-lg font-bold tracking-tight">BHMS</p><p className="mt-1 text-sm leading-snug text-muted-foreground">Boarding House Management System</p></div></div>
@@ -57,7 +59,7 @@ export function AdminShell() {
           <div className="flex items-center gap-2"><span className="flex size-9 shrink-0 items-center justify-center rounded-full border bg-secondary text-xs font-semibold" aria-hidden="true">DA</span><span className="sr-only xl:not-sr-only xl:text-sm">Demo administrator<span className="sr-only"> · Display only, no authentication</span></span></div>
         </div>
       </header>
-      <div className="border-b border-amber-200/70 bg-amber-50 px-4 py-2.5 text-center text-xs leading-relaxed text-amber-950 sm:px-8"><span className="font-semibold">Demo workspace</span> · Fictional data only · Sample period: November 2026 · Changes stay in this browser.</div>
+      <div className="border-b border-amber-200/70 bg-amber-50 px-4 py-2.5 text-center text-xs leading-relaxed text-amber-950 sm:px-8"><span className="font-semibold">Demo workspace</span> · Fictional data only · Snapshot: {formatDate(DEMO_DATE)} · Changes stay in this browser.</div>
       <main id="main-content" ref={mainRef} tabIndex={-1} className="mx-auto max-w-[1600px] p-4 outline-none sm:p-8 lg:p-9">
         <div role="status" className="sr-only">{notice}</div>
         {storageWarning && <div role="alert" className="mb-6 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950"><CircleAlert className="mt-0.5 size-5 shrink-0" aria-hidden="true" /><p>{storageWarning}</p></div>}

@@ -1,6 +1,7 @@
-import { createDemoData } from '@/data/fixtures/demo'
+import { createDemoData, DEMO_DATE } from '@/data/fixtures/demo'
 import type { PrototypeData } from '@/domain/types/models'
 import type { StateAction } from './actions'
+import { activeAssignments } from '@/domain/calculations/summary'
 
 export function prototypeReducer(state: PrototypeData, action: StateAction): PrototypeData {
   switch (action.type) {
@@ -15,7 +16,7 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
       }
     case 'room/statusToggled': {
       // An occupied room cannot be removed from available capacity.
-      if (state.tenants.some(tenant => tenant.roomId === action.roomId)) return state
+      if (activeAssignments(state, DEMO_DATE).some(assignment => assignment.roomId === action.roomId)) return state
       return {
         ...state,
         rooms: state.rooms.map(room => room.id === action.roomId
