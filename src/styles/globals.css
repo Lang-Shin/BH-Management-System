@@ -69,6 +69,27 @@
 
 .route-content { animation: route-enter var(--route-duration) ease-out both; min-width: 0; }
 
+/* Stationary decoration behind the opaque main surface, outside route animation. */
+.bhms-ambient-glow { isolation: isolate; }
+.bhms-ambient-glow::before {
+  content: "";
+  position: fixed;
+  inset: 4.5rem 0 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 18% 85%, color-mix(in srgb, var(--forest-green) 12%, transparent), transparent 70%),
+    radial-gradient(ellipse at 90% 15%, color-mix(in srgb, var(--tomato-red) 5%, transparent), transparent 55%);
+}
+
+@media (width >= 64rem) {
+  .bhms-ambient-glow::before { left: 15rem; }
+}
+
+@media (width < 48rem) {
+  .bhms-ambient-glow::before { opacity: 0.65; }
+}
+
 .sidebar-surface {
   background: var(--forest-green);
   color: var(--oat-milk);
