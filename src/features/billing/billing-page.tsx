@@ -21,7 +21,7 @@ export default function Billing() {
   const charges = issuedCharges(data, DEMO_DATE, periodId).filter(c => !outstandingOnly || chargeBalance(data, c, DEMO_DATE) > 0)
 
   return <>
-    <PageHeader title="Bills" description="Check rent, electricity, water, and washing payments in one place." />
+    <PageHeader title="Billing" description="Check rent, electricity, water, and washing payments in one place." />
     <PreviewNotice>You can look through these bills. Creating and changing bills will be added later.</PreviewNotice>
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4"><div className="max-w-full"><label htmlFor="billing-period" className="mb-2 block text-base font-semibold">Choose a month</label><select id="billing-period" value={periodId} onChange={e => setPeriodId(e.target.value)} className="min-h-14 max-w-full rounded-lg border bg-card px-4 py-3 text-base">{data.billingPeriods.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}</select></div><Button variant={outstandingOnly ? 'default' : 'outline'} aria-pressed={outstandingOnly} onClick={() => setOutstandingOnly(v => !v)}>{outstandingOnly ? 'Show all bills' : 'Show unpaid bills'}</Button></div>
     <section className="mb-7 grid gap-5 xl:grid-cols-3" aria-label="Bills overview">
@@ -34,9 +34,9 @@ export default function Billing() {
     <details className="mt-7 rounded-xl border bg-card p-5 sm:p-6"><summary className="min-h-12 cursor-pointer py-2 text-lg font-semibold">View bill amounts and due dates</summary><div className="mt-5"><DataTable rows={charges} caption="Bill amounts and due dates" columns={[
       { key: 'tenant', label: 'Tenant', render: c => data.tenants.find(t => t.id === c.tenantId)?.name },
       { key: 'bill', label: 'Bill for', render: c => CATEGORY_LABELS[c.category] },
-      { key: 'amount', label: 'Bill amount', render: c => formatMoney(c.amountCents) },
+      { key: 'amount', label: 'Bill amount', align: 'right', render: c => formatMoney(c.amountCents) },
       { key: 'paid', label: 'Paid', render: c => <div><p>{formatMoney(chargePaid(data, c.id, DEMO_DATE))}</p><div className="mt-2"><StatusBadge status={CHARGE_STATUS_LABELS[chargeStatus(data, c, DEMO_DATE)]} /></div></div> },
-      { key: 'balance', label: 'Still to pay', render: c => <span className="font-semibold">{formatMoney(chargeBalance(data, c, DEMO_DATE))}</span> },
+      { key: 'balance', label: 'Still to pay', align: 'right', render: c => <span className="font-semibold">{formatMoney(chargeBalance(data, c, DEMO_DATE))}</span> },
       { key: 'due', label: 'Pay by', render: c => <div>{formatDate(c.dueDate)}{c.dueDate < DEMO_DATE && chargeBalance(data, c, DEMO_DATE) > 0 && <div className="mt-2"><StatusBadge status="Late payment" /></div>}</div> },
     ]} /></div></details>
     <ElectricityPreview data={data} periodId={periodId} />

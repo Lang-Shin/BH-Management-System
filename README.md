@@ -29,20 +29,20 @@ npm run preview    # Serve the built application locally
 
 | Route | Foundation capability |
 | --- | --- |
-| `/dashboard` | Home: simple money totals, bill payments, recent payments, upcoming bills, and room counts |
+| `/dashboard` | Dashboard (titled Overview): simple money totals, bill payments, recent payments, upcoming bills, and room counts |
 | `/tenants` | Search, fictional profiles, assignment history, tenant/account statuses, demo notes |
 | `/rooms` | Occupied, available, and under-repair rooms; current tenants; bed counts for information only |
-| `/billing` | Bills: choose a month, see who has paid, check due dates, and view electricity details |
+| `/billing` | Billing: choose a month, see who has paid, check due dates, and view electricity details |
 | `/payments` | Read-only payment allocations, partial-payment examples, advance credit, sample receipt snapshots |
 | `/reports` | Sample monthly collection reports, billing policies, audit log, export/backup/recovery placeholders |
 
 - Fixed desktop sidebar and accessible mobile/tablet navigation drawer.
 - Responsive cards and horizontally scrollable data tables.
 - Top header, active-route links, document titles, keyboard focus styles, skip link, dialogs, and status announcements.
-- Lazy-loaded modules with a shared loading skeleton, reusable empty/error UI, rendering error boundary, and unknown-route fallback.
+- Eagerly loaded admin modules avoid route-loading flashes; route content enters with a 200ms fade and 8px rise while the shell stays mounted. Reduced-motion users receive no route animation. Shared loading/empty/error UI and the unknown-route fallback remain available.
 - **Restore sample records** is under **Reports & Settings → More settings and sample records**. It requires confirmation and replaces only the sample dataset.
 - Branding: **Halili BH**, with **BHMS** below the logo text. The interface self-hosts the variable **Nunito** font for consistent rendering on every device, with system fallbacks. No authentication is implemented.
-- Larger text and controls, plain-English titles, and stacked phone records make everyday screens easier to read. See the [landlord UI notes](docs/landlord-ui.md).
+- Blue-accented SaaS shell, compact typography, comfortable controls, plain-English descriptions, and stacked phone records. See the [landlord UI notes](docs/landlord-ui.md) and [TASK 1A.1 redesign report](docs/task-1a-1-report.md).
 
 ### Demo data and persistence
 

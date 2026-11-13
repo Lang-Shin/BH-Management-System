@@ -36,7 +36,7 @@ IDs are explicit strings with referential validation. The type alias `PrototypeD
 
 ### Room occupancy — landlord clarification
 
-Count **rooms, not beds**. Any current rental makes the room occupied, including one tenant renting a three-bed room. A room with unused beds is not automatically available to rent again. Empty rooms that are not under repair are available; rooms under repair are a separate count. `selectRoomSummary()` is shared by Home and Rooms. The current sample shows 4 occupied / 6 rooms, 1 available, and 1 under repair. Existing `Room.capacity` values are retained as bed information for storage compatibility, not used as a headcount restriction or a payment rule.
+Count **rooms, not beds**. Any current rental makes the room occupied, including one tenant renting a three-bed room. A room with unused beds is not automatically available to rent again. Empty rooms that are not under repair are available; rooms under repair are a separate count. `selectRoomSummary()` is shared by the Dashboard and Rooms. The current sample shows 4 occupied / 6 rooms, 1 available, and 1 under repair. Existing `Room.capacity` values are retained as bed information for storage compatibility, not used as a headcount restriction or a payment rule.
 
 ## Confirmed billing requirements preserved
 

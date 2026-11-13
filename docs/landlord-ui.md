@@ -6,8 +6,8 @@ Make day-to-day information easy to read and understand for a landlord with litt
 
 ## Everyday screens
 
-- Navigation uses **Home**, **Tenants**, **Rooms**, **Bills**, **Payments & Receipts**, and **Reports & Settings**. Existing route URLs are unchanged.
-- Main text is 17px, supporting text 16px, and small labels 14px. Regular buttons are at least 48px high; navigation links are at least 56px high.
+- Navigation uses **Dashboard**, **Tenants**, **Rooms**, **Billing**, **Payments & Receipts**, and **Reports & Settings**. The Dashboard page is titled **Overview**. Existing route URLs are unchanged.
+- TASK 1A.1 uses a compact 15px body, 14px supporting text, and 13px small labels. Regular buttons and navigation links are at least 48px high. A neutral blue-accented shell and rounded content panel replace the earlier green theme. Owner approval of the denser typography remains pending.
 - The header has a visible **Menu** button on phones. The sample reset tool and demo administrator avatar are removed from the daily header.
 - Phone tables become stacked, labeled records, so a tenant’s details can be read without swiping sideways. There is one semantic table and one set of controls rather than duplicated desktop/mobile forms.
 - Less-used details, electricity history, receipt lists, and future tools are collapsed behind descriptive labels.
@@ -30,11 +30,11 @@ Make day-to-day information easy to read and understand for a landlord with litt
 | Admin audit log | Record of changes |
 | Reset demo | Restore sample records |
 
-Amounts have not changed. “Already paid” is money used to pay bills for the chosen month. “Money received” includes payments for older bills and advance payments, so the totals can differ. Home includes a short expandable explanation rather than hiding this distinction.
+Amounts have not changed. “Already paid” is money used to pay bills for the chosen month. “Money received” includes payments for older bills and advance payments, so the totals can differ. The Dashboard includes a short expandable explanation rather than hiding this distinction.
 
 ## Whole-room occupancy
 
-`roomOccupancy()` and `selectRoomSummary()` are the common source for Home, Rooms, and room filters.
+`roomOccupancy()` and `selectRoomSummary()` are the common source for the Dashboard, Rooms, and room filters.
 
 - **Occupied:** at least one tenant currently rents the room.
 - **Available:** no current tenant and the room is not under repair.
@@ -61,7 +61,7 @@ Browser checks exercise all six routes at 320, 390, 768, 1366, and 1920px; phone
 
 Owner/landlord visual acceptance remains pending; these checks do not substitute for feedback from the person who will use the application.
 
-Completed checks for this revision:
+Historical checks for the earlier landlord-focused revision (current redesign verification is in [TASK 1A.1](task-1a-1-report.md)):
 
 - `npm run build`: passed, including strict TypeScript compilation.
 - `npm run lint`: passed with zero warnings.

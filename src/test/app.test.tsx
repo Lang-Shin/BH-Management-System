@@ -5,6 +5,9 @@ import { describe, expect, it } from 'vitest'
 import { AppRouter } from '@/app/router/app-router'
 import { PrototypeProvider } from '@/app/providers/prototype-provider'
 import { localStorageRepository, STORAGE_KEY } from '@/data/repositories/local-storage-repository'
+import { selectSummary } from '@/domain/calculations/summary'
+import { DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
+import { formatMoney } from '@/lib/format'
 
 function renderApp(route = '/') {
   return render(<PrototypeProvider repository={localStorageRepository}><MemoryRouter initialEntries={[route]}><AppRouter /></MemoryRouter></PrototypeProvider>)
@@ -14,14 +17,21 @@ describe('admin workspace integration', () => {
   it('redirects the root and navigates all six modules', async () => {
     const user = userEvent.setup()
     renderApp()
-    expect(await screen.findByRole('heading', { level: 1, name: 'Home' }, { timeout: 5000 })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Overview' }, { timeout: 5000 })).toBeInTheDocument()
     const nav = screen.getByRole('navigation', { name: 'Main navigation' })
-    for (const title of ['Tenants', 'Rooms', 'Bills', 'Payments & Receipts', 'Reports & Settings']) {
+    const header = screen.getByRole('banner')
+    const main = screen.getByRole('main')
+    expect(within(nav).getByRole('link', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page')
+    for (const title of ['Tenants', 'Rooms', 'Billing', 'Payments & Receipts', 'Reports & Settings']) {
       await user.click(within(nav).getByRole('link', { name: title }))
-      // Lazy modules may need an initial transform under parallel Windows test workers.
       expect(await screen.findByRole('heading', { level: 1, name: title }, { timeout: 5000 })).toBeInTheDocument()
       expect(within(nav).getByRole('link', { name: title })).toHaveAttribute('aria-current', 'page')
+      expect(screen.getByRole('banner')).toBe(header)
+      expect(screen.getByRole('main')).toBe(main)
+      expect(screen.getByRole('navigation', { name: 'Main navigation' })).toBe(nav)
     }
+    await user.click(within(nav).getByRole('link', { name: 'Dashboard' }))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument()
   }, 15000)
 
   it('filters tenants, shows an empty state, and preserves saved notes after remount', async () => {
@@ -73,7 +83,7 @@ describe('admin workspace integration', () => {
   it('handles unknown deep links with a route back home', async () => {
     renderApp('/missing-page')
     expect(await screen.findByText('This page could not be found')).toBeInTheDocument()
-    expect(screen.getAllByRole('link', { name: 'Back to Home' })[0]).toHaveAttribute('href', '/dashboard')
+    expect(screen.getAllByRole('link', { name: 'Back to Dashboard' })[0]).toHaveAttribute('href', '/dashboard')
   })
 
   it('shows category applicability separately from unpaid status and can switch sample periods', async () => {
@@ -116,11 +126,21 @@ describe('admin workspace integration', () => {
     expect(screen.getAllByRole('article')).toHaveLength(4)
   })
 
-  it('uses plain financial labels and keeps sample-reset controls out of the daily header', async () => {
+  it('preserves shared financial summary values and keeps reset controls out of the dashboard', async () => {
     renderApp('/dashboard')
-    await screen.findByRole('heading', { level: 1, name: 'Home' })
-    expect(screen.getByRole('heading', { name: 'Already paid' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Still to pay' })).toBeInTheDocument()
+    await screen.findByRole('heading', { level: 1, name: 'Overview' })
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')
+    const summary = selectSummary(saved.data, DEMO_DATE, DEMO_PERIOD)
+    const overview = screen.getByRole('region', { name: 'Money overview' })
+    for (const [label, value] of [
+      ['Total billed', formatMoney(summary.billed)],
+      ['Total collected', formatMoney(summary.applied)],
+      ['Total outstanding', formatMoney(summary.outstanding)],
+      ['Collection rate', `${(summary.applied / summary.billed * 100).toFixed(1)}%`],
+    ] as const) {
+      const card = within(overview).getByRole('heading', { name: label }).closest('[data-slot="card"]')
+      expect(card).toHaveTextContent(value)
+    }
     expect(screen.queryByText('Applied to November charges')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /reset demo|restore sample records/i })).not.toBeInTheDocument()
   })

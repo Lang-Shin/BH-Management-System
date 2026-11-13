@@ -25,7 +25,7 @@ Context with `useReducer` is sufficient for a 30-tenant demonstration. State-cha
 ### Feature ownership and dependency direction
 
 - `features/<module>/` owns that module’s pages and local UI state. Add module-specific components beside the page as they grow; shared primitives stay in `components/`.
-- `app/router/` owns lazy route composition and navigation metadata. The sidebar and header read the same destination labels.
+- `app/router/` owns route composition and navigation metadata. The sidebar and header read the same destination labels.
 - `app/state/` owns the action union, context, and reducer. `hooks/use-prototype.ts` provides typed state access.
 - `app/providers/` composes dependencies and handles the repository lifecycle.
 - `domain/` owns models, pure business calculations, and runtime validation. It has no React, application-state, or fixture dependencies.
@@ -46,17 +46,17 @@ The repository instance is selected in `app/providers/app-providers.tsx` and rem
 
 ### Reusable layout, bounded module scope
 
-`AdminShell` owns navigation, header, demo notice, storage warning, and the main content outlet. The six modules are lazy loaded; a Suspense boundary inside the shell shows the shared loading state while preserving navigation. Unknown paths render a useful return-home action. The root rendering error boundary handles unexpected rendering and lazy-import failures with a reload action.
+`AdminShell` owns navigation, header, storage warning, and the main content outlet. The six small modules are eagerly imported to avoid first-navigation loading flashes. A pathname-keyed content wrapper uses a 200ms fade and 8px rise; the sidebar, header, main landmark, and shared provider stay mounted. Reduced motion disables route animation. Unknown paths render a useful return-to-dashboard action. The root rendering error boundary handles unexpected rendering errors with a reload action.
 
 Shared page, table, empty, loading, error, status-badge, and statistic components establish patterns for later modules. Tables have captions, header scopes, focusable scrolling regions, and contained horizontal overflow. The navigation drawer and dialogs use shadcn/Radix keyboard handling and focus management. Route changes update the document title and move focus to main content. `lib/format.ts` centralizes PHP formatting and UTC date-only formatting; `domain/validation/date.ts` is shared by formatting and stored-data validation. Invalid dates are labeled instead of silently normalized, and fractional/non-finite/unsafe centavo inputs are rejected by currency formatting.
 
-The current branding is **Halili BH**, with **BHMS** under the name beside the logo. The landlord-focused revision uses 17px primary text, 16px supporting text, and 14px small labels, with regular buttons at least 48px high and navigation links at least 56px high. The desktop sidebar scrolls on shorter viewports. On phones, each table row becomes one stacked, labeled record without duplicating the controls. The palette is neutral with a restrained green accent; every status includes text. No decorative charts or illustrations were introduced. Advanced details and unfinished tools are collapsed, and sample reset is in Reports & Settings instead of the header.
+The current branding is **Halili BH**, with **BHMS** under the name beside the logo. TASK 1A.1 uses self-hosted Nunito with 15px primary text, 14px supporting text, and 13px small labels, plus regular buttons and navigation links at least 48px high. The 240px desktop sidebar scrolls on shorter viewports and becomes an accessible drawer below 1024px. A rounded white main panel sits on a light neutral background with a restrained #2855F5 blue accent. Tables have muted headers, separators, hover feedback, and optional right-aligned numeric columns. On phones, rows become stacked, labeled records without duplicating controls; wider tablet tables scroll within their own region. Every status includes text. Advanced details and unfinished tools are collapsed, and sample reset is in Reports & Settings instead of the header.
 
 Tailwind 4 uses its Vite plugin and CSS-first theme. There is no Tailwind 3 configuration. shadcn/ui components are generated local source, with `cn` imports pointing to the project's own `lib/utils.ts`. Root and app TypeScript aliases match Vite and `components.json` so future component additions resolve under `src/`.
 
 ### Intentional demonstration assumptions
 
-- Six destinations are Home, Tenants, Rooms, Bills, Payments & Receipts, and Reports & Settings. All route URLs remain stable. Receipt generation is future scope; settings show read-only defaults rather than introducing configuration workflows.
+- Six destinations are Dashboard (titled Overview), Tenants, Rooms, Billing, Payments & Receipts, and Reports & Settings. All route URLs remain stable. Receipt generation is future scope; a labeled sample preview uses existing receipt data. Settings show read-only defaults rather than introducing configuration workflows.
 - Property branding: Halili BH. The demonstration tenant and financial records remain fictional; display currency: PHP.
 - Fixed sample date: November 13, 2026, keeping overdue/upcoming examples deterministic.
 - There are 10 fictional tenants (9 active and 1 moved out), 6 rooms, 2 sample billing periods, 23 category charges, and 10 sample payments. Room totals initially show 4 occupied, 1 available, and 1 under repair. Bed counts do not affect these totals.
