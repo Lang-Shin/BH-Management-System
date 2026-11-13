@@ -88,25 +88,42 @@
 
 .route-content { animation: route-enter var(--route-duration) ease-out both; min-width: 0; }
 
-/* Stationary decoration behind the opaque main surface, outside route animation. */
-.bhms-ambient-glow { isolation: isolate; }
+/* Expose the glow peaks in the outer frame, not beneath the opaque content. */
+.bhms-ambient-glow {
+  position: relative;
+  isolation: isolate;
+  padding: 0.5rem 0.5rem 1rem;
+}
 .bhms-ambient-glow::before {
   content: "";
   position: fixed;
   inset: 4.5rem 0 0;
-  z-index: -1;
+  z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse at 18% 85%, color-mix(in srgb, var(--forest-green) 12%, transparent), transparent 70%),
-    radial-gradient(ellipse at 90% 15%, color-mix(in srgb, var(--tomato-red) 5%, transparent), transparent 55%);
+    radial-gradient(ellipse 320px 680px at 0% 60%, color-mix(in srgb, var(--forest-green) 25%, transparent), transparent 75%),
+    radial-gradient(ellipse 400px 340px at 100% 0%, color-mix(in srgb, var(--tomato-red) 10%, transparent), transparent 75%);
+}
+.bhms-ambient-glow > main {
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--forest-green) 8%, transparent);
+}
+
+@media (width >= 40rem) {
+  .bhms-ambient-glow { padding: 1rem; }
 }
 
 @media (width >= 64rem) {
+  .bhms-ambient-glow { padding: 1.5rem; }
   .bhms-ambient-glow::before { left: 15rem; }
 }
 
 @media (width < 48rem) {
-  .bhms-ambient-glow::before { opacity: 0.65; }
+  .bhms-ambient-glow::before { opacity: 0.6; }
+  .bhms-ambient-glow > main {
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--forest-green) 5%, transparent);
+  }
 }
 
 .sidebar-surface {

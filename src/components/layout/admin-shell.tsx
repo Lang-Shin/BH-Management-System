@@ -39,7 +39,7 @@ export function AdminShell() {
   return <div className="min-h-dvh">
     <a href="#main-content" className="sr-only fixed top-3 left-3 z-50 rounded-md bg-primary p-3 text-white focus:not-sr-only">Skip to content</a>
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 overflow-y-auto bg-sidebar lg:block"><SidebarContent /></aside>
-    <div className="bhms-ambient-glow min-w-0 lg:pl-60">
+    <div className="min-w-0 lg:pl-60">
       <header className="sticky top-0 z-20 flex min-h-18 items-center justify-between gap-3 border-b bg-background px-4 sm:px-6 lg:border-0 lg:px-8">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <Sheet open={menuOpen} onOpenChange={setMenuOpen}><SheetTrigger asChild><Button variant="outline" className="lg:hidden" aria-label="Open menu"><Menu />Menu</Button></SheetTrigger><SheetContent side="left" className="sidebar-surface w-72 max-w-[90vw] gap-0 overflow-y-auto p-0"><SheetHeader className="sr-only"><SheetTitle>Main menu</SheetTitle><SheetDescription>Choose Dashboard, Tenants, Rooms, Billing, Payments, or Reports and Settings.</SheetDescription></SheetHeader><SidebarContent onNavigate={() => setMenuOpen(false)} /></SheetContent></Sheet>
@@ -47,11 +47,13 @@ export function AdminShell() {
         </div>
         <p className="hidden shrink-0 rounded-full border bg-card px-3 py-1 text-xs text-muted-foreground sm:block">Sample records</p>
       </header>
-      <main id="main-content" ref={mainRef} tabIndex={-1} className="mx-2 mb-4 min-h-[calc(100dvh-5.5rem)] min-w-0 rounded-2xl border bg-card p-4 outline-none sm:mx-4 sm:p-6 lg:mr-6 lg:ml-0 lg:p-7">
+      <div className="bhms-ambient-glow">
+      <main id="main-content" ref={mainRef} tabIndex={-1} className="min-h-[calc(100dvh-5.5rem)] min-w-0 rounded-2xl border bg-card p-4 outline-none sm:p-6 lg:p-7">
         {storageWarning && <div role="alert" className="mb-6 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-base text-amber-950"><CircleAlert className="mt-0.5 size-6 shrink-0" aria-hidden="true" /><div><p>{storageWarning}</p><NavLink to="/reports" className="mt-3 inline-flex min-h-12 items-center font-semibold underline">Open Reports &amp; Settings</NavLink></div></div>}
         <div key={location.pathname} className="route-content"><Outlet /></div>
         <footer className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t pt-5 text-sm text-muted-foreground"><p className="text-[1rem]"><span className="brand-name">Halili BH</span> · <span className="brand-acronym">BHMS</span></p><NavLink to="/dashboard" className="flex min-h-12 items-center font-medium hover:text-primary">Back to Dashboard</NavLink></footer>
       </main>
+      </div>
     </div>
   </div>
 }
