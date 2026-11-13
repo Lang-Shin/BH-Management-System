@@ -35,7 +35,7 @@ export function PrototypeProvider({ children, repository }: { children: ReactNod
         const warning = await repository.save(data)
         if (!cancelled) setStorageWarning(warning)
       } catch {
-        if (!cancelled) setStorageWarning('Demo changes could not be saved. Your current session is still available. Reset the demo to retry.')
+        if (!cancelled) setStorageWarning('Your changes could not be saved. You can keep using this page, but your latest changes may be lost when it closes.')
       }
     })
     return () => { cancelled = true }
@@ -46,7 +46,7 @@ export function PrototypeProvider({ children, repository }: { children: ReactNod
     reduce(action)
   }
 
-  if (loadFailed) return <div className="p-6"><ErrorState title="Workspace could not be loaded" onRetry={() => window.location.reload()} /></div>
+  if (loadFailed) return <div className="p-6"><ErrorState title="Your records could not be opened" onRetry={() => window.location.reload()} /></div>
   if (!ready) return <div className="p-6"><LoadingState /></div>
   return <PrototypeContext.Provider value={{ data, dispatch, storageWarning }}>{children}</PrototypeContext.Provider>
 }

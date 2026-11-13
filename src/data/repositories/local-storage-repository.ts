@@ -17,20 +17,20 @@ export const localStorageRepository: PrototypeRepository = {
     } catch {
       return {
         data: createDemoData(),
-        warning: 'Saved demo data could not be loaded. Fresh sample data is shown in memory. Reset the demo to replace saved data and retry persistence.',
+        warning: 'Your saved sample records could not be opened. Fresh sample records are shown for now. In Reports & Settings, choose “Restore sample records” to start again.',
         canPersist: false,
       }
     }
   },
   async save(data) {
     if (!isPrototypeData(data)) {
-      return 'Demo changes failed validation. Previously saved data was left unchanged. Reset the demo to recover.'
+      return 'Your changes could not be saved because a record needs checking. Previously saved records have not been changed. Open Reports & Settings for help.'
     }
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: STORAGE_SCHEMA_VERSION, data }))
       return null
     } catch {
-      return 'Browser storage is unavailable or full. Changes work for this session but will not survive a reload. Reset the demo to retry.'
+      return 'Your changes could not be saved in this browser. You can keep using this page, but your latest changes will be lost when it closes.'
     }
   },
 }

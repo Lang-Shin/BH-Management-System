@@ -34,7 +34,7 @@ describe('repository initialization and safe writes', () => {
     const saved = localStorage.getItem(STORAGE_KEY)
     const invalid = createDemoData()
     invalid.payments[0]!.amountCents = -1
-    expect(await localStorageRepository.save(invalid)).toContain('failed validation')
+    expect(await localStorageRepository.save(invalid)).toContain('a record needs checking')
     expect(localStorage.getItem(STORAGE_KEY)).toBe(saved)
     expect((await localStorageRepository.load()).data).toEqual(valid)
   })

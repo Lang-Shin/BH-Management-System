@@ -9,7 +9,7 @@ Defined in `src/domain/types/models.ts`:
 | Model | Key relationships and purpose |
 | --- | --- |
 | `Tenant` | Fictional profile, explicit `ACTIVE` / `MOVED_OUT` status; account status is derived separately |
-| `Room` | Capacity, private/shared configuration, maintenance availability |
+| `Room` | Bed count and private/shared configuration for reference; repair status; beds do not decide availability |
 | `RoomAssignment` | Tenant → room with start/end dates and agreed rent; historical assignments remain after move-out |
 | `ElectricityMeter` | Meter identity and serial number; ownership explicitly `UNCONFIRMED` |
 | `MeterReading` | Meter → dated scaled-integer reading, confirmation state, optional authorized replacement reference |
@@ -33,6 +33,10 @@ IDs are explicit strings with referential validation. The type alias `PrototypeD
 - No charge in a category means **not applicable** in the sample matrix. No zero-value unpaid placeholder charge is manufactured.
 - Overdue is a date/balance condition, separate from partial/unpaid status.
 - An active tenant may have outstanding debt and advance credit simultaneously. Credit does not automatically offset charges.
+
+### Room occupancy — landlord clarification
+
+Count **rooms, not beds**. Any current rental makes the room occupied, including one tenant renting a three-bed room. A room with unused beds is not automatically available to rent again. Empty rooms that are not under repair are available; rooms under repair are a separate count. `selectRoomSummary()` is shared by Home and Rooms. The current sample shows 4 occupied / 6 rooms, 1 available, and 1 under repair. Existing `Room.capacity` values are retained as bed information for storage compatibility, not used as a headcount restriction or a payment rule.
 
 ## Confirmed billing requirements preserved
 
@@ -94,10 +98,10 @@ The fixture factory generates fresh objects for reset/tests; it is not an execut
 - **Payments & Receipts:** payment/allocation history, partial-payment examples, advance credit, and fictional receipt snapshots.
 - **Reports & Settings:** derived collection rows by sample period, confirmed/unconfirmed billing settings, seeded admin event, and explicit export/backup/recovery placeholders.
 
-Unfinished workflows appear as labeled explanatory text, not decorative action buttons. localStorage is demo persistence, not production backup. Reset replaces only the prototype snapshot with fresh fixtures.
+Unfinished tools are collapsed under clearly marked “Coming later” sections, not decorative action buttons. localStorage is demo persistence, not production backup. Restore sample records is under Reports & Settings and replaces only the prototype snapshot with fresh fixtures after confirmation.
 
 ## Persistence compatibility
 
-The expanded schema uses envelope version **2**. The existing key `bhms:prototype:v1` is intentionally retained so version 1 snapshots can be detected and preserved. Loading an old schema shows fresh fixtures in memory and a recovery notice; saving remains disabled until the user explicitly confirms Reset demo. No silent migration discards old notes or rewrites financial samples.
+The expanded schema uses envelope version **2**. The existing key `bhms:prototype:v1` is intentionally retained so version 1 snapshots can be detected and preserved. Loading an old schema shows fresh fixtures in memory and a recovery notice; saving remains disabled until the user explicitly confirms Restore sample records in Reports & Settings. No silent migration discards old notes or rewrites financial samples. The room-based UI revision does not change the stored shape or schema version; saved notes and rental records are preserved.
 
-Runtime validation checks collection shapes, IDs, relationships, dated assignment capacity, safe-integer money, category-specific fields, reading/rate snapshots, allocation limits, source-credit reservations/consumption, receipt links, and correction/audit references. A pure parser safely handles malformed JSON and incompatible envelopes. The repository also validates before writes and refuses invalid snapshots without replacing previously saved data. This is a useful prototype integrity boundary, not a replacement for future server validation and authorized financial transactions. localStorage is editable by browser users and is not secure financial storage.
+Runtime validation checks collection shapes, IDs, relationships, assignment dates/overlaps, occupied-room repair restrictions, safe-integer money, category-specific fields, reading/rate snapshots, allocation limits, source-credit reservations/consumption, receipt links, and correction/audit references. Bed counts do not restrict the number of rental records. A pure parser safely handles malformed JSON and incompatible envelopes. The repository also validates before writes and refuses invalid snapshots without replacing previously saved data. This is a useful prototype integrity boundary, not a replacement for future server validation and authorized financial transactions. localStorage is editable by browser users and is not secure financial storage.

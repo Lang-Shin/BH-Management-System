@@ -17,6 +17,7 @@ export interface Room {
   id: string
   name: string
   floor: number
+  /** Number of beds for reference only; it does not decide whether the room is occupied. */
   capacity: number
   kind: 'PRIVATE' | 'SHARED'
   status: 'available' | 'maintenance'

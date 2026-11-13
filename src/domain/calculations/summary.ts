@@ -1,4 +1,4 @@
-import type { Charge, ChargeStatus, PrototypeAppState, RoomAssignment, TenantCredit } from '@/domain/types/models'
+import type { Charge, ChargeStatus, PrototypeAppState, Room, RoomAssignment, TenantCredit } from '@/domain/types/models'
 
 export function activeAssignments(data: PrototypeAppState, asOf: string): RoomAssignment[] {
   return data.roomAssignments.filter(a => a.startDate <= asOf && (a.endDate === null || a.endDate >= asOf))
@@ -7,6 +7,24 @@ export function activeAssignments(data: PrototypeAppState, asOf: string): RoomAs
 export function roomOccupants(data: PrototypeAppState, roomId: string, asOf: string) {
   const ids = new Set(activeAssignments(data, asOf).filter(a => a.roomId === roomId).map(a => a.tenantId))
   return data.tenants.filter(t => ids.has(t.id))
+}
+
+export type RoomOccupancy = 'OCCUPIED' | 'AVAILABLE' | 'UNDER_REPAIR'
+
+/** A room is occupied as soon as someone rents it, regardless of its bed count. */
+export function roomOccupancy(data: PrototypeAppState, room: Room, asOf: string): RoomOccupancy {
+  if (roomOccupants(data, room.id, asOf).length > 0) return 'OCCUPIED'
+  return room.status === 'maintenance' ? 'UNDER_REPAIR' : 'AVAILABLE'
+}
+
+export function selectRoomSummary(data: PrototypeAppState, asOf: string) {
+  const states = data.rooms.map(room => roomOccupancy(data, room, asOf))
+  return {
+    totalRooms: data.rooms.length,
+    occupiedRooms: states.filter(status => status === 'OCCUPIED').length,
+    availableRooms: states.filter(status => status === 'AVAILABLE').length,
+    maintenanceRooms: states.filter(status => status === 'UNDER_REPAIR').length,
+  }
 }
 
 export function chargePaid(data: PrototypeAppState, chargeId: string, asOf: string): number {
@@ -44,8 +62,6 @@ export function tenantAccount(data: PrototypeAppState, tenantId: string, asOf: s
 
 /** Billing-period charges and cash received during that period are distinct. */
 export function selectSummary(data: PrototypeAppState, asOf: string, periodId?: string) {
-  const assignments = activeAssignments(data, asOf)
-  const capacity = data.rooms.filter(r => r.status === 'available').reduce((sum, r) => sum + r.capacity, 0)
   const charges = issuedCharges(data, asOf, periodId)
   const billed = charges.reduce((sum, c) => sum + c.amountCents, 0)
   const applied = charges.reduce((sum, c) => sum + chargePaid(data, c.id, asOf), 0)
@@ -54,8 +70,7 @@ export function selectSummary(data: PrototypeAppState, asOf: string, periodId?: 
     && (!period || (p.paidOn >= period.startDate && p.paidOn <= period.endDate))).reduce((sum, p) => sum + p.amountCents, 0)
   return {
     tenants: data.tenants.filter(t => t.status === 'ACTIVE').length,
-    capacity, occupiedBeds: assignments.length, availableBeds: capacity - assignments.length,
-    occupancy: capacity ? Math.round(assignments.length / capacity * 100) : 0,
+    ...selectRoomSummary(data, asOf),
     billed, applied, received, outstanding: billed - applied,
     credit: data.tenantCredits.reduce((sum, c) => sum + creditRemaining(data, c, asOf), 0),
     overdue: charges.filter(c => c.dueDate < asOf && chargeBalance(data, c, asOf) > 0).length,

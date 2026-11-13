@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Search, ArrowUpRight } from 'lucide-react'
-import { PageHeader } from '@/components/shared/page'
+import { Search } from 'lucide-react'
+import { PageHeader, PreviewNotice } from '@/components/shared/page'
 import { DataTable } from '@/components/shared/data-table'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { WorkflowPlaceholders } from '@/components/shared/workflow-placeholders'
@@ -11,6 +11,7 @@ import { usePrototype } from '@/hooks/use-prototype'
 import { activeAssignments, tenantAccount } from '@/domain/calculations/summary'
 import { DEMO_DATE } from '@/data/fixtures/demo'
 import { formatDate, formatMoney } from '@/lib/format'
+import { ACCOUNT_STATUS_LABELS, TENANT_STATUS_LABELS } from '@/lib/labels'
 import type { Tenant } from '@/domain/types/models'
 
 function TenantDetails({ tenant, onClose }: { tenant: Tenant; onClose: () => void }) {
@@ -20,20 +21,20 @@ function TenantDetails({ tenant, onClose }: { tenant: Tenant; onClose: () => voi
   const assignments = data.roomAssignments.filter(a => a.tenantId === tenant.id)
 
   return <Dialog open onOpenChange={open => { if (!open) onClose() }}><DialogContent className="max-h-[85dvh] overflow-y-auto">
-    <DialogHeader className="pr-6"><DialogTitle>{tenant.name}</DialogTitle><DialogDescription>Fictional tenant profile · {tenant.id}</DialogDescription></DialogHeader>
-    <dl className="grid grid-cols-2 gap-4 rounded-lg border bg-muted/40 p-4 text-sm">
-      <div><dt className="text-muted-foreground">Tenant status</dt><dd className="mt-2"><StatusBadge status={tenant.status === 'ACTIVE' ? 'Active' : 'Moved out'} /></dd></div>
-      <div><dt className="text-muted-foreground">Account status</dt><dd className="mt-2"><StatusBadge status={account.status} /></dd></div>
-      <div><dt className="text-muted-foreground">Outstanding charges</dt><dd className="mt-1">{formatMoney(account.balance)}</dd></div>
-      <div><dt className="text-muted-foreground">Unapplied credit</dt><dd className="mt-1">{formatMoney(account.credit)}</dd></div>
-      <div className="col-span-2 min-w-0"><dt className="text-muted-foreground">Fictional contact information</dt><dd className="mt-1 break-all">{tenant.email}</dd><dd className="mt-1 break-words">{tenant.phone}</dd><dd className="mt-1 leading-relaxed">{tenant.address}</dd></div>
+    <DialogHeader className="pr-6"><DialogTitle>{tenant.name}</DialogTitle><DialogDescription>Tenant details · Sample record</DialogDescription></DialogHeader>
+    <dl className="grid gap-5 rounded-lg border bg-muted/40 p-4 text-base sm:grid-cols-2">
+      <div><dt className="text-muted-foreground">Tenant status</dt><dd className="mt-2"><StatusBadge status={TENANT_STATUS_LABELS[tenant.status]} /></dd></div>
+      <div><dt className="text-muted-foreground">Payments</dt><dd className="mt-2"><StatusBadge status={ACCOUNT_STATUS_LABELS[account.status] ?? account.status} /></dd></div>
+      <div><dt className="text-muted-foreground">Still to pay</dt><dd className="mt-1 text-xl font-semibold">{formatMoney(account.balance)}</dd></div>
+      <div><dt className="text-muted-foreground">Advance payment</dt><dd className="mt-1 text-xl font-semibold">{formatMoney(account.credit)}</dd></div>
+      <div className="min-w-0 sm:col-span-2"><dt className="text-muted-foreground">Contact details</dt><dd className="mt-2 break-all">{tenant.email}</dd><dd className="mt-1 break-words">{tenant.phone}</dd><dd className="mt-2 leading-relaxed">{tenant.address}</dd></div>
     </dl>
-    <section><h2 className="mb-2 text-sm font-semibold">Room assignment history</h2><ul className="space-y-3">{assignments.map(a => <li key={a.id} className="rounded-lg border p-3 text-sm"><p className="font-medium">Room {data.rooms.find(r => r.id === a.roomId)?.name} · Agreed rent {formatMoney(a.agreedRentCents)}</p><p className="mt-1 text-xs text-muted-foreground">{formatDate(a.startDate)} – {a.endDate ? formatDate(a.endDate) : 'Current assignment'}</p></li>)}</ul></section>
+    <section><h2 className="mb-3 text-lg font-semibold">Rooms rented</h2><ul className="space-y-3">{assignments.map(a => <li key={a.id} className="rounded-lg border p-4 text-base"><p className="font-semibold">Room {data.rooms.find(r => r.id === a.roomId)?.name}</p><p className="mt-2">Agreed rent: {formatMoney(a.agreedRentCents)}</p><p className="mt-2 text-sm text-muted-foreground">{formatDate(a.startDate)} – {a.endDate ? formatDate(a.endDate) : 'Still renting'}</p></li>)}</ul></section>
     <form onSubmit={event => { event.preventDefault(); dispatch({ type: 'tenant/noteUpdated', tenantId: tenant.id, notes }); onClose() }}>
-      <label htmlFor="tenant-notes" className="text-sm font-medium">Demo notes</label><p id="notes-help" className="mt-1 text-xs leading-relaxed text-muted-foreground">The only editable profile field in this foundation. Use fictional information; saved in this browser.</p>
-      <textarea id="tenant-notes" aria-describedby="notes-help" value={notes} onChange={event => setNotes(event.target.value)} maxLength={500} rows={3} className="mt-3 w-full resize-y rounded-md border bg-card p-3 text-sm" placeholder="For example: prefers email reminders." />
-      <p className="mt-1 text-right text-xs text-muted-foreground">{notes.length}/500</p>
-      <DialogFooter className="mt-5"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">Save demo note</Button></DialogFooter>
+      <label htmlFor="tenant-notes" className="text-base font-semibold">Notes</label><p id="notes-help" className="mt-2 text-sm text-muted-foreground">Write a short reminder. Try this using sample information.</p>
+      <textarea id="tenant-notes" aria-describedby="notes-help" value={notes} onChange={e => setNotes(e.target.value)} maxLength={500} rows={3} className="mt-3 w-full resize-y rounded-lg border bg-card p-4 text-base" placeholder="For example: prefers a text reminder." />
+      <p className="mt-1 text-right text-sm text-muted-foreground">{notes.length} / 500 characters</p>
+      <DialogFooter className="mt-5"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">Save note</Button></DialogFooter>
     </form>
   </DialogContent></Dialog>
 }
@@ -49,20 +50,20 @@ export default function Tenants() {
   const tenants = data.tenants.filter(t => `${t.name} ${t.email} ${roomName(t.id) ?? ''}`.toLowerCase().includes(query))
 
   return <>
-    <PageHeader title="Tenants" description="A fictional directory with active and moved-out residents, assignment history, and account visibility." />
-    <div className="mb-5 flex flex-wrap items-center justify-between gap-4"><div className="relative w-full sm:max-w-sm"><label htmlFor="tenant-search" className="sr-only">Search tenants</label><Search className="pointer-events-none absolute top-3.5 left-3 size-4 text-muted-foreground" aria-hidden="true" /><Input id="tenant-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, email, or current room…" className="h-11 bg-card pl-9" type="search" /></div><p className="text-sm text-muted-foreground" role="status">{tenants.length} of {data.tenants.length} fictional tenants</p></div>
-    <DataTable rows={tenants} caption="Fictional tenant directory" columns={[
-      { key: 'name', label: 'Tenant', render: t => <div><p className="font-medium">{t.name}</p><p className="mt-1 text-xs text-muted-foreground">{t.email}</p></div> },
-      { key: 'room', label: 'Current assignment', render: t => roomName(t.id) ? `Room ${roomName(t.id)}` : 'No current assignment' },
-      { key: 'status', label: 'Tenant status', render: t => <StatusBadge status={t.status === 'ACTIVE' ? 'Active' : 'Moved out'} /> },
-      { key: 'account', label: 'Tenant account', render: t => { const a = tenantAccount(data, t.id, DEMO_DATE); return <div><StatusBadge status={a.status} /><p className="mt-1 text-xs">Balance {formatMoney(a.balance)} · Credit {formatMoney(a.credit)}</p></div> } },
-      { key: 'notes', label: 'Notes', render: t => <span className="text-xs text-muted-foreground">{t.notes ? 'Demo note saved' : 'No notes yet'}</span> },
-      { key: 'actions', label: 'Profile', render: t => <Button variant="ghost" size="sm" onClick={() => setSelectedId(t.id)} aria-label={`View ${t.name}`}>View <ArrowUpRight /></Button> },
+    <PageHeader title="Tenants" description="Find a tenant, check their room, or see what they still need to pay." />
+    <PreviewNotice>You can open a tenant’s details and try saving a note.</PreviewNotice>
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-4"><div className="w-full sm:max-w-md"><label htmlFor="tenant-search" className="mb-2 block text-base font-semibold">Find a tenant</label><div className="relative"><Search className="pointer-events-none absolute top-4 left-4 size-5 text-muted-foreground" aria-hidden="true" /><Input id="tenant-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Type a name or room number" className="h-14 bg-card pl-12 text-base" type="search" /></div></div><p className="text-sm text-muted-foreground" role="status">Showing {tenants.length} of {data.tenants.length} tenants</p></div>
+    <DataTable rows={tenants} caption="Tenant list" columns={[
+      { key: 'name', label: 'Tenant', render: t => <div><p className="font-semibold">{t.name}</p>{t.notes && <p className="mt-2 text-sm text-muted-foreground">Note saved</p>}</div> },
+      { key: 'room', label: 'Room', render: t => roomName(t.id) ? `Room ${roomName(t.id)}` : 'No room rented now' },
+      { key: 'status', label: 'Tenant status', render: t => <StatusBadge status={TENANT_STATUS_LABELS[t.status]} /> },
+      { key: 'balance', label: 'Still to pay', render: t => { const a = tenantAccount(data, t.id, DEMO_DATE); return <div><p className="font-semibold">{formatMoney(a.balance)}</p><div className="mt-2"><StatusBadge status={ACCOUNT_STATUS_LABELS[a.status] ?? a.status} /></div>{a.credit > 0 && <p className="mt-2 text-sm">Advance: {formatMoney(a.credit)}</p>}</div> } },
+      { key: 'actions', label: 'Details', render: t => <Button variant="outline" onClick={() => setSelectedId(t.id)} aria-label={`View ${t.name}`}>View details</Button> },
     ]} />
-    {search && <Button variant="link" onClick={() => setSearch('')} className="mt-3">Clear search</Button>}
-    <WorkflowPlaceholders items={[
-      { title: 'Tenant creation and editing', description: 'Full tenant CRUD and move-out workflows belong to the next milestone.' },
-      { title: 'Room assignment and tenant status changes', description: 'Assignment and status history are shown read-only. Transfers and status changes are not implemented.' },
+    {search && <Button variant="outline" onClick={() => setSearch('')} className="mt-4">Clear search</Button>}
+    <WorkflowPlaceholders title="More tenant tools" items={[
+      { title: 'Add or update a tenant', description: 'Adding tenants and changing their details will be available later.' },
+      { title: 'Move a tenant to another room', description: 'Changing rooms and recording a move-out will be added later.' },
     ]} />
     {selected && <TenantDetails key={selected.id} tenant={selected} onClose={() => setSelectedId(null)} />}
   </>

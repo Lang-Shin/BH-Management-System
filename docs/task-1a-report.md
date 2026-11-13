@@ -1,5 +1,7 @@
 # TASK 1A final implementation report
 
+> Historical verification snapshot. The later Halili BH landlord-focused UI revision changes the wording, typography, and occupancy to count whole rooms rather than beds. See [landlord UI notes](landlord-ui.md) for the current behavior and checks. The dependency inventory and earlier command outcomes below remain a record of that milestone.
+
 **Milestone 1: PASS — prototype foundation ready for owner review.**
 
 | Gate | Result |

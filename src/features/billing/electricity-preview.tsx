@@ -5,26 +5,24 @@ import { formatDate, formatMoney } from '@/lib/format'
 
 export function ElectricityPreview({ data, periodId }: { data: PrototypeAppState; periodId: string }) {
   const charge = data.charges.find(c => c.category === 'ELECTRICITY' && c.billingPeriodId === periodId && c.state === 'ISSUED')
-  return <section className="mt-7" aria-labelledby="electricity-foundation"><h2 id="electricity-foundation" className="mb-4 text-lg font-semibold">Electricity reading and rate foundations</h2>
-    <div className="grid gap-5 xl:grid-cols-2"><Card className="shadow-none"><CardHeader><CardTitle>Issued sample charge snapshot</CardTitle><CardDescription>Ownership and shared-room allocation remain unconfirmed.</CardDescription></CardHeader><CardContent>
-      {charge?.category === 'ELECTRICITY' ? <><dl className="grid grid-cols-2 gap-4 text-sm">{[
+  return <details className="mt-7 rounded-xl border bg-card p-5 sm:p-6"><summary className="min-h-12 cursor-pointer py-2 text-lg font-semibold">View electricity readings and prices</summary>
+    <div className="mt-5 grid gap-5 2xl:grid-cols-2"><Card className="shadow-none"><CardHeader><CardTitle>Electricity bill</CardTitle><CardDescription>See how this sample amount was worked out.</CardDescription></CardHeader><CardContent>
+      {charge?.category === 'ELECTRICITY' ? <><dl className="grid gap-5 text-base sm:grid-cols-2">{[
+        ['Tenant', data.tenants.find(t => t.id === charge.tenantId)?.name],
         ['Meter', data.electricityMeters.find(m => m.id === charge.electricity.meterId)?.label],
-        ['Tenant example', data.tenants.find(t => t.id === charge.tenantId)?.name],
-        ['Previous confirmed reading', `${charge.electricity.previousReadingMilliKwh / 1000} kWh`],
-        ['Current confirmed reading', `${charge.electricity.currentReadingMilliKwh / 1000} kWh`],
-        ['Consumption', `${charge.electricity.consumptionMilliKwh / 1000} kWh`],
-        ['Applied rate', `${formatMoney(charge.electricity.appliedRateCentsPerKwh)} / kWh`],
-        ['Rate effective date', formatDate(charge.electricity.appliedRateEffectiveFrom)],
-        ['Issued charge', formatMoney(charge.amountCents)],
-      ].map(([label, value]) => <div key={label}><dt className="text-muted-foreground">{label}</dt><dd className="mt-1 font-medium">{value}</dd></div>)}</dl><p className="mt-5 text-sm leading-relaxed text-muted-foreground">({charge.electricity.currentReadingMilliKwh / 1000} − {charge.electricity.previousReadingMilliKwh / 1000}) kWh × {formatMoney(charge.electricity.appliedRateCentsPerKwh)} = {formatMoney(charge.amountCents)}. This basis is stored on the charge, not recalculated from the latest rate.</p></> : <p className="text-sm text-muted-foreground">No applicable electricity charge in this sample period.</p>}
+        ['Last reading', `${charge.electricity.previousReadingMilliKwh / 1000} kWh`],
+        ['New reading', `${charge.electricity.currentReadingMilliKwh / 1000} kWh`],
+        ['Electricity used', `${charge.electricity.consumptionMilliKwh / 1000} kWh`],
+        ['Price per kWh', formatMoney(charge.electricity.appliedRateCentsPerKwh)],
+        ['Price started on', formatDate(charge.electricity.appliedRateEffectiveFrom)],
+        ['Amount to pay', formatMoney(charge.amountCents)],
+      ].map(([label, value]) => <div key={label}><dt className="text-muted-foreground">{label}</dt><dd className="mt-2 font-semibold">{value}</dd></div>)}</dl><p className="mt-6 text-base">{charge.electricity.consumptionMilliKwh / 1000} kWh × {formatMoney(charge.electricity.appliedRateCentsPerKwh)} = <strong>{formatMoney(charge.amountCents)}</strong></p><p className="mt-3 text-sm text-muted-foreground">Changing the price later will not change this bill.</p></> : <p className="text-base text-muted-foreground">There is no electricity bill for this month.</p>}
     </CardContent></Card>
-    <Card className="shadow-none"><CardHeader><CardTitle>Sample rate history</CardTitle><CardDescription>Separate effective-dated records; later rates do not rewrite history.</CardDescription></CardHeader><CardContent><dl className="space-y-4 text-sm">{data.electricityRates.map(rate => <div key={rate.id} className="rounded-lg bg-muted p-3"><dt className="font-medium">{formatMoney(rate.rateCentsPerKwh)} / kWh · {formatDate(rate.effectiveFrom)}</dt><dd className="mt-1 text-muted-foreground">{rate.label}</dd></div>)}</dl><p className="mt-4 text-sm leading-relaxed text-muted-foreground">The future workflow will retrieve the previous confirmed reading before accepting a current reading. Meter entry, authorized corrections, and fractional-consumption rounding rules are not implemented.</p></CardContent></Card></div>
-    <h3 className="mt-5 mb-3 font-semibold">Sample confirmed reading history</h3><DataTable rows={data.meterReadings} caption="Fictional electricity meter reading history" columns={[
+    <Card className="shadow-none"><CardHeader><CardTitle>Electricity prices</CardTitle><CardDescription>Each price has its own starting date.</CardDescription></CardHeader><CardContent><dl className="space-y-4 text-base">{data.electricityRates.map(rate => <div key={rate.id} className="rounded-lg bg-muted p-4"><dt className="font-semibold">{formatMoney(rate.rateCentsPerKwh)} per kWh</dt><dd className="mt-2 text-sm text-muted-foreground">Starting {formatDate(rate.effectiveFrom)}</dd></div>)}</dl><p className="mt-5 text-sm text-muted-foreground">Who uses each meter and how shared electricity is divided still need to be agreed.</p></CardContent></Card></div>
+    <h2 className="mt-6 mb-4 text-xl font-semibold">Past meter readings</h2><DataTable rows={data.meterReadings} caption="Past meter readings" columns={[
       { key: 'meter', label: 'Meter', render: r => data.electricityMeters.find(m => m.id === r.meterId)?.label },
-      { key: 'date', label: 'Reading date', render: r => formatDate(r.readOn) },
+      { key: 'date', label: 'Date', render: r => formatDate(r.readOn) },
       { key: 'reading', label: 'Reading', render: r => `${r.readingMilliKwh / 1000} kWh` },
-      { key: 'state', label: 'State', render: r => r.status },
-      { key: 'actor', label: 'Confirmed by (demo)', render: r => r.confirmedBy ?? 'Not confirmed' },
     ]} />
-  </section>
+  </details>
 }

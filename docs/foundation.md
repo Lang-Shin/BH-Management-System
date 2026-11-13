@@ -20,7 +20,7 @@ The application was initialized directly in the repository. The original README 
 
 Context with `useReducer` is sufficient for a 30-tenant demonstration. State-changing actions are limited to tenant notes, empty-room maintenance, and reset. Search terms, filters, dialog selections, and navigation state are ephemeral component state rather than persisted domain data.
 
-`domain/calculations/summary.ts` derives usable capacity, dated occupancy, category balances/statuses, credit remaining, and collection totals from shared records. Date-sensitive calculations take an explicit ISO reporting date. Charges billed for a period, payments allocated to those charges, and cash received during that period’s dates are deliberately distinct measures. No financial transition actions exist. An occupied room cannot be set to maintenance; the reducer enforces this even if a future UI dispatches an invalid action.
+`domain/calculations/summary.ts` derives dated occupied/available/under-repair room counts, category balances/statuses, credit remaining, and collection totals from shared records. One or more current tenants make a room occupied regardless of bed count. Date-sensitive calculations take an explicit ISO reporting date. Charges billed for a period, payments allocated to those charges, and cash received during that period’s dates remain distinct measures, presented in plain English. No financial transition actions exist. An occupied room cannot be set to maintenance; the reducer enforces this even if a future UI dispatches an invalid action.
 
 ### Feature ownership and dependency direction
 
@@ -36,7 +36,7 @@ Feature pages depend on the state hook and domain functions; the provider depend
 
 ### Treat localStorage as untrusted input
 
-`data/repositories/local-storage-repository.ts` owns browser storage access and the storage key. `data/repositories/prototype-storage.ts` owns the schema version and a pure, non-throwing snapshot parser. It delegates runtime validation to `domain/validation/prototype-data.ts`, which checks field shapes, literal values, dates, unique IDs, references, room capacity, and payment totals. The adapter validates before writing as well as on load, preserving the last saved value when a proposed state is invalid. The single type assertion follows explicit field validation; no unchecked JSON is exposed to components.
+`data/repositories/local-storage-repository.ts` owns browser storage access and the storage key. `data/repositories/prototype-storage.ts` owns the schema version and a pure, non-throwing snapshot parser. It delegates runtime validation to `domain/validation/prototype-data.ts`, which checks field shapes, literal values, dates, unique IDs, references, assignment overlap, occupied-room repair restrictions, and payment totals. Bed counts are informational and are no longer a tenant-count restriction. The adapter validates before writing as well as on load, preserving the last saved value when a proposed state is invalid. The single type assertion follows explicit field validation; no unchecked JSON is exposed to components.
 
 Invalid data falls back to fixtures without automatically overwriting the original saved value. Reset explicitly permits replacing it. Both reads and writes catch storage exceptions. This is prototype persistence, not a production data store. The expanded model uses schema version 2 under the retained `bhms:prototype:v1` key. Version 1 and other incompatible envelopes show the recovery message and are not automatically migrated or overwritten.
 
@@ -50,16 +50,16 @@ The repository instance is selected in `app/providers/app-providers.tsx` and rem
 
 Shared page, table, empty, loading, error, status-badge, and statistic components establish patterns for later modules. Tables have captions, header scopes, focusable scrolling regions, and contained horizontal overflow. The navigation drawer and dialogs use shadcn/Radix keyboard handling and focus management. Route changes update the document title and move focus to main content. `lib/format.ts` centralizes PHP formatting and UTC date-only formatting; `domain/validation/date.ts` is shared by formatting and stored-data validation. Invalid dates are labeled instead of silently normalized, and fractional/non-finite/unsafe centavo inputs are rejected by currency formatting.
 
-The application uses its full name, **Boarding House Management System**, alongside **BHMS**. The demo administrator label explicitly describes a display-only identity. Primary navigation, regular buttons, and dialog/drawer close controls provide 44px touch targets. Supporting text uses a minimum 12px size, with 14px text for primary reading content. The desktop sidebar scrolls on shorter viewports, and long header destinations truncate within the available mobile space. The palette is neutral with one restrained green accent; status colors communicate state. No charts, gradients, or decorative illustrations were introduced.
+The current branding is **Halili BH**, with **BHMS** under the name beside the logo. The landlord-focused revision uses 17px primary text, 16px supporting text, and 14px small labels, with regular buttons at least 48px high and navigation links at least 56px high. The desktop sidebar scrolls on shorter viewports. On phones, each table row becomes one stacked, labeled record without duplicating the controls. The palette is neutral with a restrained green accent; every status includes text. No decorative charts or illustrations were introduced. Advanced details and unfinished tools are collapsed, and sample reset is in Reports & Settings instead of the header.
 
 Tailwind 4 uses its Vite plugin and CSS-first theme. There is no Tailwind 3 configuration. shadcn/ui components are generated local source, with `cn` imports pointing to the project's own `lib/utils.ts`. Root and app TypeScript aliases match Vite and `components.json` so future component additions resolve under `src/`.
 
 ### Intentional demonstration assumptions
 
-- Six destinations are Dashboard, Tenants, Rooms, Billing, Payments & Receipts, and Reports & Settings. Existing `/payments` and `/reports` URLs remain stable. Receipt generation is described as future scope; settings show read-only demo defaults rather than introducing configuration workflows.
-- Fictional property name: Maple House; display currency: PHP.
+- Six destinations are Home, Tenants, Rooms, Bills, Payments & Receipts, and Reports & Settings. All route URLs remain stable. Receipt generation is future scope; settings show read-only defaults rather than introducing configuration workflows.
+- Property branding: Halili BH. The demonstration tenant and financial records remain fictional; display currency: PHP.
 - Fixed sample date: November 13, 2026, keeping overdue/upcoming examples deterministic.
-- There are 10 fictional tenants (9 active and 1 moved out), 6 rooms, 2 sample billing periods, 23 category charges, and 10 sample payments. Occupancy initially uses 9 of 11 usable beds, with 2 additional beds under maintenance.
+- There are 10 fictional tenants (9 active and 1 moved out), 6 rooms, 2 sample billing periods, 23 category charges, and 10 sample payments. Room totals initially show 4 occupied, 1 available, and 1 under repair. Bed counts do not affect these totals.
 - Rent agreements are PHP 3,500 for active sample assignments and PHP 3,000 for the moved-out historical assignment. These are agreed sample amounts, not a permanent monthly/per-bed policy.
 - November charges total PHP 33,086.00, with PHP 16,300.00 allocated and PHP 16,786.00 outstanding. November cash received is PHP 20,044.00, including prior-period collections and an unapplied PHP 500.00 advance.
 - Water charges and the optional washing machine charge are manual examples. Electricity readings and effective-dated rates are historical fixtures; no meter ownership or shared-room allocation policy has been implemented.
@@ -73,7 +73,7 @@ Completed on the implementation environment:
 
 - `npm run build`: passed, including strict TypeScript compilation and production bundling.
 - `npm run lint`: passed with zero warnings.
-- `npm test`: **67 tests passed** across six suites. Tests cover state/persistence, application/sidebar/mobile navigation, currency/date formatting, reporting-date rules, occupancy boundaries, independent category payment status, credit/receipt/assignment consistency, applied-rate preservation, authorized reading history, safe snapshot parsing, refused invalid writes, asynchronous repository injection, serialized saves, and load/save failure handling.
+- The TASK 1A test run passed 67 tests; the landlord-focused UI revision adds whole-room occupancy and simplified-navigation coverage. Latest results are recorded in [landlord UI notes](landlord-ui.md).
 - `npm audit --omit=dev`: zero runtime dependency vulnerabilities at implementation time.
 - Full dependency audit reported 10 moderate development-tooling advisories related to transitive `minimatch` versions in ESLint/typescript-eslint. No forced major-version updates or unverified overrides were applied. Recheck these when updating tooling.
 - Headless Chromium smoke test at widths **320, 390, 768, 1366, and 1920 pixels**: all six routes rendered with no page-level horizontal overflow. Mobile/tablet drawer navigation passed.

@@ -1,41 +1,35 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Building2, Menu, RotateCcw, FlaskConical, CircleAlert, ArrowUpRight } from 'lucide-react'
+import { Building2, Menu, CircleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog'
 import { usePrototype } from '@/hooks/use-prototype'
 import { cn } from '@/lib/utils'
 import { LoadingState } from '@/components/shared/states'
 import { navigation } from '@/app/router/navigation'
 
 function Brand() {
-  return <div className="flex items-start gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white"><Building2 className="size-6" aria-hidden="true" /></div><div className="min-w-0"><p className="text-lg font-bold tracking-tight">BHMS</p><p className="mt-1 text-sm leading-snug text-muted-foreground">Boarding House Management System</p></div></div>
+  return <div className="flex items-center gap-3"><div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary text-white"><Building2 className="size-7" aria-hidden="true" /></div><div className="min-w-0"><p className="text-xl font-bold tracking-tight">Halili BH</p><p className="text-sm text-muted-foreground">BHMS</p></div></div>
 }
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   return <div className="flex h-full flex-col px-5 py-7">
     <Brand />
-    <div className="mt-9 rounded-xl border bg-muted/60 px-3 py-3"><p className="text-sm font-semibold">Halili BH</p></div>
-    <p className="mt-8 mb-3 px-3 text-xs font-semibold tracking-wider text-muted-foreground uppercase">Workspace</p>
-    <nav aria-label="Main navigation" className="space-y-1.5">{navigation.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} onClick={onNavigate} className={({ isActive }) => cn('flex min-h-11 items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors', isActive ? 'bg-primary text-white shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-primary')}><Icon className="size-[18px]" aria-hidden="true" />{label}</NavLink>)}</nav>
-    <div className="mt-auto pt-8"><p className="text-center text-xs text-muted-foreground">Admin prototype · Phase 1</p></div>
+    <p className="mt-9 mb-3 px-3 text-sm font-medium text-muted-foreground">Menu</p>
+    <nav aria-label="Main navigation" className="space-y-2">{navigation.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} onClick={onNavigate} className={({ isActive }) => cn('flex min-h-14 items-center gap-3 rounded-xl px-3 py-3 text-base font-semibold transition-colors', isActive ? 'bg-primary text-white' : 'text-foreground hover:bg-accent hover:text-primary')}><Icon className="size-5 shrink-0" aria-hidden="true" />{label}</NavLink>)}</nav>
   </div>
 }
 
 export function AdminShell() {
   const [menuOpen, setMenuOpen] = useState(false)
-  const [resetOpen, setResetOpen] = useState(false)
-  const [notice, setNotice] = useState('')
-  const { dispatch, storageWarning } = usePrototype()
+  const { storageWarning } = usePrototype()
   const location = useLocation()
   const mainRef = useRef<HTMLElement>(null)
   const previousPath = useRef(location.pathname)
   const active = navigation.find(item => item.to === location.pathname)
 
   useEffect(() => {
-    document.title = `${active?.label ?? 'Page not found'} · BHMS prototype`
+    document.title = `${active?.label ?? 'Page not found'} · Halili BH`
     if (previousPath.current !== location.pathname) {
       mainRef.current?.focus()
       window.scrollTo(0, 0)
@@ -45,23 +39,19 @@ export function AdminShell() {
 
   return <div className="min-h-dvh">
     <a href="#main-content" className="sr-only fixed top-3 left-3 z-50 rounded-md bg-primary p-3 text-white focus:not-sr-only">Skip to content</a>
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 overflow-y-auto border-r bg-card lg:block"><SidebarContent /></aside>
-    <div className="min-w-0 lg:pl-64">
-      <header className="sticky top-0 z-20 flex min-h-20 items-center justify-between gap-3 border-b bg-card/95 px-4 backdrop-blur-sm sm:px-8">
+    <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 overflow-y-auto border-r bg-card lg:block"><SidebarContent /></aside>
+    <div className="min-w-0 lg:pl-72">
+      <header className="sticky top-0 z-20 flex min-h-20 items-center justify-between gap-3 border-b bg-card px-4 sm:px-8">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <Sheet open={menuOpen} onOpenChange={setMenuOpen}><SheetTrigger asChild><Button variant="ghost" size="icon" className="lg:hidden" aria-label="Open navigation"><Menu /></Button></SheetTrigger><SheetContent side="left" className="w-72 max-w-[90vw] gap-0 overflow-y-auto p-0"><SheetHeader className="sr-only"><SheetTitle>Admin navigation</SheetTitle><SheetDescription>Navigate between BHMS modules.</SheetDescription></SheetHeader><SidebarContent onNavigate={() => setMenuOpen(false)} /></SheetContent></Sheet>
-          <div className="min-w-0"><p className="truncate text-sm text-muted-foreground"><span className="hidden sm:inline">Workspace <span aria-hidden="true" className="px-2">/</span> </span><span className="text-foreground">{active?.label ?? 'Not found'}</span></p><p className="mt-1 hidden text-xs text-muted-foreground sm:block">BHMS · Demo workspace</p></div>
+          <Sheet open={menuOpen} onOpenChange={setMenuOpen}><SheetTrigger asChild><Button variant="outline" className="lg:hidden" aria-label="Open menu"><Menu />Menu</Button></SheetTrigger><SheetContent side="left" className="w-80 max-w-[95vw] gap-0 overflow-y-auto p-0"><SheetHeader className="sr-only"><SheetTitle>Main menu</SheetTitle><SheetDescription>Choose Home, Tenants, Rooms, Bills, Payments, or Reports and Settings.</SheetDescription></SheetHeader><SidebarContent onNavigate={() => setMenuOpen(false)} /></SheetContent></Sheet>
+          <div className="min-w-0"><p className="truncate text-base font-semibold">{active?.label ?? 'Page not found'}</p><p className="text-sm text-muted-foreground lg:hidden">Halili BH</p></div>
         </div>
-        <div className="flex shrink-0 items-center gap-2 sm:gap-3"><Badge variant="outline" className="hidden gap-1.5 border-primary/20 bg-accent py-1.5 text-primary sm:inline-flex"><FlaskConical className="size-3" aria-hidden="true" />Prototype</Badge>
-          <Dialog open={resetOpen} onOpenChange={setResetOpen}><DialogTrigger asChild><Button variant="ghost" size="sm" aria-label="Reset demo"><RotateCcw /><span className="hidden md:inline">Reset demo</span></Button></DialogTrigger><DialogContent><DialogHeader><DialogTitle>Reset the demo workspace?</DialogTitle><DialogDescription>This replaces saved demo notes and room status changes with the original fictional sample data.</DialogDescription></DialogHeader><DialogFooter><DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose><Button onClick={() => { dispatch({ type: 'demo/reset' }); setResetOpen(false); setNotice('Demo workspace reset to the original sample data.'); }}>Reset demo</Button></DialogFooter></DialogContent></Dialog>
-          <div className="flex items-center gap-2"><span className="flex size-9 shrink-0 items-center justify-center rounded-full border bg-secondary text-xs font-semibold" aria-hidden="true">DA</span><span className="sr-only xl:not-sr-only xl:text-sm">Demo administrator<span className="sr-only"> · Display only, no authentication</span></span></div>
-        </div>
+        <p className="hidden shrink-0 text-sm text-muted-foreground sm:block">Sample records</p>
       </header>
       <main id="main-content" ref={mainRef} tabIndex={-1} className="mx-auto max-w-[1600px] p-4 outline-none sm:p-8 lg:p-9">
-        <div role="status" className="sr-only">{notice}</div>
-        {storageWarning && <div role="alert" className="mb-6 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950"><CircleAlert className="mt-0.5 size-5 shrink-0" aria-hidden="true" /><p>{storageWarning}</p></div>}
+        {storageWarning && <div role="alert" className="mb-6 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-base text-amber-950"><CircleAlert className="mt-0.5 size-6 shrink-0" aria-hidden="true" /><div><p>{storageWarning}</p><NavLink to="/reports" className="mt-3 inline-flex min-h-12 items-center font-semibold underline">Open Reports &amp; Settings</NavLink></div></div>}
         <Suspense fallback={<LoadingState />}><Outlet /></Suspense>
-        <footer className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t pt-5 text-sm text-muted-foreground"><p>Boarding House Management System · Prototype</p><NavLink to="/dashboard" className="flex min-h-11 items-center gap-1 hover:text-primary">Demo overview <ArrowUpRight className="size-4" aria-hidden="true" /></NavLink></footer>
+        <footer className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t pt-5 text-sm text-muted-foreground"><p>Halili BH · BHMS</p><NavLink to="/dashboard" className="flex min-h-12 items-center font-medium hover:text-primary">Back to Home</NavLink></footer>
       </main>
     </div>
   </div>

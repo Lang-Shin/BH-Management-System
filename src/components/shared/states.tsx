@@ -8,11 +8,11 @@ export function EmptyState({ title = 'No results found', description = 'Try anot
 }
 
 export function LoadingState() {
-  return <div role="status" aria-label="Loading module" className="space-y-6"><span className="sr-only">Loading module…</span><Skeleton className="h-9 w-52" /><Skeleton className="h-5 w-3/4" /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-36" />)}</div><Skeleton className="h-72 w-full" /></div>
+  return <div role="status" aria-label="Opening records" className="space-y-6"><p className="text-base font-medium">Please wait, opening your records…</p><Skeleton className="h-5 w-3/4" /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-36" />)}</div><Skeleton className="h-72 w-full" /></div>
 }
 
-export function ErrorState({ title = 'Something went wrong', description = 'This module could not be displayed. Reload the application to try again.', onRetry }: { title?: string; description?: string; onRetry: () => void }) {
-  return <div role="alert" className="rounded-xl border bg-card px-6 py-14 text-center"><CircleAlert className="mx-auto mb-4 size-9 text-destructive" aria-hidden="true" /><h1 className="text-xl font-semibold">{title}</h1><p className="mx-auto my-4 max-w-md text-sm text-muted-foreground">{description}</p><Button onClick={onRetry}>Reload application</Button></div>
+export function ErrorState({ title = 'This page could not be opened', description = 'Please try opening the page again. Your saved records have not been changed.', onRetry }: { title?: string; description?: string; onRetry: () => void }) {
+  return <div role="alert" className="rounded-xl border bg-card px-6 py-14 text-center"><CircleAlert className="mx-auto mb-4 size-9 text-destructive" aria-hidden="true" /><h1 className="text-2xl font-semibold">{title}</h1><p className="mx-auto my-5 max-w-md text-base text-muted-foreground">{description}</p><Button onClick={onRetry}>Try again</Button></div>
 }
 
 export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {

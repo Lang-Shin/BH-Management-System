@@ -10,7 +10,7 @@ describe('shared fictional financial model', () => {
   it('starts with consistent references, allocations, credits, and November summaries', () => {
     const data = createDemoData()
     expect(isPrototypeData(data)).toBe(true)
-    expect(selectSummary(data, DEMO_DATE, DEMO_PERIOD)).toEqual({ tenants: 9, capacity: 11, occupiedBeds: 9, availableBeds: 2, occupancy: 82,
+    expect(selectSummary(data, DEMO_DATE, DEMO_PERIOD)).toEqual({ tenants: 9, totalRooms: 6, occupiedRooms: 4, availableRooms: 1, maintenanceRooms: 1,
       billed: 3_308_600, applied: 1_630_000, received: 2_004_400, outstanding: 1_678_600, credit: 50_000, overdue: 2, paid: 7, partial: 2, unpaid: 11 })
     const received = data.payments.reduce((sum, p) => sum + p.amountCents, 0)
     const allocated = data.paymentAllocations.reduce((sum, a) => sum + a.amountCents, 0)
@@ -61,7 +61,7 @@ describe('shared fictional financial model', () => {
     { name: 'orphan assignment', change: d => { d.roomAssignments[0]!.roomId = 'missing' } },
     { name: 'duplicate IDs', change: d => { d.rooms[1]!.id = 'room-1' } },
     { name: 'impossible date', change: d => { d.roomAssignments[0]!.startDate = '2026-02-30' } },
-    { name: 'over-capacity room', change: d => { d.rooms[0]!.capacity = 1 } },
+    { name: 'occupied room marked under repair', change: d => { d.rooms[0]!.status = 'maintenance' } },
     { name: 'fractional currency', change: d => { d.payments[0]!.amountCents = 1.5 } },
     { name: 'negative currency', change: d => { d.charges[0]!.amountCents = -1 } },
     { name: 'charge over-allocation', change: d => { d.paymentAllocations[0]!.amountCents = 500_000 } },
@@ -111,7 +111,7 @@ describe('prototype reducer and persistence', () => {
     const data = createDemoData()
     expect(prototypeReducer(data, { type: 'room/statusToggled', roomId: 'room-1' })).toBe(data)
     const changed = prototypeReducer(data, { type: 'room/statusToggled', roomId: 'room-6' })
-    expect(selectSummary(changed, DEMO_DATE).capacity).toBe(13)
+    expect(selectSummary(changed, DEMO_DATE)).toMatchObject({ totalRooms: 6, occupiedRooms: 4, availableRooms: 2, maintenanceRooms: 0 })
     expect(isPrototypeData(changed)).toBe(true)
     const historicalRoom = prototypeReducer(data, { type: 'room/statusToggled', roomId: 'room-5' })
     expect(isPrototypeData(historicalRoom)).toBe(true)
@@ -124,7 +124,7 @@ describe('prototype reducer and persistence', () => {
     const loaded = await localStorageRepository.load()
     expect(loaded.data).toEqual(createDemoData())
     expect(loaded.canPersist).toBe(false)
-    expect(loaded.warning).toContain('could not be loaded')
+    expect(loaded.warning).toContain('could not be opened')
     expect(localStorage.getItem(STORAGE_KEY)).toBe(raw)
   })
 
@@ -132,6 +132,6 @@ describe('prototype reducer and persistence', () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new DOMException('Denied', 'SecurityError') })
     expect((await localStorageRepository.load()).canPersist).toBe(false)
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('Full', 'QuotaExceededError') })
-    expect(await localStorageRepository.save(createDemoData())).toContain('unavailable or full')
+    expect(await localStorageRepository.save(createDemoData())).toContain('could not be saved in this browser')
   })
 })

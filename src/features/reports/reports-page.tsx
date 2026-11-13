@@ -3,48 +3,59 @@ import { PageHeader, PreviewNotice, StatCard } from '@/components/shared/page'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { DataTable } from '@/components/shared/data-table'
 import { WorkflowPlaceholders } from '@/components/shared/workflow-placeholders'
+import { ResetDemoButton } from '@/components/shared/reset-demo-button'
 import { usePrototype } from '@/hooks/use-prototype'
 import { selectSummary } from '@/domain/calculations/summary'
 import { DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
 import { formatDate, formatMoney } from '@/lib/format'
+import type { AuditEvent } from '@/domain/types/models'
+
+const changeLabels: Record<AuditEvent['action'], string> = {
+  DEMO_SEEDED: 'Sample records added', READING_CORRECTED: 'Meter reading corrected', CHARGE_CORRECTED: 'Bill corrected',
+  PAYMENT_CORRECTED: 'Payment corrected', ALLOCATION_REVERSED: 'Payment removed from a bill',
+}
 
 export default function Reports() {
-  const { data } = usePrototype()
+  const { data, storageWarning } = usePrototype()
   const summary = selectSummary(data, DEMO_DATE, DEMO_PERIOD)
   const periods = data.billingPeriods.map(period => ({ ...period, summary: selectSummary(data, DEMO_DATE, period.id) }))
   const currentRate = [...data.electricityRates].filter(r => r.effectiveFrom <= DEMO_DATE).sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0]
 
   return <>
-    <PageHeader title="Reports & Settings" description="Sample collection reports, unconfirmed billing policies, audit visibility, and clearly scoped export and recovery foundations." />
-    <PreviewNotice>Reports are derived from shared fictional records as of {formatDate(DEMO_DATE)}. They are not profit reports or accounting statements. Settings are read-only.</PreviewNotice>
-    <section className="grid gap-4 sm:grid-cols-3" aria-label="Sample report summary"><StatCard label="November cash received" value={formatMoney(summary.received)} detail="Received during the sample date range" icon={Wallet} /><StatCard label="Applied to November charges" value={formatMoney(summary.applied)} detail="Allocations against this period’s issued charges" icon={ReceiptText} /><StatCard label="November outstanding" value={formatMoney(summary.outstanding)} detail="Billed less allocated; credit remains separate" icon={CircleAlert} /></section>
-    <section className="mt-7" aria-labelledby="monthly-reports"><h2 id="monthly-reports" className="mb-2 text-lg font-semibold">Monthly collection report foundations</h2><p className="mb-4 text-sm leading-relaxed text-muted-foreground">Sample calendar months illustrate reporting only. “Received in date range” includes advances and payments for earlier periods; “Applied to period charges” tracks the selected charges regardless of payment month.</p><DataTable rows={periods} caption="Fictional collection report by sample period" columns={[
-      { key: 'period', label: 'Sample period', render: p => p.label },
-      { key: 'billed', label: 'Period charges', render: p => formatMoney(p.summary.billed) },
-      { key: 'received', label: 'Received in date range', render: p => formatMoney(p.summary.received) },
-      { key: 'applied', label: 'Applied to period charges', render: p => formatMoney(p.summary.applied) },
-      { key: 'balance', label: 'Period outstanding', render: p => formatMoney(p.summary.outstanding) },
+    <PageHeader title="Reports & Settings" description="See your monthly totals and find the house settings." />
+    <PreviewNotice>The amounts shown here are for trying the app, not your actual earnings.</PreviewNotice>
+    <section className="grid gap-5 xl:grid-cols-3" aria-label="Monthly money overview">
+      <StatCard label="Money received" value={formatMoney(summary.received)} detail="All payments received in November." icon={Wallet} />
+      <StatCard label="Already paid" value={formatMoney(summary.applied)} detail="Paid toward November’s bills." icon={ReceiptText} />
+      <StatCard label="Still to pay" value={formatMoney(summary.outstanding)} detail="What tenants still owe for November." icon={CircleAlert} />
+    </section>
+    <section className="mt-8" aria-labelledby="monthly-reports"><h2 id="monthly-reports" className="mb-2 text-xl font-semibold">Monthly summary</h2><p className="mb-5 text-base text-muted-foreground">Money received may include payments for older bills or money paid in advance.</p><DataTable rows={periods} caption="Monthly summary" columns={[
+      { key: 'period', label: 'Month', render: p => p.label },
+      { key: 'billed', label: 'Total bills', render: p => formatMoney(p.summary.billed) },
+      { key: 'applied', label: 'Paid for these bills', render: p => formatMoney(p.summary.applied) },
+      { key: 'balance', label: 'Still to pay', render: p => formatMoney(p.summary.outstanding) },
+      { key: 'received', label: 'Money received', render: p => formatMoney(p.summary.received) },
     ]} /></section>
-    <Card className="mt-7 shadow-none"><CardHeader><CardTitle>Billing settings foundations</CardTitle><CardDescription>Confirmed entry methods and policies awaiting landlord confirmation.</CardDescription></CardHeader><CardContent><dl className="grid gap-5 text-sm sm:grid-cols-2 lg:grid-cols-3">{[
-      ['Currency', 'PHP · amounts stored in integer centavos'],
-      ['Rent', 'Agreed amount preserved on each issued rent charge'],
-      ['Billing-cycle policy', 'Unconfirmed · sample periods are illustrative'],
-      ['Electricity rate example', currentRate ? `${formatMoney(currentRate.rateCentsPerKwh)} / kWh, effective ${formatDate(currentRate.effectiveFrom)}` : 'No effective sample rate'],
-      ['Meter ownership / shared allocation', 'Both unconfirmed · no allocation rule is assumed'],
-      ['Water and washing machine', 'Manually entered per tenant; washing charge optional'],
-    ].map(([label, value]) => <div key={label}><dt className="text-muted-foreground">{label}</dt><dd className="mt-1 leading-relaxed font-medium">{value}</dd></div>)}</dl></CardContent></Card>
-    <section className="mt-7" aria-labelledby="audit-log"><h2 id="audit-log" className="mb-2 text-lg font-semibold">Admin audit log foundation</h2><p className="mb-4 text-sm text-muted-foreground">Read-only seeded events. The demo actor label is not authenticated; production authorization and correction workflows are not implemented.</p><DataTable rows={data.auditEvents} caption="Fictional administrator audit events" columns={[
-      { key: 'date', label: 'Date', render: a => formatDate(a.occurredOn) },
-      { key: 'actor', label: 'Demo actor', render: a => a.actorId },
-      { key: 'action', label: 'Action', render: a => a.action },
-      { key: 'entity', label: 'Entity', render: a => a.entityId },
-      { key: 'reason', label: 'Reason', render: a => <span className="inline-block max-w-sm whitespace-normal leading-relaxed">{a.reason}</span> },
-    ]} /></section>
-    <WorkflowPlaceholders title="Reporting and recovery foundations" items={[
-      { title: 'Export records', description: 'CSV/PDF export, export history, and scope selection are prototype placeholders. No file export is performed.' },
-      { title: 'Billing settings editing', description: 'Rate configuration, billing-cycle decisions, and allocation settings require confirmed requirements before implementation.' },
-      { title: 'Admin audit log and authorized corrections', description: 'Future audit events must retain actor references, reasons, dates, and before/after snapshots. The seeded event is not a production audit trail.' },
-      { title: 'Backup and recovery', description: 'Backup export, restore, scheduling, and integrity checks are not implemented. Browser localStorage is demo persistence, not a backup. Reset demo only restores the original fixtures.' },
+    <Card className="mt-8 shadow-none"><CardHeader><CardTitle>House settings</CardTitle><CardDescription>You can view these settings. Changing them will be added later.</CardDescription></CardHeader><CardContent><dl className="grid gap-6 text-base sm:grid-cols-2">{[
+      ['Currency', 'Philippine peso (₱)'],
+      ['Rent', 'Based on the agreed rent for each tenant'],
+      ['When rent is due', 'To be confirmed'],
+      ['Electricity price', currentRate ? `${formatMoney(currentRate.rateCentsPerKwh)} per kWh, starting ${formatDate(currentRate.effectiveFrom)}` : 'No price set'],
+      ['Sharing the electricity bill', 'Who uses each meter and how to share the bill still need to be agreed'],
+      ['Water and washing', 'Water amounts are entered by hand. Washing is an optional extra bill.'],
+    ].map(([label, value]) => <div key={label}><dt className="text-muted-foreground">{label}</dt><dd className="mt-2 leading-relaxed font-medium">{value}</dd></div>)}</dl></CardContent></Card>
+    <details open={Boolean(storageWarning)} className="mt-7 rounded-xl border bg-card p-5 sm:p-6"><summary className="min-h-12 cursor-pointer py-2 text-lg font-semibold">More settings and sample records</summary>
+      <section className="mt-5" aria-labelledby="sample-records"><h2 id="sample-records" className="mb-3 text-xl font-semibold">Start again with sample records</h2><p className="mb-5 max-w-2xl text-base text-muted-foreground">Restore the original sample records and remove your saved notes and room changes. This is only for trying the app.</p><ResetDemoButton /></section>
+      <section className="mt-7" aria-labelledby="audit-log"><h2 id="audit-log" className="mb-3 text-xl font-semibold">Record of changes</h2><DataTable rows={data.auditEvents} caption="Record of changes" columns={[
+        { key: 'date', label: 'Date', render: a => formatDate(a.occurredOn) },
+        { key: 'action', label: 'What changed', render: a => changeLabels[a.action] },
+        { key: 'reason', label: 'Note', render: a => <span className="inline-block max-w-sm whitespace-normal leading-relaxed">{a.action === 'DEMO_SEEDED' ? 'Sample records were added so you can try the screens.' : a.reason}</span> },
+      ]} /></section>
+      <p className="mt-5 text-sm text-muted-foreground">Your changes are saved only in this browser. This is not a backup.</p>
+    </details>
+    <WorkflowPlaceholders title="More report tools" items={[
+      { title: 'Print or save a report', description: 'Downloading or printing reports will be available later.' },
+      { title: 'Save a backup', description: 'Making a backup copy and bringing back saved records will be added later.' },
     ]} />
   </>
 }

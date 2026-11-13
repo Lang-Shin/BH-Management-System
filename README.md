@@ -29,10 +29,10 @@ npm run preview    # Serve the built application locally
 
 | Route | Foundation capability |
 | --- | --- |
-| `/dashboard` | Financial overview, category payment status, recent payments, upcoming due dates, occupancy |
+| `/dashboard` | Home: simple money totals, bill payments, recent payments, upcoming bills, and room counts |
 | `/tenants` | Search, fictional profiles, assignment history, tenant/account statuses, demo notes |
-| `/rooms` | Shared/private room directory, dated occupancy, configuration preview, empty-room maintenance toggle |
-| `/billing` | Period selection, rent/electricity/water/optional washing charges, category status matrix, due dates, meter/rate history |
+| `/rooms` | Occupied, available, and under-repair rooms; current tenants; bed counts for information only |
+| `/billing` | Bills: choose a month, see who has paid, check due dates, and view electricity details |
 | `/payments` | Read-only payment allocations, partial-payment examples, advance credit, sample receipt snapshots |
 | `/reports` | Sample monthly collection reports, billing policies, audit log, export/backup/recovery placeholders |
 
@@ -40,16 +40,17 @@ npm run preview    # Serve the built application locally
 - Responsive cards and horizontally scrollable data tables.
 - Top header, active-route links, document titles, keyboard focus styles, skip link, dialogs, and status announcements.
 - Lazy-loaded modules with a shared loading skeleton, reusable empty/error UI, rendering error boundary, and unknown-route fallback.
-- Header **Reset demo** action restores the fictional dataset after confirmation.
-- Application identity: **Boarding House Management System (BHMS)**. The demo administrator is a display label with no authentication.
+- **Restore sample records** is under **Reports & Settings → More settings and sample records**. It requires confirmation and replaces only the sample dataset.
+- Branding: **Halili BH**, with **BHMS** below the logo text. The interface uses the SF Pro font stack with system fallbacks. No authentication is implemented.
+- Larger text and controls, plain-English titles, and stacked phone records make everyday screens easier to read. See the [landlord UI notes](docs/landlord-ui.md).
 
 ### Demo data and persistence
 
-**Maple House** and all records are fictional: **10 tenants** (9 active, 1 moved out), **6 rooms**, 2 sample billing periods, 23 category charges, 10 payments, explicit allocations, an advance credit, and sample receipt references. Emails use `example.com`; phone strings are deliberately non-dialable demo numbers, and addresses use fictional Demo City locations. The snapshot is **November 13, 2026**, and amounts use **PHP with two decimal places**.
+The app is branded **Halili BH**. Its demonstration records are fictional: **10 tenants** (9 active, 1 moved out), **6 rooms**, 2 sample billing periods, 23 category charges, 10 payments, explicit allocations, an advance credit, and sample receipt references. Emails use `example.com`; phone strings are deliberately non-dialable demo numbers, and addresses use fictional Demo City locations. The snapshot is **November 13, 2026**, and amounts use **PHP with two decimal places**.
 
-Initially there are 13 total beds, 11 usable beds, 9 occupied, and 2 available. Shared rooms include full and partially occupied examples; one private room is empty after a tenant moved out, and another room is under maintenance. Changing an empty room’s maintenance status updates occupancy without removing assignment history. Notes are limited to 500 characters.
+Occupancy is **room-based, not bed-based**. The sample starts with **4 occupied / 6 rooms**, **1 available**, and **1 under repair**. A room rented by one person is occupied even if it has three beds. Only an empty room that is not under repair is available. Bed counts are reference information and do not limit rental records or determine availability. Changing an empty room’s repair status updates the shared room totals without removing history. Notes are limited to 500 characters.
 
-State is shared through React Context and `useReducer`, and persisted in `localStorage` under the existing key **`bhms:prototype:v1`**, now with **schema version 2** in its envelope. The key is retained so older snapshots are detected rather than silently abandoned. Version 1 snapshots are preserved and show a recovery message; use **Reset demo** to explicitly replace them. A reusable snapshot parser rejects malformed JSON, unsupported versions, and invalid records. Runtime validation checks shapes, references, currency precision, occupancy, charge/payment allocation limits, credits, receipts, and correction links. Validation also runs before saving: invalid state cannot replace the last valid saved snapshot. Storage failures preserve the current in-memory session and show a warning.
+State is shared through React Context and `useReducer`, and persisted in `localStorage` under the existing key **`bhms:prototype:v1`**, now with **schema version 2** in its envelope. The key is retained so older snapshots are detected rather than silently abandoned. Version 1 snapshots are preserved and show a recovery message; use **Restore sample records** in Reports & Settings to explicitly replace them. A reusable snapshot parser rejects malformed JSON, unsupported versions, and invalid records. Runtime validation checks shapes, references, currency precision, occupancy, charge/payment allocation limits, credits, receipts, and correction links. Validation also runs before saving: invalid state cannot replace the last valid saved snapshot. Storage failures preserve the current in-memory session and show a warning.
 
 **November sample totals:** PHP 33,086.00 billed, PHP 16,300.00 explicitly applied to those charges, and PHP 16,786.00 outstanding. PHP 20,044.00 was received during November, including PHP 3,244.00 against October charges and PHP 500.00 in unapplied advance credit. These are distinct measures derived from the same shared records.
 
@@ -101,4 +102,4 @@ src/
 
 Feature pages use `usePrototype()` and domain calculations; they do not access repositories or browser storage. The asynchronous repository is injected in `src/app/providers/app-providers.tsx`, providing a single replacement point for a future API adapter. Domain code is independent of React and fixtures; import-boundary rules are checked by ESLint.
 
-See [foundation notes](docs/foundation.md) for the repository inspection and architecture decisions, and the [TASK 1A final report](docs/task-1a-report.md) for exact dependencies, command outcomes, browser verification, remaining limitations, and owner-review status.
+See [foundation notes](docs/foundation.md) for architecture, [landlord UI notes](docs/landlord-ui.md) for the latest wording and room rules, and the archived [TASK 1A final report](docs/task-1a-report.md) for the earlier milestone’s dependency inventory and verification record.

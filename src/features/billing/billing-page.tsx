@@ -21,28 +21,28 @@ export default function Billing() {
   const charges = issuedCharges(data, DEMO_DATE, periodId).filter(c => !outstandingOnly || chargeBalance(data, c, DEMO_DATE) > 0)
 
   return <>
-    <PageHeader title="Billing" description="Read-only fictional charges by category and billing period. Each category has its own balance, due date, and allocation history." />
-    <PreviewNotice>Sample periods and due dates illustrate the UI; the actual billing-cycle policy is unconfirmed. No bills can be generated or issued here.</PreviewNotice>
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-4"><div><label htmlFor="billing-period" className="mb-2 block text-sm font-medium">Billing period</label><select id="billing-period" value={periodId} onChange={e => setPeriodId(e.target.value)} className="h-11 max-w-full rounded-md border bg-card px-3 text-sm">{data.billingPeriods.map(p => <option key={p.id} value={p.id}>{p.label} · {p.status}</option>)}</select></div><Button variant={outstandingOnly ? 'secondary' : 'outline'} aria-pressed={outstandingOnly} onClick={() => setOutstandingOnly(v => !v)}>{outstandingOnly ? 'Show all charges' : 'Show outstanding only'}</Button></div>
-    <section className="mb-6 grid gap-4 sm:grid-cols-3" aria-label="Sample billing summary"><StatCard label="Issued charges" value={formatMoney(summary.billed)} detail="Selected sample billing period" icon={ReceiptText} /><StatCard label="Applied payments" value={formatMoney(summary.applied)} detail="Explicit allocations to these charges" icon={Wallet} /><StatCard label="Outstanding" value={formatMoney(summary.outstanding)} detail={`${summary.overdue} overdue charges as of ${formatDate(DEMO_DATE)}`} icon={CircleAlert} /></section>
-    <h2 className="mb-2 text-lg font-semibold">Billing status matrix</h2><p className="mb-4 text-sm leading-relaxed text-muted-foreground">“Not applicable” means no issued charge exists for that category in this sample period. It is distinct from an unpaid charge. No washing charge is assumed unless explicitly entered.</p>
+    <PageHeader title="Bills" description="Check rent, electricity, water, and washing payments in one place." />
+    <PreviewNotice>You can look through these bills. Creating and changing bills will be added later.</PreviewNotice>
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-4"><div className="max-w-full"><label htmlFor="billing-period" className="mb-2 block text-base font-semibold">Choose a month</label><select id="billing-period" value={periodId} onChange={e => setPeriodId(e.target.value)} className="min-h-14 max-w-full rounded-lg border bg-card px-4 py-3 text-base">{data.billingPeriods.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}</select></div><Button variant={outstandingOnly ? 'default' : 'outline'} aria-pressed={outstandingOnly} onClick={() => setOutstandingOnly(v => !v)}>{outstandingOnly ? 'Show all bills' : 'Show unpaid bills'}</Button></div>
+    <section className="mb-7 grid gap-5 xl:grid-cols-3" aria-label="Bills overview">
+      <StatCard label="Total bills" value={formatMoney(summary.billed)} detail="All bills for the month you chose." icon={ReceiptText} />
+      <StatCard label="Already paid" value={formatMoney(summary.applied)} detail="Payments used to pay these bills." icon={Wallet} />
+      <StatCard label="Still to pay" value={formatMoney(summary.outstanding)} detail={`${summary.overdue} bills are past their due date.`} icon={CircleAlert} />
+    </section>
+    <h2 className="mb-2 text-xl font-semibold">Who has paid?</h2><p className="mb-5 text-base text-muted-foreground">“No bill” means there is nothing to pay for that item.</p>
     <BillingStatusMatrix data={data} periodId={periodId} asOf={DEMO_DATE} outstandingOnly={outstandingOnly} />
-    <h2 className="mt-7 mb-4 text-lg font-semibold">Charge details and due dates</h2>
-    <DataTable rows={charges} caption="Fictional issued charge details" columns={[
-      { key: 'charge', label: 'Charge', render: c => <div><p className="font-medium">{CATEGORY_LABELS[c.category]}</p><p className="mt-1 text-xs text-muted-foreground">{c.id}</p></div> },
+    <details className="mt-7 rounded-xl border bg-card p-5 sm:p-6"><summary className="min-h-12 cursor-pointer py-2 text-lg font-semibold">View bill amounts and due dates</summary><div className="mt-5"><DataTable rows={charges} caption="Bill amounts and due dates" columns={[
       { key: 'tenant', label: 'Tenant', render: c => data.tenants.find(t => t.id === c.tenantId)?.name },
-      { key: 'amount', label: 'Issued amount', render: c => formatMoney(c.amountCents) },
-      { key: 'paid', label: 'Allocated', render: c => formatMoney(chargePaid(data, c.id, DEMO_DATE)) },
-      { key: 'balance', label: 'Outstanding', render: c => formatMoney(chargeBalance(data, c, DEMO_DATE)) },
-      { key: 'due', label: 'Due date', render: c => <div>{formatDate(c.dueDate)}{c.dueDate < DEMO_DATE && chargeBalance(data, c, DEMO_DATE) > 0 && <div className="mt-1"><StatusBadge status="Overdue" /></div>}</div> },
-      { key: 'status', label: 'Payment status', render: c => <StatusBadge status={CHARGE_STATUS_LABELS[chargeStatus(data, c, DEMO_DATE)]} /> },
-    ]} />
+      { key: 'bill', label: 'Bill for', render: c => CATEGORY_LABELS[c.category] },
+      { key: 'amount', label: 'Bill amount', render: c => formatMoney(c.amountCents) },
+      { key: 'paid', label: 'Paid', render: c => <div><p>{formatMoney(chargePaid(data, c.id, DEMO_DATE))}</p><div className="mt-2"><StatusBadge status={CHARGE_STATUS_LABELS[chargeStatus(data, c, DEMO_DATE)]} /></div></div> },
+      { key: 'balance', label: 'Still to pay', render: c => <span className="font-semibold">{formatMoney(chargeBalance(data, c, DEMO_DATE))}</span> },
+      { key: 'due', label: 'Pay by', render: c => <div>{formatDate(c.dueDate)}{c.dueDate < DEMO_DATE && chargeBalance(data, c, DEMO_DATE) > 0 && <div className="mt-2"><StatusBadge status="Late payment" /></div>}</div> },
+    ]} /></div></details>
     <ElectricityPreview data={data} periodId={periodId} />
-    <WorkflowPlaceholders title="Billing workflow foundations" items={[
-      { title: 'Rent and billing periods', description: 'Rent uses an agreed rental amount. The actual billing-cycle and proration policies remain unconfirmed; sample calendar periods are not a permanent rule.' },
-      { title: 'Water and washing machine entry', description: 'Both amounts will be entered manually per tenant. Washing machine charges are optional. No automatic water-meter calculation is planned.' },
-      { title: 'Meter readings and rate configuration', description: 'Current reading entry, previous-confirmed-reading lookup, and effective-dated rate changes are future workflows. Issued reading and rate snapshots must remain intact.' },
-      { title: 'Bill generation and authorized corrections', description: 'Issuance, corrections, and shared-room electricity allocation are not implemented. Ownership and allocation rules still require landlord confirmation.' },
+    <WorkflowPlaceholders title="More billing tools" items={[
+      { title: 'Make a new bill', description: 'Adding rent, electricity, water, and optional washing bills will be available later.' },
+      { title: 'Correct a bill', description: 'Corrections will keep a record of what changed and why. This tool is not available yet.' },
     ]} />
   </>
 }

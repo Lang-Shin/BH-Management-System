@@ -20,7 +20,7 @@ describe('repository injection boundary', () => {
       .mockImplementationOnce(() => new Promise(resolve => { finishFirstSave = resolve }))
       .mockResolvedValue(null)
     render(<PrototypeProvider repository={{ load, save }}><Consumer /></PrototypeProvider>)
-    expect(screen.getByRole('status', { name: 'Loading module' })).toBeInTheDocument()
+    expect(screen.getByRole('status', { name: 'Opening records' })).toBeInTheDocument()
     expect(save).not.toHaveBeenCalled()
     await act(async () => resolveLoad({ data: createDemoData(), warning: null, canPersist: true }))
     expect(await screen.findByText('10 residents loaded')).toBeInTheDocument()
@@ -39,8 +39,8 @@ describe('repository injection boundary', () => {
       save: vi.fn().mockResolvedValue(null),
     }
     render(<PrototypeProvider repository={repository}><Consumer /></PrototypeProvider>)
-    expect(await screen.findByRole('heading', { name: 'Workspace could not be loaded' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Reload application' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Your records could not be opened' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
     expect(repository.save).not.toHaveBeenCalled()
   })
 
@@ -51,6 +51,6 @@ describe('repository injection boundary', () => {
     }
     render(<PrototypeProvider repository={repository}><Consumer /></PrototypeProvider>)
     expect(await screen.findByText('10 residents loaded')).toBeInTheDocument()
-    expect(await screen.findByRole('alert')).toHaveTextContent('Demo changes could not be saved')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your changes could not be saved')
   })
 })

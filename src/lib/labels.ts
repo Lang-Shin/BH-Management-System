@@ -1,8 +1,16 @@
-import type { ChargeCategory, ChargeStatus } from '@/domain/types/models'
+import type { ChargeCategory, ChargeStatus, Tenant } from '@/domain/types/models'
 
 export const CATEGORY_LABELS: Record<ChargeCategory, string> = {
   RENT: 'Rent', ELECTRICITY: 'Electricity', WATER: 'Water', WASHING_MACHINE: 'Washing machine',
 }
 export const CHARGE_STATUS_LABELS: Record<ChargeStatus, string> = {
-  UNPAID: 'Unpaid', PARTIALLY_PAID: 'Partially paid', PAID: 'Paid',
+  UNPAID: 'Not yet paid', PARTIALLY_PAID: 'Partly paid', PAID: 'Paid',
+}
+
+export const ACCOUNT_STATUS_LABELS: Record<string, string> = {
+  Overdue: 'Late payment', Outstanding: 'Still to pay', 'Credit available': 'Paid in advance', Clear: 'Fully paid',
+}
+
+export const TENANT_STATUS_LABELS: Record<Tenant['status'], string> = {
+  ACTIVE: 'Current tenant', MOVED_OUT: 'Moved out',
 }

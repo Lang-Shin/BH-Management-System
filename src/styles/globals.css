@@ -3,6 +3,12 @@
 
 @theme inline {
   --font-sans: var(--app-font-family);
+  --text-xs: 0.875rem;
+  --text-xs--line-height: 1.5;
+  --text-sm: 1rem;
+  --text-sm--line-height: 1.6;
+  --text-base: 1.0625rem;
+  --text-base--line-height: 1.6;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -14,7 +20,7 @@
   --color-secondary: #edf3f1;
   --color-secondary-foreground: #244a43;
   --color-muted: #f0f3f2;
-  --color-muted-foreground: #5f706a;
+  --color-muted-foreground: #526159;
   --color-accent: #e7f2ed;
   --color-accent-foreground: #134e4a;
   --color-destructive: #b42335;
@@ -30,7 +36,7 @@
 :root {
   --app-font-family: "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif;
   font-family: var(--app-font-family);
-  --background: #f6f8f7;
+  --background: #f7f8f4;
   --foreground: #1a3029;
   --card: #ffffff;
   --primary: #136859;
@@ -40,6 +46,7 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
 }
 
 @layer base {
@@ -47,7 +54,7 @@
   body { @apply m-0 min-w-80; }
   button, a, input { -webkit-tap-highlight-color: transparent; }
   button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
-  :focus-visible { @apply outline-2 outline-offset-4 outline-ring; }
+  :focus-visible { @apply outline-3 outline-offset-4 outline-ring; }
   ::selection { @apply bg-primary/20; }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {

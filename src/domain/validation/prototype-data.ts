@@ -83,9 +83,8 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
   })) return false
   if (!data.roomAssignments.every(a => !data.roomAssignments.some(b => a.id !== b.id && a.tenantId === b.tenantId
     && a.startDate <= (b.endDate ?? '9999-12-31') && b.startDate <= (a.endDate ?? '9999-12-31')))) return false
-  if (!data.rooms.every(r => !(r.status === 'maintenance' && data.roomAssignments.some(a => a.roomId === r.id && a.endDate === null))
-    && data.roomAssignments.filter(a => a.roomId === r.id).every(a => data.roomAssignments.filter(b => b.roomId === r.id
-      && b.startDate <= a.startDate && (b.endDate === null || b.endDate >= a.startDate)).length <= r.capacity))) return false
+  // Bed counts are room information, not a rule for renting or availability.
+  if (!data.rooms.every(r => !(r.status === 'maintenance' && data.roomAssignments.some(a => a.roomId === r.id && a.endDate === null)))) return false
   if (!data.billingPeriods.every(p => p.startDate <= p.endDate)) return false
   if (!data.meterReadings.every(r => {
     const original = r.correction && data.meterReadings.find(o => o.id === r.correction?.supersedesId)
