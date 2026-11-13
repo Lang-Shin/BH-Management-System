@@ -33,14 +33,15 @@ npm run preview    # Serve the built application locally
 | `/tenants` | Search by name/email/room, open a profile, save a demo note |
 | `/rooms` | Filter rooms, view occupancy, toggle maintenance on empty rooms |
 | `/billing` | Read-only sample invoices with an outstanding-only filter |
-| `/payments` | Read-only sample payment register and method totals |
-| `/reports` | Derived property and sample collection summaries |
+| `/payments` | Payments & Receipts: sample register, method totals, and receipt scope |
+| `/reports` | Reports & Settings: derived summaries and read-only demo defaults |
 
 - Fixed desktop sidebar and accessible mobile/tablet navigation drawer.
 - Responsive cards and horizontally scrollable data tables.
 - Top header, active-route links, document titles, keyboard focus styles, skip link, dialogs, and status announcements.
 - Lazy-loaded modules with a shared loading skeleton, reusable empty/error UI, rendering error boundary, and unknown-route fallback.
 - Header **Reset demo** action restores the fictional dataset after confirmation.
+- Application identity: **Boarding House Management System (BHMS)**. The demo administrator is a display label with no authentication.
 
 ### Demo data and persistence
 
@@ -55,7 +56,7 @@ Use fictional information only. This is a single-browser, single-workspace proto
 ### Technology and organization
 
 - React 19, TypeScript 6 (strict mode), Vite 8.
-- Tailwind CSS 4 through `@tailwindcss/vite`; CSS-first theme in `src/index.css`.
+- Tailwind CSS 4 through `@tailwindcss/vite`; CSS-first theme in `src/styles/globals.css`.
 - shadcn/ui New York components, using Radix primitives, committed as local source.
 - React Router 7, Lucide React, Context + reducer.
 - Vitest 5, React Testing Library, ESLint.
@@ -64,19 +65,36 @@ Exact resolved versions are recorded in `package-lock.json`. Use `npm ci` for re
 
 ```text
 src/
+  app/
+    App.tsx             # Providers and route composition
+    providers/          # Repository injection, async load/save lifecycle
+    router/             # Routes, navigation metadata, unknown-route fallback
+    state/              # Context, action union, reducer
   components/
-    layout/             # Admin shell, navigation, header
+    layout/             # Responsive admin shell, sidebar, header
     shared/             # Page headers, stats, tables, badges, UI states
     ui/                 # Local shadcn/ui components
-  data/                 # Fictional fixture factory and fixed demo date
+  features/
+    dashboard/          # Dashboard module
+    tenants/            # Tenant directory and demo profile dialog
+    rooms/              # Room occupancy and maintenance interactions
+    billing/            # Sample billing preview
+    payments/           # Payments & Receipts preview
+    reports/            # Reports & Settings preview
+  domain/
+    types/              # Strict domain models
+    calculations/       # Pure balances, occupancy, and summary calculations
+    validation/         # Runtime data validation and relationship rules
+  data/
+    fixtures/           # Fictional fixture factory and fixed demo date
+    repositories/       # Async repository contract and localStorage adapter
+  hooks/                # Typed application-state access hook
   lib/                  # Formatting and class-name utilities
-  pages/                # Six module pages and unknown-route fallback
-  state/                # Context, reducer, selectors, persistence, state tests
-  test/                 # Test setup and app integration tests
-  types/                # Strict domain interfaces and action union
-  app.tsx               # Route composition
-  index.css             # Tailwind imports and theme tokens
-  main.tsx              # Application providers and root error boundary
+  styles/               # Tailwind imports, theme tokens, base styles
+  test/                 # Test setup and cross-layer integration tests
+  main.tsx              # React root and Strict Mode
 ```
+
+Feature pages use `usePrototype()` and domain calculations; they do not access repositories or browser storage. The asynchronous repository is injected in `src/app/providers/app-providers.tsx`, providing a single replacement point for a future API adapter. Domain code is independent of React and fixtures; import-boundary rules are checked by ESLint.
 
 See [foundation notes](docs/foundation.md) for the repository inspection, architecture decisions, verification results, and suggested next steps.

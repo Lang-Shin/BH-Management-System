@@ -4,14 +4,15 @@ import { PageHeader, PreviewNotice, StatCard } from '@/components/shared/page'
 import { DataTable } from '@/components/shared/data-table'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { Button } from '@/components/ui/button'
-import { usePrototype } from '@/state/prototype-context'
-import { invoiceBalance, invoiceStatus, invoiceTotal, selectSummary } from '@/state/selectors'
+import { usePrototype } from '@/hooks/use-prototype'
+import { invoiceBalance, invoiceStatus, invoiceTotal, selectSummary } from '@/domain/calculations/summary'
+import { DEMO_DATE } from '@/data/fixtures/demo'
 import { formatDate, formatMoney } from '@/lib/format'
 
 export default function Billing() {
   const { data } = usePrototype()
   const [outstandingOnly, setOutstandingOnly] = useState(false)
-  const summary = selectSummary(data)
+  const summary = selectSummary(data, DEMO_DATE)
   const invoices = outstandingOnly ? data.invoices.filter(invoice => invoiceBalance(data, invoice) > 0) : data.invoices
   return <>
     <PageHeader title="Billing" description="A first look at monthly billing visibility, using fictional November 2026 records." />
@@ -24,7 +25,7 @@ export default function Billing() {
       { key: 'due', label: 'Due date', render: invoice => formatDate(invoice.dueDate) },
       { key: 'total', label: 'Total', render: invoice => formatMoney(invoiceTotal(invoice)) },
       { key: 'balance', label: 'Balance', render: invoice => formatMoney(invoiceBalance(data, invoice)) },
-      { key: 'status', label: 'Status', render: invoice => <StatusBadge status={invoiceStatus(data, invoice)} /> },
+      { key: 'status', label: 'Status', render: invoice => <StatusBadge status={invoiceStatus(data, invoice, DEMO_DATE)} /> },
     ]} />
   </>
 }

@@ -1,8 +1,11 @@
-import { createDemoData } from '@/data/demo'
-import type { PrototypeAction, PrototypeData } from '@/types/domain'
+import { createDemoData } from '@/data/fixtures/demo'
+import type { PrototypeData } from '@/domain/types/models'
+import type { StateAction } from './actions'
 
-export function prototypeReducer(state: PrototypeData, action: PrototypeAction): PrototypeData {
+export function prototypeReducer(state: PrototypeData, action: StateAction): PrototypeData {
   switch (action.type) {
+    case 'data/loaded':
+      return action.data
     case 'tenant/noteUpdated':
       return {
         ...state,

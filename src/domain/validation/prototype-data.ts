@@ -1,11 +1,7 @@
-import { createDemoData } from '@/data/demo'
-import type { PrototypeData } from '@/types/domain'
-
-export const STORAGE_KEY = 'bhms:prototype:v1'
-const SCHEMA_VERSION = 1
+import type { PrototypeData } from '@/domain/types/models'
 
 type RecordValue = Record<string, unknown>
-const isRecord = (value: unknown): value is RecordValue =>
+export const isRecord = (value: unknown): value is RecordValue =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 const isText = (value: unknown): value is string => typeof value === 'string' && value.length <= 500
 const isId = (value: unknown): value is string => isText(value) && value.length > 0
@@ -43,37 +39,4 @@ export function isPrototypeData(value: unknown): value is PrototypeData {
   if (!data.payments.every(p => data.invoices.some(i => i.id === p.invoiceId))) return false
   return data.invoices.every(i => data.payments.filter(p => p.invoiceId === i.id)
     .reduce((sum, p) => sum + p.amountCents, 0) <= i.rentCents + i.utilitiesCents)
-}
-
-export interface LoadResult {
-  data: PrototypeData
-  warning: string | null
-  canPersist: boolean
-}
-
-export function loadPrototype(): LoadResult {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (raw === null) return { data: createDemoData(), warning: null, canPersist: true }
-    const parsed: unknown = JSON.parse(raw)
-    if (!isRecord(parsed) || parsed.version !== SCHEMA_VERSION || !isPrototypeData(parsed.data)) {
-      throw new Error('Invalid or unsupported saved demo')
-    }
-    return { data: parsed.data, warning: null, canPersist: true }
-  } catch {
-    return {
-      data: createDemoData(),
-      warning: 'Saved demo data could not be loaded. Fresh sample data is shown in memory. Reset the demo to replace saved data and retry persistence.',
-      canPersist: false,
-    }
-  }
-}
-
-export function savePrototype(data: PrototypeData): string | null {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: SCHEMA_VERSION, data }))
-    return null
-  } catch {
-    return 'Browser storage is unavailable or full. Changes work for this session but will not survive a reload. Reset the demo to retry.'
-  }
 }

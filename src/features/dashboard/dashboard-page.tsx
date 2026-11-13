@@ -5,13 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { EmptyState } from '@/components/shared/states'
-import { usePrototype } from '@/state/prototype-context'
-import { invoiceBalance, invoiceStatus, selectSummary } from '@/state/selectors'
+import { usePrototype } from '@/hooks/use-prototype'
+import { invoiceBalance, invoiceStatus, selectSummary } from '@/domain/calculations/summary'
+import { DEMO_DATE } from '@/data/fixtures/demo'
 import { formatMoney } from '@/lib/format'
 
 export default function Dashboard() {
   const { data } = usePrototype()
-  const summary = selectSummary(data)
+  const summary = selectSummary(data, DEMO_DATE)
   const outstanding = data.invoices.filter(invoice => invoiceBalance(data, invoice) > 0)
   return <>
     <PageHeader title="A clear view of your boarding house." description="Welcome to Maple House. Here’s a snapshot of the people, spaces, and sample records that keep it running." action={<Button variant="outline" asChild><Link to="/rooms"><DoorOpen />Explore rooms</Link></Button>} />
@@ -27,12 +28,12 @@ export default function Dashboard() {
         <div className="mt-3 flex justify-between text-xs text-muted-foreground"><span>{summary.tenants} occupied beds</span><span>{summary.availableBeds} available beds</span></div>
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">{data.rooms.map(room => {
           const count = data.tenants.filter(tenant => tenant.roomId === room.id).length
-          return <Link to="/rooms" key={room.id} className="rounded-lg border bg-muted/30 p-3 transition-colors hover:border-primary/50 hover:bg-accent"><DoorOpen className="mb-2 size-4 text-primary" aria-hidden="true" /><p className="text-sm font-semibold">Room {room.name}</p><p className="mt-1 text-[11px] text-muted-foreground">{room.status === 'maintenance' ? 'Maintenance' : `${count} / ${room.capacity} beds`}</p></Link>
+          return <Link to="/rooms" key={room.id} className="rounded-lg border bg-muted/30 p-3 transition-colors hover:border-primary/50 hover:bg-accent"><DoorOpen className="mb-2 size-4 text-primary" aria-hidden="true" /><p className="text-sm font-semibold">Room {room.name}</p><p className="mt-1 text-xs text-muted-foreground">{room.status === 'maintenance' ? 'Maintenance' : `${count} / ${room.capacity} beds`}</p></Link>
         })}</div>
         <p className="mt-5 text-xs leading-relaxed text-muted-foreground">30 beds in total. Rooms under maintenance are excluded from usable capacity.</p>
       </CardContent></Card>
       <Card className="shadow-none"><CardHeader><CardTitle>Balances to keep an eye on</CardTitle><CardDescription>Sample records as of November 13, 2026.</CardDescription></CardHeader><CardContent>
-        {outstanding.length === 0 ? <EmptyState title="All caught up" description="There are no outstanding sample balances." /> : <ul className="divide-y">{outstanding.map(invoice => <li key={invoice.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0"><div><p className="text-sm font-medium">{data.tenants.find(tenant => tenant.id === invoice.tenantId)?.name}</p><div className="mt-1.5"><StatusBadge status={invoiceStatus(data, invoice)} /></div></div><p className="text-sm font-semibold tabular-nums">{formatMoney(invoiceBalance(data, invoice))}</p></li>)}</ul>}
+        {outstanding.length === 0 ? <EmptyState title="All caught up" description="There are no outstanding sample balances." /> : <ul className="divide-y">{outstanding.map(invoice => <li key={invoice.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0"><div><p className="text-sm font-medium">{data.tenants.find(tenant => tenant.id === invoice.tenantId)?.name}</p><div className="mt-1.5"><StatusBadge status={invoiceStatus(data, invoice, DEMO_DATE)} /></div></div><p className="text-sm font-semibold tabular-nums">{formatMoney(invoiceBalance(data, invoice))}</p></li>)}</ul>}
         <Button variant="outline" className="mt-5 w-full" asChild><Link to="/billing">View sample billing <ArrowRight /></Link></Button>
       </CardContent></Card>
     </div>

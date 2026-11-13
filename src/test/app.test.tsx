@@ -2,12 +2,12 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
-import { App } from '@/app'
-import { PrototypeProvider } from '@/state/prototype-context'
-import { STORAGE_KEY } from '@/state/persistence'
+import { AppRouter } from '@/app/router/app-router'
+import { PrototypeProvider } from '@/app/providers/prototype-provider'
+import { localStorageRepository, STORAGE_KEY } from '@/data/repositories/local-storage-repository'
 
 function renderApp(route = '/') {
-  return render(<PrototypeProvider><MemoryRouter initialEntries={[route]}><App /></MemoryRouter></PrototypeProvider>)
+  return render(<PrototypeProvider repository={localStorageRepository}><MemoryRouter initialEntries={[route]}><AppRouter /></MemoryRouter></PrototypeProvider>)
 }
 
 describe('admin workspace integration', () => {
@@ -16,7 +16,7 @@ describe('admin workspace integration', () => {
     renderApp()
     expect(await screen.findByRole('heading', { name: 'A clear view of your boarding house.' })).toBeInTheDocument()
     const nav = screen.getByRole('navigation', { name: 'Main navigation' })
-    for (const title of ['Tenants', 'Rooms', 'Billing', 'Payments', 'Reports']) {
+    for (const title of ['Tenants', 'Rooms', 'Billing', 'Payments & Receipts', 'Reports & Settings']) {
       await user.click(within(nav).getByRole('link', { name: title }))
       expect(await screen.findByRole('heading', { level: 1, name: title })).toBeInTheDocument()
     }
@@ -54,7 +54,7 @@ describe('admin workspace integration', () => {
     localStorage.setItem(STORAGE_KEY, '{broken')
     const user = userEvent.setup()
     renderApp('/dashboard')
-    expect(screen.getByRole('alert')).toHaveTextContent('Saved demo data could not be loaded')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Saved demo data could not be loaded')
     expect(localStorage.getItem(STORAGE_KEY)).toBe('{broken')
     await user.click(screen.getByRole('button', { name: 'Reset demo' }))
     const dialog = screen.getByRole('dialog', { name: 'Reset the demo workspace?' })

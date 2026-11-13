@@ -40,8 +40,3 @@ export interface PrototypeData {
   invoices: Invoice[]
   payments: Payment[]
 }
-
-export type PrototypeAction =
-  | { type: 'tenant/noteUpdated'; tenantId: string; notes: string }
-  | { type: 'room/statusToggled'; roomId: string }
-  | { type: 'demo/reset' }

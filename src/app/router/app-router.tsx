@@ -1,16 +1,16 @@
 import { lazy } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AdminShell } from '@/components/layout/admin-shell'
-import { NotFound } from '@/pages/not-found'
+import { NotFound } from './not-found'
 
-const Dashboard = lazy(() => import('@/pages/dashboard'))
-const Tenants = lazy(() => import('@/pages/tenants'))
-const Rooms = lazy(() => import('@/pages/rooms'))
-const Billing = lazy(() => import('@/pages/billing'))
-const Payments = lazy(() => import('@/pages/payments'))
-const Reports = lazy(() => import('@/pages/reports'))
+const Dashboard = lazy(() => import('@/features/dashboard/dashboard-page'))
+const Tenants = lazy(() => import('@/features/tenants/tenants-page'))
+const Rooms = lazy(() => import('@/features/rooms/rooms-page'))
+const Billing = lazy(() => import('@/features/billing/billing-page'))
+const Payments = lazy(() => import('@/features/payments/payments-page'))
+const Reports = lazy(() => import('@/features/reports/reports-page'))
 
-export function App() {
+export function AppRouter() {
   return <Routes><Route element={<AdminShell />}>
     <Route index element={<Navigate to="/dashboard" replace />} />
     <Route path="dashboard" element={<Dashboard />} />

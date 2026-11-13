@@ -1,14 +1,14 @@
 import { Wallet, Banknote, Landmark } from 'lucide-react'
 import { PageHeader, PreviewNotice, StatCard } from '@/components/shared/page'
 import { DataTable } from '@/components/shared/data-table'
-import { usePrototype } from '@/state/prototype-context'
+import { usePrototype } from '@/hooks/use-prototype'
 import { formatDate, formatMoney } from '@/lib/format'
 
 export default function Payments() {
   const { data } = usePrototype()
   const total = (method?: 'cash' | 'bank-transfer') => data.payments.filter(payment => !method || payment.method === method).reduce((sum, payment) => sum + payment.amountCents, 0)
   return <>
-    <PageHeader title="Payments" description="A simple, readable view of what a future payment register could look like." />
+    <PageHeader title="Payments & Receipts" description="A simple, readable view of sample payments and the scope of a future receipt register." />
     <PreviewNotice>All payment records are fictional and read-only. Recording payments, issuing receipts, and payment gateway integration are outside this foundation milestone.</PreviewNotice>
     <section className="mb-7 grid gap-4 sm:grid-cols-3" aria-label="Sample payment summary"><StatCard label="Sample payments" value={formatMoney(total())} detail={`${data.payments.length} fictional records · November 2026`} icon={Wallet} /><StatCard label="Cash" value={formatMoney(total('cash'))} detail="Demonstration payment method" icon={Banknote} /><StatCard label="Bank transfer" value={formatMoney(total('bank-transfer'))} detail="Demonstration payment method" icon={Landmark} /></section>
     <h2 className="mb-4 font-semibold">Sample payment register</h2>

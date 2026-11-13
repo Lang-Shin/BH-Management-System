@@ -1,5 +1,4 @@
-import { DEMO_DATE } from '@/data/demo'
-import type { Invoice, PrototypeData } from '@/types/domain'
+import type { Invoice, PrototypeData } from '@/domain/types/models'
 
 export function invoiceTotal(invoice: Invoice): number {
   return invoice.rentCents + invoice.utilitiesCents
@@ -11,12 +10,12 @@ export function invoiceBalance(data: PrototypeData, invoice: Invoice): number {
   return Math.max(0, invoiceTotal(invoice) - paid)
 }
 
-export function invoiceStatus(data: PrototypeData, invoice: Invoice): 'Paid' | 'Overdue' | 'Upcoming' {
+export function invoiceStatus(data: PrototypeData, invoice: Invoice, asOf: string): 'Paid' | 'Overdue' | 'Upcoming' {
   if (invoiceBalance(data, invoice) === 0) return 'Paid'
-  return invoice.dueDate < DEMO_DATE ? 'Overdue' : 'Upcoming'
+  return invoice.dueDate < asOf ? 'Overdue' : 'Upcoming'
 }
 
-export function selectSummary(data: PrototypeData) {
+export function selectSummary(data: PrototypeData, asOf: string) {
   const capacity = data.rooms.filter(room => room.status === 'available')
     .reduce((total, room) => total + room.capacity, 0)
   const billed = data.invoices.reduce((sum, invoice) => sum + invoiceTotal(invoice), 0)
@@ -29,6 +28,6 @@ export function selectSummary(data: PrototypeData) {
     billed,
     collected: billed - outstanding,
     outstanding,
-    overdue: data.invoices.filter(invoice => invoiceStatus(data, invoice) === 'Overdue').length,
+    overdue: data.invoices.filter(invoice => invoiceStatus(data, invoice, asOf) === 'Overdue').length,
   }
 }

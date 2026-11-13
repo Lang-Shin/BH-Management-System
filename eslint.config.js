@@ -18,7 +18,26 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/components/ui/**/*.tsx', 'src/state/prototype-context.tsx'],
+    files: ['src/domain/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [{
+          group: ['@/app/*', '@/components/*', '@/data/*', '@/features/*', '@/hooks/*', 'react', 'react-dom*', 'lucide-react'],
+          message: 'Domain code must remain independent of UI, application state, and data adapters.',
+        }],
+      }],
+    },
+  },
+  {
+    files: ['src/features/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [{ group: ['@/data/repositories/*'], message: 'Use application state hooks; persistence belongs in the providers.' }],
+      }],
+    },
+  },
+  {
+    files: ['src/components/ui/**/*.tsx'],
     rules: { 'react-refresh/only-export-components': 'off' },
   },
 )

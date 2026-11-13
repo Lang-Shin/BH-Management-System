@@ -5,7 +5,7 @@ import { EmptyState } from '@/components/shared/states'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { usePrototype } from '@/state/prototype-context'
+import { usePrototype } from '@/hooks/use-prototype'
 import { formatMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -30,7 +30,7 @@ export default function Rooms() {
         <div className="my-5 flex items-center justify-between rounded-lg bg-muted/70 px-3 py-3 text-sm"><span className="flex items-center gap-2 text-muted-foreground"><Users className="size-4" aria-hidden="true" />Occupancy</span><span className="font-semibold">{tenants.length} / {room.capacity} beds</span></div>
         <p className="min-h-10 text-xs leading-relaxed text-muted-foreground">{room.status === 'maintenance' ? 'Not included in usable bed capacity.' : isEmpty ? 'Empty and ready for the next resident.' : tenants.map(tenant => tenant.name).join(' · ')}</p>
         <Button variant="outline" className="mt-5 w-full" disabled={!isEmpty} aria-label={`${room.status === 'maintenance' ? 'Make available' : 'Set maintenance'} for room ${room.name}`} onClick={() => { dispatch({ type: 'room/statusToggled', roomId: room.id }); setNotice(`Room ${room.name} ${room.status === 'maintenance' ? 'made available' : 'set to maintenance'}.`); }}>{room.status === 'maintenance' ? 'Make available' : 'Set maintenance'}</Button>
-        {!isEmpty && <p className="mt-2 text-center text-[11px] text-muted-foreground">Only empty rooms can change status.</p>}
+        {!isEmpty && <p className="mt-2 text-center text-xs text-muted-foreground">Only empty rooms can change status.</p>}
       </CardContent></Card>
     })}</div>}
   </>

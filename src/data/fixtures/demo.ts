@@ -1,4 +1,4 @@
-import type { PrototypeData } from '@/types/domain'
+import type { PrototypeData } from '@/domain/types/models'
 
 export const DEMO_DATE = '2026-11-13'
 export const DEMO_PERIOD = '2026-11'
