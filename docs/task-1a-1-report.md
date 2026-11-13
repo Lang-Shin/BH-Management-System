@@ -1,5 +1,11 @@
 # TASK 1A.1 — Modern admin UI and route transitions
 
+## Owner palette revision
+
+The owner subsequently replaced the original blue direction with a 60–30–10 palette: Oat Milk `#EEE5D4` for dominant surfaces, Forest Green `#1D4A35` for sidebar/headings/structural elements, and Tomato Red `#F2462E` for primary actions and small accents. Containers use a lighter oat tint (`#F8F3E9`) for separation. The proportions express visual hierarchy rather than literal pixel quotas. Tomato actions use dark text for contrast; sidebar secondary labels and focus rings use light tones. Existing semantic status colors remain recognizable.
+
+The palette revision passed build, lint, and the existing production Chromium browser checks across all six routes at 1440, 1024, 768, 390, and 360px, including axe WCAG A/AA scans, reduced motion, dialog checks, persistence, and restore interactions. Desktop/mobile Dashboard screenshots were inspected. The sections below record the original redesign and its initial blue palette.
+
 ## Status
 
 **PASS — implementation and verification complete; owner visual acceptance pending.**

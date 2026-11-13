@@ -7,7 +7,7 @@ Make day-to-day information easy to read and understand for a landlord with litt
 ## Everyday screens
 
 - Navigation uses **Dashboard**, **Tenants**, **Rooms**, **Billing**, **Payments & Receipts**, and **Reports & Settings**. The Dashboard page is titled **Overview**. Existing route URLs are unchanged.
-- TASK 1A.1 uses a compact 15px body, 14px supporting text, and 13px small labels. Regular buttons and navigation links are at least 48px high. A neutral blue-accented shell and rounded content panel replace the earlier green theme. Owner approval of the denser typography remains pending.
+- TASK 1A.1 uses a compact 15px body, 14px supporting text, and 13px small labels. Regular buttons and navigation links are at least 48px high. The owner-selected palette uses 60% Oat Milk (`#EEE5D4`), 30% Forest Green (`#1D4A35`), and 10% Tomato Red (`#F2462E`) as a visual hierarchy, rather than exact pixel quotas: warm backgrounds and lightly tinted containers, forest navigation/headings, and tomato action accents. Owner approval of the denser typography remains pending.
 - The header has a visible **Menu** button on phones. The sample reset tool and demo administrator avatar are removed from the daily header.
 - Phone tables become stacked, labeled records, so a tenant’s details can be read without swiping sideways. There is one semantic table and one set of controls rather than duplicated desktop/mobile forms.
 - Less-used details, electricity history, receipt lists, and future tools are collapsed behind descriptive labels.
