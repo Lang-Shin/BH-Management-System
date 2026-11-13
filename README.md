@@ -49,7 +49,7 @@ npm run preview    # Serve the built application locally
 
 Initially there are 13 total beds, 11 usable beds, 9 occupied, and 2 available. Shared rooms include full and partially occupied examples; one private room is empty after a tenant moved out, and another room is under maintenance. Changing an empty room’s maintenance status updates occupancy without removing assignment history. Notes are limited to 500 characters.
 
-State is shared through React Context and `useReducer`, and persisted in `localStorage` under the existing key **`bhms:prototype:v1`**, now with **schema version 2** in its envelope. The key is retained so older snapshots are detected rather than silently abandoned. Version 1 snapshots are preserved and show a recovery message; use **Reset demo** to explicitly replace them. Runtime validation checks shapes, references, currency precision, occupancy, charge/payment allocation limits, credits, receipts, and correction links. Storage failures preserve the current in-memory session and show a warning.
+State is shared through React Context and `useReducer`, and persisted in `localStorage` under the existing key **`bhms:prototype:v1`**, now with **schema version 2** in its envelope. The key is retained so older snapshots are detected rather than silently abandoned. Version 1 snapshots are preserved and show a recovery message; use **Reset demo** to explicitly replace them. A reusable snapshot parser rejects malformed JSON, unsupported versions, and invalid records. Runtime validation checks shapes, references, currency precision, occupancy, charge/payment allocation limits, credits, receipts, and correction links. Validation also runs before saving: invalid state cannot replace the last valid saved snapshot. Storage failures preserve the current in-memory session and show a warning.
 
 **November sample totals:** PHP 33,086.00 billed, PHP 16,300.00 explicitly applied to those charges, and PHP 16,786.00 outstanding. PHP 20,044.00 was received during November, including PHP 3,244.00 against October charges and PHP 500.00 in unapplied advance credit. These are distinct measures derived from the same shared records.
 
@@ -101,4 +101,4 @@ src/
 
 Feature pages use `usePrototype()` and domain calculations; they do not access repositories or browser storage. The asynchronous repository is injected in `src/app/providers/app-providers.tsx`, providing a single replacement point for a future API adapter. Domain code is independent of React and fixtures; import-boundary rules are checked by ESLint.
 
-See [foundation notes](docs/foundation.md) for the repository inspection, architecture decisions, verification results, and suggested next steps.
+See [foundation notes](docs/foundation.md) for the repository inspection and architecture decisions, and the [TASK 1A final report](docs/task-1a-report.md) for exact dependencies, command outcomes, browser verification, remaining limitations, and owner-review status.

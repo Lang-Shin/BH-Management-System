@@ -36,7 +36,7 @@ Feature pages depend on the state hook and domain functions; the provider depend
 
 ### Treat localStorage as untrusted input
 
-`data/repositories/local-storage-repository.ts` owns storage access, the storage key, and version envelope. It delegates runtime validation to `domain/validation/prototype-data.ts`, which checks field shapes, literal values, dates, unique IDs, references, room capacity, and payment totals before restoring a saved snapshot. The single type assertion follows explicit field validation; no unchecked JSON is exposed to components.
+`data/repositories/local-storage-repository.ts` owns browser storage access and the storage key. `data/repositories/prototype-storage.ts` owns the schema version and a pure, non-throwing snapshot parser. It delegates runtime validation to `domain/validation/prototype-data.ts`, which checks field shapes, literal values, dates, unique IDs, references, room capacity, and payment totals. The adapter validates before writing as well as on load, preserving the last saved value when a proposed state is invalid. The single type assertion follows explicit field validation; no unchecked JSON is exposed to components.
 
 Invalid data falls back to fixtures without automatically overwriting the original saved value. Reset explicitly permits replacing it. Both reads and writes catch storage exceptions. This is prototype persistence, not a production data store. The expanded model uses schema version 2 under the retained `bhms:prototype:v1` key. Version 1 and other incompatible envelopes show the recovery message and are not automatically migrated or overwritten.
 
@@ -48,7 +48,7 @@ The repository instance is selected in `app/providers/app-providers.tsx` and rem
 
 `AdminShell` owns navigation, header, demo notice, storage warning, and the main content outlet. The six modules are lazy loaded; a Suspense boundary inside the shell shows the shared loading state while preserving navigation. Unknown paths render a useful return-home action. The root rendering error boundary handles unexpected rendering and lazy-import failures with a reload action.
 
-Shared page, table, empty, loading, error, status-badge, and statistic components establish patterns for later modules. Tables have captions, header scopes, focusable scrolling regions, and contained horizontal overflow. The navigation drawer and dialogs use shadcn/Radix keyboard handling and focus management. Route changes update the document title and move focus to main content.
+Shared page, table, empty, loading, error, status-badge, and statistic components establish patterns for later modules. Tables have captions, header scopes, focusable scrolling regions, and contained horizontal overflow. The navigation drawer and dialogs use shadcn/Radix keyboard handling and focus management. Route changes update the document title and move focus to main content. `lib/format.ts` centralizes PHP formatting and UTC date-only formatting; `domain/validation/date.ts` is shared by formatting and stored-data validation. Invalid dates are labeled instead of silently normalized, and fractional/non-finite/unsafe centavo inputs are rejected by currency formatting.
 
 The application uses its full name, **Boarding House Management System**, alongside **BHMS**. The demo administrator label explicitly describes a display-only identity. Primary navigation, regular buttons, and dialog/drawer close controls provide 44px touch targets. Supporting text uses a minimum 12px size, with 14px text for primary reading content. The desktop sidebar scrolls on shorter viewports, and long header destinations truncate within the available mobile space. The palette is neutral with one restrained green accent; status colors communicate state. No charts, gradients, or decorative illustrations were introduced.
 
@@ -73,7 +73,7 @@ Completed on the implementation environment:
 
 - `npm run build`: passed, including strict TypeScript compilation and production bundling.
 - `npm run lint`: passed with zero warnings.
-- `npm test`: **37 tests passed** across three suites. Tests cover state/persistence, application navigation, reporting-date rules, independent category payment status, credit/receipt/assignment consistency, applied-rate preservation, authorized reading history, asynchronous repository injection, serialized saves, and load/save failure handling.
+- `npm test`: **67 tests passed** across six suites. Tests cover state/persistence, application/sidebar/mobile navigation, currency/date formatting, reporting-date rules, occupancy boundaries, independent category payment status, credit/receipt/assignment consistency, applied-rate preservation, authorized reading history, safe snapshot parsing, refused invalid writes, asynchronous repository injection, serialized saves, and load/save failure handling.
 - `npm audit --omit=dev`: zero runtime dependency vulnerabilities at implementation time.
 - Full dependency audit reported 10 moderate development-tooling advisories related to transitive `minimatch` versions in ESLint/typescript-eslint. No forced major-version updates or unverified overrides were applied. Recheck these when updating tooling.
 - Headless Chromium smoke test at widths **320, 390, 768, 1366, and 1920 pixels**: all six routes rendered with no page-level horizontal overflow. Mobile/tablet drawer navigation passed.
@@ -82,6 +82,8 @@ Completed on the implementation environment:
 - Automated axe WCAG A/AA scans found no violations on all six routes at 320px and 1366px. This is an automated check, not a claim of complete accessibility conformance.
 
 The browser smoke test and axe scans used temporary Playwright tooling outside the repository; the repeatable committed test suite uses Vitest/React Testing Library. Real device and screen-reader acceptance testing remains appropriate before a client demonstration or deployment.
+
+Final required command outcomes, the investigated lazy-route test timeout, exact dependency versions, and the owner-review gate are recorded in the [TASK 1A report](task-1a-report.md). All six routes were also exercised through navigation and refreshed in Chromium against the production build served locally by Vite preview. No deployment was performed.
 
 ## Continue from this foundation
 

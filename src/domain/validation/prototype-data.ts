@@ -1,4 +1,5 @@
 import type { AuthorizedCorrection, PrototypeAppState } from '@/domain/types/models'
+import { isIsoDate as date } from './date'
 
 type RecordValue = Record<string, unknown>
 export const isRecord = (value: unknown): value is RecordValue =>
@@ -7,8 +8,6 @@ const text = (v: unknown): v is string => typeof v === 'string' && v.length <= 1
 const id = (v: unknown): v is string => text(v) && v.length > 0
 const money = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0
 const positive = (v: unknown): v is number => money(v) && v > 0
-const date = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)
-  && !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().slice(0, 10) === v
 const nullableText = (v: unknown) => v === null || text(v)
 const oneOf = (v: unknown, values: readonly string[]) => typeof v === 'string' && values.includes(v)
 const correction = (v: unknown) => v === null || (isRecord(v) && id(v.supersedesId) && id(v.auditEventId) && id(v.authorizedBy))

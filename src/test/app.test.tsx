@@ -14,13 +14,15 @@ describe('admin workspace integration', () => {
   it('redirects the root and navigates all six modules', async () => {
     const user = userEvent.setup()
     renderApp()
-    expect(await screen.findByRole('heading', { name: 'A clear view of your boarding house.' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'A clear view of your boarding house.' }, { timeout: 5000 })).toBeInTheDocument()
     const nav = screen.getByRole('navigation', { name: 'Main navigation' })
     for (const title of ['Tenants', 'Rooms', 'Billing', 'Payments & Receipts', 'Reports & Settings']) {
       await user.click(within(nav).getByRole('link', { name: title }))
-      expect(await screen.findByRole('heading', { level: 1, name: title })).toBeInTheDocument()
+      // Lazy modules may need an initial transform under parallel Windows test workers.
+      expect(await screen.findByRole('heading', { level: 1, name: title }, { timeout: 5000 })).toBeInTheDocument()
+      expect(within(nav).getByRole('link', { name: title })).toHaveAttribute('aria-current', 'page')
     }
-  })
+  }, 15000)
 
   it('filters tenants, shows an empty state, and preserves saved notes after remount', async () => {
     const user = userEvent.setup()
@@ -58,7 +60,11 @@ describe('admin workspace integration', () => {
     expect(localStorage.getItem(STORAGE_KEY)).toBe('{broken')
     await user.click(screen.getByRole('button', { name: 'Reset demo' }))
     const dialog = screen.getByRole('dialog', { name: 'Reset the demo workspace?' })
-    await user.click(within(dialog).getByRole('button', { name: 'Reset demo' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('{broken')
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Reset demo' }))
+    await user.click(within(screen.getByRole('dialog', { name: 'Reset the demo workspace?' })).getByRole('button', { name: 'Reset demo' }))
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 2)
   })
