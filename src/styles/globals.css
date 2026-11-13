@@ -34,7 +34,7 @@
 }
 
 :root {
-  --app-font-family: "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif;
+  --app-font-family: "Nunito Variable", "Nunito", ui-rounded, system-ui, "Segoe UI", sans-serif;
   font-family: var(--app-font-family);
   --background: #f7f8f4;
   --foreground: #1a3029;

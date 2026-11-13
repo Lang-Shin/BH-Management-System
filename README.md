@@ -41,7 +41,7 @@ npm run preview    # Serve the built application locally
 - Top header, active-route links, document titles, keyboard focus styles, skip link, dialogs, and status announcements.
 - Lazy-loaded modules with a shared loading skeleton, reusable empty/error UI, rendering error boundary, and unknown-route fallback.
 - **Restore sample records** is under **Reports & Settings → More settings and sample records**. It requires confirmation and replaces only the sample dataset.
-- Branding: **Halili BH**, with **BHMS** below the logo text. The interface uses the SF Pro font stack with system fallbacks. No authentication is implemented.
+- Branding: **Halili BH**, with **BHMS** below the logo text. The interface self-hosts the variable **Nunito** font for consistent rendering on every device, with system fallbacks. No authentication is implemented.
 - Larger text and controls, plain-English titles, and stacked phone records make everyday screens easier to read. See the [landlord UI notes](docs/landlord-ui.md).
 
 ### Demo data and persistence

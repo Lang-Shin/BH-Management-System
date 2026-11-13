@@ -2,7 +2,7 @@
 
 ## Goal
 
-Make day-to-day information easy to read and understand for a landlord with little experience using software. Use respectful, plain English, a quiet light theme, larger text, and direct actions. Keep Halili BH branding and the SF Pro font stack; available system fonts remain the fallback.
+Make day-to-day information easy to read and understand for a landlord with little experience using software. Use respectful, plain English, a quiet light theme, larger text, and direct actions. Keep Halili BH branding and the rounded **Nunito** variable font, self-hosted through `@fontsource-variable/nunito` so every device renders the same typeface. System rounded/sans fonts remain the fallback if the font asset fails.
 
 ## Everyday screens
 
