@@ -7,7 +7,7 @@ import { usePrototype } from '@/hooks/use-prototype'
 import { navigation } from '@/app/router/navigation'
 
 function Brand() {
-  return <div className="flex items-center gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-tomato text-tomato-foreground"><Building2 className="size-5" aria-hidden="true" /></div><div className="min-w-0"><p className="text-lg font-bold tracking-tight">Halili BH</p><p className="text-xs font-medium tracking-widest text-muted-foreground">BHMS</p></div></div>
+  return <div className="flex items-center gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-tomato text-tomato-foreground"><Building2 className="size-5" aria-hidden="true" /></div><div className="min-w-0"><p className="brand-name text-2xl tracking-tight">Halili BH</p><p className="brand-acronym text-[1rem] tracking-widest text-muted-foreground">BHMS</p></div></div>
 }
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
@@ -43,14 +43,14 @@ export function AdminShell() {
       <header className="sticky top-0 z-20 flex min-h-18 items-center justify-between gap-3 border-b bg-background px-4 sm:px-6 lg:border-0 lg:px-8">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <Sheet open={menuOpen} onOpenChange={setMenuOpen}><SheetTrigger asChild><Button variant="outline" className="lg:hidden" aria-label="Open menu"><Menu />Menu</Button></SheetTrigger><SheetContent side="left" className="sidebar-surface w-72 max-w-[90vw] gap-0 overflow-y-auto p-0"><SheetHeader className="sr-only"><SheetTitle>Main menu</SheetTitle><SheetDescription>Choose Dashboard, Tenants, Rooms, Billing, Payments, or Reports and Settings.</SheetDescription></SheetHeader><SidebarContent onNavigate={() => setMenuOpen(false)} /></SheetContent></Sheet>
-          <div className="min-w-0"><p className="truncate text-base font-semibold">{active?.label ?? 'Page not found'}</p><p className="text-sm text-muted-foreground lg:hidden">Halili BH</p></div>
+          <div className="min-w-0"><p className="truncate text-base font-semibold">{active?.label ?? 'Page not found'}</p><p className="brand-name text-[1rem] text-muted-foreground lg:hidden">Halili BH</p></div>
         </div>
         <p className="hidden shrink-0 rounded-full border bg-card px-3 py-1 text-xs text-muted-foreground sm:block">Sample records</p>
       </header>
       <main id="main-content" ref={mainRef} tabIndex={-1} className="mx-2 mb-4 min-h-[calc(100dvh-5.5rem)] min-w-0 rounded-2xl border bg-card p-4 outline-none sm:mx-4 sm:p-6 lg:mr-6 lg:ml-0 lg:p-7">
         {storageWarning && <div role="alert" className="mb-6 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-base text-amber-950"><CircleAlert className="mt-0.5 size-6 shrink-0" aria-hidden="true" /><div><p>{storageWarning}</p><NavLink to="/reports" className="mt-3 inline-flex min-h-12 items-center font-semibold underline">Open Reports &amp; Settings</NavLink></div></div>}
         <div key={location.pathname} className="route-content"><Outlet /></div>
-        <footer className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t pt-5 text-sm text-muted-foreground"><p>Halili BH · BHMS</p><NavLink to="/dashboard" className="flex min-h-12 items-center font-medium hover:text-primary">Back to Dashboard</NavLink></footer>
+        <footer className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t pt-5 text-sm text-muted-foreground"><p className="text-[1rem]"><span className="brand-name">Halili BH</span> · <span className="brand-acronym">BHMS</span></p><NavLink to="/dashboard" className="flex min-h-12 items-center font-medium hover:text-primary">Back to Dashboard</NavLink></footer>
       </main>
     </div>
   </div>
