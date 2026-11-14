@@ -37,6 +37,7 @@ npm run preview    # Serve the built application locally
 | `/reports` | Sample monthly collection reports, billing policies, audit log, export/backup/recovery placeholders |
 
 - Fixed desktop sidebar and accessible mobile/tablet navigation drawer.
+- Light iOS-inspired details: frosted header/dialog surfaces, luminous rounded inner cards with layered shadows, softer controls, button press feedback, and segmented room filters. Solid surface fallbacks support reduced transparency.
 - Responsive cards and horizontally scrollable data tables.
 - Dashboard analytics include a room-occupancy doughnut and a bill-status stacked bar, with counts and percentage legends from the current summary data. Charts animate on each Dashboard visit and respect reduced motion.
 - Top header, active-route links, document titles, keyboard focus styles, skip link, dialogs, and status announcements.

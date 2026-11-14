@@ -27,7 +27,7 @@ export default function Rooms() {
   return <>
     <PageHeader title="Rooms" description="A room is occupied when someone rents it, even if some beds are unused." />
     <RoomSummary summary={summary} />
-    <div className="mb-6 flex flex-wrap items-center justify-between gap-4"><div className="flex flex-wrap gap-2" role="group" aria-label="Show rooms">{filters.map(item => <Button key={item.value} variant={filter === item.value ? 'default' : 'outline'} aria-pressed={filter === item.value} onClick={() => setFilter(item.value)}>{item.label}</Button>)}</div><p role="status" className="text-sm text-muted-foreground">Showing {rooms.length} of {data.rooms.length} rooms</p></div>
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-4"><div className="room-segmented-control" role="group" aria-label="Show rooms">{filters.map(item => <Button key={item.value} variant="ghost" className="room-filter" aria-pressed={filter === item.value} onClick={() => setFilter(item.value)}>{item.label}</Button>)}</div><p role="status" className="text-sm text-muted-foreground">Showing {rooms.length} of {data.rooms.length} rooms</p></div>
     <p role="status" className="sr-only">{notice}</p>
     {rooms.length === 0 ? <EmptyState title="No rooms here" description="There are no rooms with this status." action={<Button variant="outline" onClick={() => setFilter('ALL')}>Show all rooms</Button>} /> : <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">{rooms.map(room => {
       const tenants = roomOccupants(data, room.id, DEMO_DATE)

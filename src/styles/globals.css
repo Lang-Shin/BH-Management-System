@@ -92,6 +92,102 @@
   line-height: 1.6;
 }
 
+.feature-surface {
+  border-radius: 24px;
+  border-color: color-mix(in srgb, white 75%, var(--border));
+  background:
+    radial-gradient(ellipse at 100% 0%, color-mix(in srgb, var(--forest-green) 5%, transparent), transparent 60%),
+    linear-gradient(145deg, color-mix(in srgb, white 80%, var(--card)), color-mix(in srgb, white 35%, var(--card)) 55%, var(--card));
+  box-shadow:
+    inset 0 2px 0 rgb(255 255 255 / 90%),
+    inset 0 -1px 0 color-mix(in srgb, var(--oat-milk) 65%, transparent),
+    0 3px 6px -3px color-mix(in srgb, var(--forest-green) 12%, transparent),
+    0 18px 36px -18px color-mix(in srgb, var(--forest-green) 25%, transparent);
+}
+
+.stat-glass-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, white 70%, var(--border));
+  background: linear-gradient(145deg, rgb(255 255 255 / 95%), color-mix(in srgb, var(--forest-green) 13%, var(--card)));
+  box-shadow: inset 0 1px 0 white, 0 4px 8px -4px color-mix(in srgb, var(--forest-green) 20%, transparent);
+}
+
+.workspace-glass-header {
+  box-shadow: inset 0 -1px 0 rgb(255 255 255 / 35%), 0 4px 16px -12px color-mix(in srgb, var(--forest-green) 18%, transparent);
+}
+
+[data-slot="button"] {
+  transition: background-color 180ms ease, color 180ms ease, box-shadow 180ms ease, transform 120ms ease;
+}
+
+[data-slot="button"]:active:not(:disabled):not([aria-disabled="true"]) {
+  transform: scale(0.97);
+}
+
+[data-slot="button"][data-variant="default"],
+[data-slot="button"][data-variant="outline"] {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 35%), 0 2px 4px -2px color-mix(in srgb, var(--forest-green) 18%, transparent);
+}
+
+[data-slot="dialog-content"] {
+  border-radius: 26px;
+  background: var(--card);
+  border-color: color-mix(in srgb, var(--border) 60%, white);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 70%), 0 24px 80px -20px rgb(0 0 0 / 30%);
+}
+
+@supports (backdrop-filter: blur(16px)) {
+  .workspace-glass-header {
+    background: color-mix(in srgb, var(--oat-milk) 88%, transparent);
+    backdrop-filter: blur(16px) saturate(125%);
+  }
+  [data-slot="dialog-overlay"] { backdrop-filter: blur(3px); }
+  [data-slot="dialog-content"] {
+    background: color-mix(in srgb, var(--card) 95%, transparent);
+    backdrop-filter: blur(16px);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .workspace-glass-header { background: var(--oat-milk); backdrop-filter: none; }
+  [data-slot="dialog-content"] { background: var(--card); backdrop-filter: none; }
+  [data-slot="dialog-overlay"] { backdrop-filter: none; }
+}
+
+.room-segmented-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  width: 100%;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--forest-green) 6%, var(--oat-milk));
+  box-shadow: inset 0 1px 3px color-mix(in srgb, var(--forest-green) 5%, transparent);
+}
+
+.room-filter {
+  min-width: 0;
+  padding-inline: 14px;
+  border-radius: 13px;
+  font-size: var(--text-sm);
+}
+
+.room-filter[aria-pressed="true"] {
+  background: var(--card);
+  color: var(--forest-green);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 65%), 0 2px 5px color-mix(in srgb, var(--forest-green) 12%, transparent);
+}
+
+@media (width >= 40rem) {
+  .room-segmented-control { grid-template-columns: repeat(4, minmax(0, 1fr)); width: auto; }
+}
+
 .room-metric {
   position: relative;
   overflow: hidden;

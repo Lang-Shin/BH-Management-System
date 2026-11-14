@@ -34,8 +34,8 @@ export default function Dashboard() {
     </section>
     <details className="mt-3 text-sm text-muted-foreground"><summary className="min-h-12 cursor-pointer py-3 font-medium">How are collections counted?</summary><p className="max-w-3xl pb-3 leading-relaxed">Total collected is the money allocated to November’s bills. Money received during November is {formatMoney(summary.received)} and can include older bills or advance payments. Collection rate uses allocated payments, so these measures can differ.</p></details>
     <div className="my-6 grid items-start gap-6 xl:grid-cols-2">
-      <Card className="shadow-none"><CardHeader><CardTitle>Rooms at a glance</CardTitle><CardDescription>Occupancy across your boarding house.</CardDescription></CardHeader><CardContent><RoomOccupancyChart summary={summary} /><Button variant="outline" className="mt-6" asChild><Link to="/rooms">View rooms <ArrowRight /></Link></Button></CardContent></Card>
-      <Card className="shadow-none"><CardHeader><CardTitle>Bill payments</CardTitle><CardDescription>Rent, electricity, water, and washing are counted separately.</CardDescription></CardHeader><CardContent>
+      <Card><CardHeader><CardTitle>Rooms at a glance</CardTitle><CardDescription>Occupancy across your boarding house.</CardDescription></CardHeader><CardContent><RoomOccupancyChart summary={summary} /><Button variant="outline" className="mt-6" asChild><Link to="/rooms">View rooms <ArrowRight /></Link></Button></CardContent></Card>
+      <Card><CardHeader><CardTitle>Bill payments</CardTitle><CardDescription>Rent, electricity, water, and washing are counted separately.</CardDescription></CardHeader><CardContent>
         <BillPaymentChart summary={summary} />
         <p className="mt-5 text-base">{summary.overdue} bills are past their due date.</p><p className="mt-3 text-sm text-muted-foreground">Advance payments kept for later: <strong className="text-foreground">{formatMoney(summary.credit)}</strong>.</p>
       </CardContent></Card>
