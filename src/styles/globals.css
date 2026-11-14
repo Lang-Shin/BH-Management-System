@@ -312,6 +312,55 @@
 
 .page-title { animation: title-enter 260ms var(--route-ease) backwards; }
 
+.back-to-top-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+  transition: color 240ms ease;
+}
+.back-to-top-arrow > svg {
+  width: 34px;
+  height: 34px;
+  transition: transform 240ms var(--route-ease), filter 240ms ease;
+}
+.back-to-top-arrow:hover,
+.back-to-top-arrow:focus-visible { color: var(--forest-green); }
+.back-to-top-arrow:hover > svg,
+.back-to-top-arrow:focus-visible > svg {
+  transform: scale(1.32);
+  filter:
+    drop-shadow(0 0 5px color-mix(in srgb, var(--forest-green) 85%, transparent))
+    drop-shadow(0 0 12px color-mix(in srgb, var(--forest-green) 65%, transparent))
+    drop-shadow(0 0 24px color-mix(in srgb, var(--forest-green) 40%, transparent));
+}
+.back-to-top-arrow:active > svg { transform: scale(1.16); }
+
+.dashboard-return {
+  transition: color 240ms ease, text-shadow 240ms ease;
+}
+.dashboard-return > span {
+  display: inline-block;
+  transform-origin: right center;
+  transition: transform 240ms var(--route-ease);
+}
+.dashboard-return:hover,
+.dashboard-return:focus-visible {
+  color: var(--forest-green);
+  text-shadow:
+    0 0 5px color-mix(in srgb, var(--forest-green) 55%, transparent),
+    0 0 14px color-mix(in srgb, var(--forest-green) 40%, transparent),
+    0 0 24px color-mix(in srgb, var(--forest-green) 25%, transparent);
+}
+.dashboard-return:hover > span,
+.dashboard-return:focus-visible > span { transform: scale(1.14); }
+.dashboard-return:active > span { transform: scale(1.08); }
+
 .header-typewriter { min-height: 1.2em; line-height: 1.2; }
 .header-typewriter-caret {
   display: inline-block;
@@ -409,6 +458,14 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .back-to-top-arrow > svg { transition: none; }
+  .back-to-top-arrow:hover > svg,
+  .back-to-top-arrow:focus-visible > svg,
+  .back-to-top-arrow:active > svg { transform: none; }
+  .dashboard-return > span { transition: none; }
+  .dashboard-return:hover > span,
+  .dashboard-return:focus-visible > span,
+  .dashboard-return:active > span { transform: none; }
   .header-typewriter-caret { display: none; animation: none; }
   .room-metric,
   .room-metric-fill,

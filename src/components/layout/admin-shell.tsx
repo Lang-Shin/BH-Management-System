@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Building2, Menu, CircleAlert } from 'lucide-react'
+import { Building2, Menu, CircleAlert, ArrowUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { usePrototype } from '@/hooks/use-prototype'
@@ -52,7 +52,10 @@ export function AdminShell() {
       <main id="main-content" ref={mainRef} tabIndex={-1} className="min-h-[calc(100dvh-5.5rem)] min-w-0 rounded-2xl border bg-card p-4 outline-none sm:p-6 lg:p-7">
         {storageWarning && <div role="alert" className="mb-6 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-base text-amber-950"><CircleAlert className="mt-0.5 size-6 shrink-0" aria-hidden="true" /><div><p>{storageWarning}</p><NavLink to="/reports" className="mt-3 inline-flex min-h-12 items-center font-semibold underline">Open Reports &amp; Settings</NavLink></div></div>}
         <div key={location.pathname} className="route-content"><Outlet /></div>
-        <footer className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t pt-5 text-sm text-muted-foreground"><p className="text-[1rem]"><span className="brand-name">Halili BH</span> · <span className="brand-acronym">BHMS</span></p><NavLink to="/dashboard" className="flex min-h-12 items-center font-medium hover:text-primary">Back to Dashboard</NavLink></footer>
+        <footer className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t pt-5 text-sm text-muted-foreground"><p className="text-[1rem]"><span className="brand-name">Halili BH</span> · <span className="brand-acronym">BHMS</span></p>{location.pathname === '/dashboard' ? <button type="button" className="back-to-top-arrow" aria-label="Back to top" title="Back to top" onClick={() => {
+          mainRef.current?.focus({ preventScroll: true })
+          window.scrollTo({ top: 0, behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+        }}><ArrowUp aria-hidden="true" /></button> : <NavLink to="/dashboard" className="dashboard-return flex min-h-12 items-center font-medium"><span>Back to Dashboard</span></NavLink>}</footer>
       </main>
       </div>
     </div>

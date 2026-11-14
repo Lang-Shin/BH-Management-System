@@ -15,6 +15,19 @@ function renderApp(route = '/') {
 }
 
 describe('admin workspace integration', () => {
+  it('offers a back-to-top button on Dashboard and a return link on other pages', async () => {
+    const user = userEvent.setup()
+    renderApp('/dashboard')
+    const button = await screen.findByRole('button', { name: 'Back to top' })
+    expect(screen.queryByRole('link', { name: 'Back to Dashboard' })).not.toBeInTheDocument()
+    await user.click(button)
+    expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 0, behavior: 'smooth' })
+    expect(screen.getByRole('main')).toHaveFocus()
+    await user.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('link', { name: 'Tenants' }))
+    expect(screen.queryByRole('button', { name: 'Back to top' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Back to Dashboard' })).toHaveAttribute('href', '/dashboard')
+  })
+
   it('refreshes dashboard analytics after a room status changes and returning to Dashboard', async () => {
     const user = userEvent.setup()
     renderApp('/dashboard')
