@@ -71,8 +71,9 @@
   --border: #d6cebc;
   --focus-ring: var(--forest-green);
   --radius: 0.875rem;
-  --route-duration: 200ms;
-  --route-offset: 8px;
+  --route-duration: 360ms;
+  --route-offset: 14px;
+  --route-ease: cubic-bezier(0.33, 1, 0.68, 1);
   color: var(--foreground);
   background: var(--background);
   font-synthesis: none;
@@ -82,11 +83,30 @@
 }
 
 @keyframes route-enter {
-  from { opacity: 0; transform: translateY(var(--route-offset)); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translate3d(0, var(--route-offset), 0) scale(0.98);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: none;
+  }
 }
 
-.route-content { animation: route-enter var(--route-duration) ease-out both; min-width: 0; }
+@keyframes title-enter {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.route-content {
+  min-width: 0;
+  transform-origin: top center;
+  animation: route-enter var(--route-duration) var(--route-ease) backwards;
+}
+
+.page-title { animation: title-enter 260ms var(--route-ease) backwards; }
 
 /* Expose the glow peaks in the outer frame, not beneath the opaque content. */
 .bhms-ambient-glow {
@@ -143,7 +163,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .route-content { animation: none; }
+  .route-content,
+  .page-title { animation: none; }
 }
 
 @layer base {
