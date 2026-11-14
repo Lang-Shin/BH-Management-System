@@ -41,7 +41,7 @@ npm run preview    # Serve the built application locally
 - Top header, active-route links, document titles, keyboard focus styles, skip link, dialogs, and status announcements.
 - Eagerly loaded admin modules avoid route-loading flashes; route content enters with a smooth 360ms fade, 14px rise, subtle scale and blur while the header title slides in and the shell stays mounted. Reduced-motion users receive no route animation. Shared loading/empty/error UI and the unknown-route fallback remain available.
 - **Restore sample records** is under **Reports & Settings → More settings and sample records**. It requires confirmation and replaces only the sample dataset.
-- Branding: **Halili BH**, with **BHMS** below the logo text. The interface self-hosts the variable **Nunito** font for consistent rendering on every device, with system fallbacks. No authentication is implemented.
+- Branding: **Halili BH**, with **BHMS** below the logo text. The interface self-hosts the variable **Nunito** font for consistent rendering on every device, with system fallbacks. Tomato-red containers use dark espresso **Lilita One** labels, also self-hosted. No authentication is implemented.
 - Oat Milk (`#EEE5D4`), Forest Green (`#1D4A35`), and Tomato Red (`#F2462E`) follow a 60–30–10 visual hierarchy: warm surfaces, forest sidebar/headings, and tomato action accents. Compact typography, comfortable controls, and stacked phone records are retained. See the [landlord UI notes](docs/landlord-ui.md) and [TASK 1A.1 redesign report](docs/task-1a-1-report.md).
 
 ### Demo data and persistence

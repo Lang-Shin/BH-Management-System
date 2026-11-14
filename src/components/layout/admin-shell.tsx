@@ -7,7 +7,7 @@ import { usePrototype } from '@/hooks/use-prototype'
 import { navigation } from '@/app/router/navigation'
 
 function Brand() {
-  return <div className="flex items-center gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-tomato text-tomato-foreground"><Building2 className="size-5" aria-hidden="true" /></div><div className="min-w-0"><p className="brand-name text-2xl tracking-tight">Halili BH</p><p className="brand-acronym text-[1rem] tracking-widest text-muted-foreground">BHMS</p></div></div>
+  return <div className="flex items-center gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-tomato"><Building2 className="size-5" aria-hidden="true" /></div><div className="min-w-0"><p className="brand-name text-2xl tracking-tight">Halili BH</p><p className="brand-acronym text-[1rem] tracking-widest text-muted-foreground">BHMS</p></div></div>
 }
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
@@ -28,7 +28,7 @@ export function AdminShell() {
   const active = navigation.find(item => item.to === location.pathname)
 
   useEffect(() => {
-    document.title = `${active?.label ?? 'Page not found'} · Halili BH`
+    document.title = `Halili BH · ${active?.label ?? 'Page not found'} `
     if (previousPath.current !== location.pathname) {
       mainRef.current?.focus()
       window.scrollTo(0, 0)

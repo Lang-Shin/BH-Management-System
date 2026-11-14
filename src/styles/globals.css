@@ -17,8 +17,17 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: "Lilita One";
+  src: url("/fonts/lilita-one-latin-400.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 .brand-name { font-family: "Luckiest Guy", var(--app-font-family); font-weight: 400; }
 .brand-acronym { font-family: "Tiny5 Duo", var(--app-font-family); font-weight: 400; }
+.bg-tomato { color: var(--tomato-foreground); font-family: "Lilita One", var(--app-font-family); font-weight: 400; }
 
 @theme inline {
   --font-sans: var(--app-font-family);
@@ -43,7 +52,7 @@
   --color-accent: #e0e6d8;
   --color-accent-foreground: var(--forest-green);
   --color-tomato: var(--tomato-red);
-  --color-tomato-foreground: #241c13;
+  --color-tomato-foreground: var(--tomato-foreground);
   --color-sidebar: var(--forest-green);
   --color-sidebar-foreground: var(--oat-milk);
   --color-destructive: #a52d1e;
@@ -63,6 +72,7 @@
   --oat-milk: #eee5d4;
   --forest-green: #1d4a35;
   --tomato-red: #f2462e;
+  --tomato-foreground: #241c13;
   --background: var(--oat-milk);
   --foreground: var(--forest-green);
   --card: #f8f3e9;
