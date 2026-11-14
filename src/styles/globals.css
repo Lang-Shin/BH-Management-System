@@ -92,6 +92,38 @@
   line-height: 1.6;
 }
 
+.room-metric {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 20px;
+  background: radial-gradient(ellipse at 100% 0%, color-mix(in srgb, var(--metric-color) 8%, transparent), transparent 65%), var(--card);
+  box-shadow: 0 2px 3px color-mix(in srgb, var(--forest-green) 3%, transparent), 0 12px 24px -15px color-mix(in srgb, var(--forest-green) 22%, transparent);
+  animation: route-enter 440ms var(--route-ease) var(--metric-delay) backwards;
+}
+
+.room-metric-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--card);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--metric-color) 75%, white), var(--metric-color) 75%);
+  border: 3px solid var(--card);
+  outline: 1px solid color-mix(in srgb, var(--metric-color) 45%, transparent);
+  box-shadow: 0 4px 10px -4px color-mix(in srgb, var(--metric-color) 45%, transparent);
+}
+
+.room-metric-fill {
+  background: var(--metric-color);
+  transform-origin: left center;
+  animation: analytics-grow 900ms var(--route-ease) var(--metric-delay) backwards;
+  transition: width 350ms var(--route-ease);
+}
+
 .table-surface {
   border-top: 3px solid color-mix(in srgb, var(--forest-green) 70%, var(--card));
   box-shadow:
@@ -266,6 +298,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .room-metric,
+  .room-metric-fill,
   .analytics-doughnut-segment,
   .analytics-payment-bar,
   .route-content,
