@@ -92,6 +92,54 @@
   line-height: 1.6;
 }
 
+.table-surface {
+  border-top: 3px solid color-mix(in srgb, var(--forest-green) 70%, var(--card));
+  box-shadow:
+    0 2px 4px color-mix(in srgb, var(--forest-green) 4%, transparent),
+    0 12px 28px -10px color-mix(in srgb, var(--forest-green) 17%, transparent);
+}
+
+.table-heading {
+  color: var(--forest-green);
+  background: linear-gradient(110deg, color-mix(in srgb, var(--forest-green) 9%, var(--card)), var(--oat-milk));
+}
+
+.table-record {
+  transition: background-color 180ms ease, box-shadow 180ms ease;
+}
+
+.table-record:nth-child(even) {
+  background: color-mix(in srgb, var(--oat-milk) 32%, var(--card));
+}
+
+.table-record:hover,
+.table-record:focus-within {
+  background: color-mix(in srgb, var(--forest-green) 7%, var(--card));
+  box-shadow: inset 3px 0 var(--forest-green);
+}
+
+@media (width >= 48rem) {
+  .table-record + .table-record { border-top: 1px solid var(--border); }
+}
+
+@media (width < 48rem) {
+  .table-surface {
+    padding: 8px;
+    background: color-mix(in srgb, var(--oat-milk) 55%, var(--card));
+  }
+  .table-record {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--card);
+    box-shadow: 0 3px 8px -4px color-mix(in srgb, var(--forest-green) 18%, transparent);
+  }
+  .table-record + .table-record { margin-top: 8px; }
+  .table-record:hover,
+  .table-record:focus-within {
+    box-shadow: inset 3px 0 var(--forest-green), 0 3px 8px -4px color-mix(in srgb, var(--forest-green) 18%, transparent);
+  }
+}
+
 @keyframes analytics-draw {
   from { stroke-dasharray: 0 100; }
 }
