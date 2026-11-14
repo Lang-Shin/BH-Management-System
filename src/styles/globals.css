@@ -312,6 +312,21 @@
 
 .page-title { animation: title-enter 260ms var(--route-ease) backwards; }
 
+.header-typewriter { min-height: 1.2em; line-height: 1.2; }
+.header-typewriter-caret {
+  display: inline-block;
+  width: 2px;
+  height: 0.85em;
+  margin-left: 3px;
+  vertical-align: -0.06em;
+  background: currentColor;
+  animation: typewriter-caret 1s step-end infinite;
+}
+@keyframes typewriter-caret {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
 /* Expose the glow peaks in the outer frame, not beneath the opaque content. */
 .bhms-ambient-glow {
   position: relative;
@@ -394,6 +409,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .header-typewriter-caret { display: none; animation: none; }
   .room-metric,
   .room-metric-fill,
   .analytics-doughnut-segment,
