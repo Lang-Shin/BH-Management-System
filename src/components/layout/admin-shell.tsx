@@ -14,7 +14,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   return <div className="sidebar-surface flex h-full min-h-full flex-col px-4 py-6">
     <Brand />
     <p className="mt-10 mb-3 px-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Workspace</p>
-    <nav aria-label="Main navigation" className="space-y-1">{navigation.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} onClick={onNavigate} className="sidebar-link flex min-h-12 items-center gap-3 rounded-lg px-3 py-3 text-sm font-semibold transition-colors"><Icon className="size-[18px] shrink-0" aria-hidden="true" /><span>{label}</span></NavLink>)}</nav>
+    <nav aria-label="Main navigation" className="space-y-1">{navigation.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} onClick={onNavigate} className="sidebar-link flex min-h-12 items-center gap-3 rounded-lg px-3 py-3 text-sm font-semibold"><Icon className="size-[18px] shrink-0" aria-hidden="true" /><span>{label}</span></NavLink>)}</nav>
     <div className="mt-auto pt-12 text-xs text-muted-foreground"><p className="border-t px-3 pt-5">Boarding house management</p></div>
   </div>
 }
