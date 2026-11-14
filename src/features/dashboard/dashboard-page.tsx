@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
 import { PaymentHistoryTable } from '@/components/shared/payment-history-table'
-import { RoomSummary } from '@/components/shared/room-summary'
+import { BillPaymentChart, RoomOccupancyChart } from './dashboard-analytics'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { usePrototype } from '@/hooks/use-prototype'
 import { chargeBalance, chargeStatus, issuedCharges, selectSummary, tenantAccount } from '@/domain/calculations/summary'
@@ -34,9 +34,9 @@ export default function Dashboard() {
     </section>
     <details className="mt-3 text-sm text-muted-foreground"><summary className="min-h-12 cursor-pointer py-3 font-medium">How are collections counted?</summary><p className="max-w-3xl pb-3 leading-relaxed">Total collected is the money allocated to November’s bills. Money received during November is {formatMoney(summary.received)} and can include older bills or advance payments. Collection rate uses allocated payments, so these measures can differ.</p></details>
     <div className="my-6 grid items-start gap-6 xl:grid-cols-2">
-      <Card className="shadow-none"><CardHeader><CardTitle>Rooms at a glance</CardTitle><CardDescription>See which rooms are rented or ready for a tenant.</CardDescription></CardHeader><CardContent><RoomSummary summary={summary} /><Button variant="outline" className="mt-6" asChild><Link to="/rooms">View rooms <ArrowRight /></Link></Button></CardContent></Card>
+      <Card className="shadow-none"><CardHeader><CardTitle>Rooms at a glance</CardTitle><CardDescription>Occupancy across your boarding house.</CardDescription></CardHeader><CardContent><RoomOccupancyChart summary={summary} /><Button variant="outline" className="mt-6" asChild><Link to="/rooms">View rooms <ArrowRight /></Link></Button></CardContent></Card>
       <Card className="shadow-none"><CardHeader><CardTitle>Bill payments</CardTitle><CardDescription>Rent, electricity, water, and washing are counted separately.</CardDescription></CardHeader><CardContent>
-        <dl className="grid grid-cols-3 gap-3">{[{ label: 'Paid', value: summary.paid }, { label: 'Partly paid', value: summary.partial }, { label: 'Not yet paid', value: summary.unpaid }].map(item => <div key={item.label} className="rounded-lg bg-muted px-2 py-4 text-center"><dt className="text-sm text-muted-foreground">{item.label}</dt><dd className="mt-2 text-2xl font-semibold">{item.value}</dd></div>)}</dl>
+        <BillPaymentChart summary={summary} />
         <p className="mt-5 text-base">{summary.overdue} bills are past their due date.</p><p className="mt-3 text-sm text-muted-foreground">Advance payments kept for later: <strong className="text-foreground">{formatMoney(summary.credit)}</strong>.</p>
       </CardContent></Card>
     </div>

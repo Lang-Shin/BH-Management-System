@@ -8,12 +8,37 @@ import { localStorageRepository, STORAGE_KEY } from '@/data/repositories/local-s
 import { selectSummary } from '@/domain/calculations/summary'
 import { DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
 import { formatMoney } from '@/lib/format'
+import { RoomOccupancyChart } from '@/features/dashboard/dashboard-analytics'
 
 function renderApp(route = '/') {
   return render(<PrototypeProvider repository={localStorageRepository}><MemoryRouter initialEntries={[route]}><AppRouter /></MemoryRouter></PrototypeProvider>)
 }
 
 describe('admin workspace integration', () => {
+  it('refreshes dashboard analytics after a room status changes and returning to Dashboard', async () => {
+    const user = userEvent.setup()
+    renderApp('/dashboard')
+    const chart = await screen.findByRole('figure', { name: 'Room occupancy analytics' })
+    expect(chart).toHaveTextContent('4 of 6 rooms occupied · 1 ready to rent')
+    expect(chart).toHaveTextContent('66.7%')
+    const nav = screen.getByRole('navigation', { name: 'Main navigation' })
+    await user.click(within(nav).getByRole('link', { name: 'Rooms' }))
+    await user.click(await screen.findByRole('button', { name: 'Mark room 106 as available' }))
+    await user.click(within(nav).getByRole('link', { name: 'Dashboard' }))
+    const updated = await screen.findByRole('figure', { name: 'Room occupancy analytics' })
+    expect(updated).not.toBe(chart)
+    expect(updated).toHaveTextContent('4 of 6 rooms occupied · 2 ready to rent')
+    expect(within(updated).getByText('Under repair').parentElement).toHaveTextContent('0(0.0%)')
+  })
+
+  it('renders an empty room chart without invalid percentages or phantom segments', () => {
+    render(<RoomOccupancyChart summary={{ totalRooms: 0, occupiedRooms: 0, availableRooms: 0, maintenanceRooms: 0 }} />)
+    const chart = screen.getByRole('figure', { name: 'Room occupancy analytics' })
+    expect(chart).toHaveTextContent('No rooms recorded yet.')
+    expect(chart).not.toHaveTextContent(/NaN|Infinity/)
+    expect(chart.querySelectorAll('.analytics-doughnut-segment')).toHaveLength(0)
+  })
+
   it('redirects the root and navigates all six modules', async () => {
     const user = userEvent.setup()
     renderApp()
