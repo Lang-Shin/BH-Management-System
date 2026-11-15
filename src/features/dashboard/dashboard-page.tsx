@@ -51,11 +51,11 @@ export default function Dashboard() {
     </div>
     <section aria-labelledby="upcoming-dues" className="mt-8"><h2 id="upcoming-dues" className="mb-2 text-lg font-bold">Upcoming due dates</h2><p className="mb-4 text-sm text-muted-foreground">The next <AnimatedNumber value={Math.min(6, upcoming.length)} /> room due-date groups to check. Choose <strong className="font-semibold text-foreground">Show Bill</strong> to see every pending month and category for that room.</p><DataTable rows={upcoming.slice(0, 6)} caption="Bills due soon" columns={[
       { key: 'room', label: 'Room', render: c => <span className="font-semibold">{c.context.label}</span> },
-      { key: 'bill', label: 'Bill for', render: c => <button type="button" className="upcoming-bill-button" aria-label={`Show Bill for ${c.context.label}`} onClick={event => { billTrigger.current = event.currentTarget; setSelectedRoomId(c.context.id) }}>Show Bill<ChevronRight aria-hidden="true" /></button> },
+      { key: 'bill', label: 'Bill for', render: c => <button type="button" className="upcoming-bill-button" aria-label={`Show Bill for ${c.context.label}`} onClick={event => { billTrigger.current = event.currentTarget; setSelectedRoomId(c.context.id) }}><span className="animated-forest-underline">Show Bill</span><ChevronRight aria-hidden="true" /></button> },
       { key: 'period', label: 'Month', render: c => data.billingPeriods.find(period => period.id === c.periodId)?.label },
       { key: 'balance', label: 'Outstanding', align: 'right', render: c => formatMoney(c.outstanding) },
       { key: 'status', label: 'Status', render: c => <StatusBadge status={CHARGE_STATUS_LABELS[c.status]} /> },
     ]} /></section>
-    {selectedRoom && <PendingPaymentsDialog data={data} room={selectedRoom} asOf={DEMO_DATE} onClose={() => setSelectedRoomId(null)} onReturnFocus={() => billTrigger.current?.focus()} />}
+    {selectedRoom && <PendingPaymentsDialog key={selectedRoom.id} data={data} room={selectedRoom} asOf={DEMO_DATE} onClose={() => setSelectedRoomId(null)} onReturnFocus={() => billTrigger.current?.focus()} />}
   </>
 }

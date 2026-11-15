@@ -1,6 +1,7 @@
 import { ReceiptText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useAnimatedDialogClose } from '@/components/ui/use-animated-dialog-close'
 import { StatusBadge } from '@/components/shared/status-badge'
 import type { PrototypeAppState, Receipt } from '@/domain/types/models'
 import { formatDate, formatMoney } from '@/lib/format'
@@ -18,9 +19,10 @@ export function ReceiptDialog({ data, receipt, onClose, onReturnFocus }: {
   // Use the receipt's issue-time allocation references, not the payment's live allocations.
   const allocations = data.paymentAllocations.filter(item => receipt.allocationIds.includes(item.id) && item.paymentId === receipt.paymentId)
   const advance = data.tenantCredits.some(item => item.sourcePaymentId === receipt.paymentId)
+  const { open, requestClose, onOpenChange, onAnimationEnd } = useAnimatedDialogClose(onClose)
 
-  return <Dialog open onOpenChange={open => { if (!open) onClose() }}>
-    <DialogContent className="gap-4 sm:max-w-lg" onCloseAutoFocus={event => { event.preventDefault(); onReturnFocus() }}>
+  return <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent className="gap-4 sm:max-w-lg" onAnimationEnd={onAnimationEnd} onCloseAutoFocus={event => { event.preventDefault(); onReturnFocus() }}>
       <DialogHeader className="pr-6">
         <span className="mb-1 flex size-12 items-center justify-center rounded-2xl bg-accent text-primary"><ReceiptText className="size-6" aria-hidden="true" /></span>
         <DialogTitle>Sample receipt · {receipt.receiptNumber}</DialogTitle>
@@ -48,7 +50,7 @@ export function ReceiptDialog({ data, receipt, onClose, onReturnFocus }: {
         </ul> : <p className="rounded-xl border bg-muted/40 p-4 text-sm text-muted-foreground">{advance ? 'Advance payment — kept for a future bill' : 'No bill allocations were included when this receipt was issued.'}</p>}
       </section>
       <p className="text-xs text-muted-foreground">Demonstration preview · Not an official receipt</p>
-      <DialogFooter><Button aria-label="Close receipt" onClick={onClose}>Close</Button></DialogFooter>
+      <DialogFooter><Button aria-label="Close receipt" onClick={requestClose}>Close</Button></DialogFooter>
     </DialogContent>
   </Dialog>
 }

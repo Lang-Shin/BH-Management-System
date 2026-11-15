@@ -529,9 +529,16 @@
 .sidebar-logout:active > svg { transform: scale(1); }
 
 .outstanding-room-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 14px; }
-.pending-room-link { display: block; min-height: 44px; padding-block: 6px; text-align: left; color: var(--muted-foreground); font-size: 14px; transition: color 180ms ease; }
+.pending-room-link { display: inline-flex; width: fit-content; min-height: 44px; padding-block: 6px; text-align: left; color: var(--muted-foreground); font-size: 14px; transition: color 180ms ease; }
 .pending-room-link:hover,
-.pending-room-link:focus-visible { color: var(--forest-green); text-decoration: underline; text-underline-offset: 4px; }
+.pending-room-link:focus-visible { color: var(--forest-green); }
+.animated-forest-underline { background-image: linear-gradient(var(--forest-green), var(--forest-green)); background-repeat: no-repeat; background-position: 0 100%; background-size: 0% 2px; transition: background-size 260ms var(--route-ease); }
+.pending-room-link:hover .animated-forest-underline,
+.pending-room-link:focus-visible .animated-forest-underline,
+.upcoming-bill-button:hover .animated-forest-underline,
+.upcoming-bill-button:focus-visible .animated-forest-underline,
+.dashboard-transaction-summary:hover > .animated-forest-underline,
+.dashboard-transaction-summary:focus-visible > .animated-forest-underline { background-size: 100% 2px; }
 .pending-payments-dialog[data-slot="dialog-content"] { display: flex; flex-direction: column; gap: 0; max-width: min(42rem, calc(100vw - 2rem)); max-height: 90dvh; padding: 0; overflow: hidden; }
 .pending-dialog-heading { flex: none; padding: 24px 24px 18px; text-align: left; }
 .pending-room-icon { display: grid; place-items: center; flex: none; width: 42px; height: 42px; border: 1px solid color-mix(in srgb, var(--forest-green) 12%, var(--border)); border-radius: 15px; background: color-mix(in srgb, var(--forest-green) 8%, var(--card)); color: var(--forest-green); }
@@ -569,6 +576,7 @@
 .upcoming-bill-button:focus-visible { font-size: 15px; }
 @media (prefers-reduced-motion: reduce) {
   .upcoming-bill-button { transition: none; }
+  .animated-forest-underline { transition: none; }
 }
 
 .dashboard-transaction-disclosure { width: 10.5rem; max-width: 100%; white-space: normal; text-align: left; }

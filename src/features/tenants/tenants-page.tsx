@@ -8,6 +8,7 @@ import { WorkflowPlaceholders } from '@/components/shared/workflow-placeholders'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog'
+import { useAnimatedDialogClose } from '@/components/ui/use-animated-dialog-close'
 import { usePrototype } from '@/hooks/use-prototype'
 import { activeAssignments, tenantAccount } from '@/domain/calculations/summary'
 import { DEMO_DATE } from '@/data/fixtures/demo'
@@ -87,8 +88,9 @@ function TenantDetails({ tenant, onClose }: { tenant: Tenant; onClose: () => voi
   const [notes, setNotes] = useState(tenant.notes)
   const account = tenantAccount(data, tenant.id, DEMO_DATE)
   const assignments = data.roomAssignments.filter(a => a.tenantId === tenant.id)
+  const { open, requestClose, onOpenChange, onAnimationEnd } = useAnimatedDialogClose(onClose)
 
-  return <Dialog open onOpenChange={open => { if (!open) onClose() }}><DialogContent className="max-h-[85dvh] overflow-y-auto">
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-h-[85dvh] overflow-y-auto" onAnimationEnd={onAnimationEnd}>
     <DialogHeader className="pr-6"><DialogTitle>{tenant.name}</DialogTitle><DialogDescription>Tenant details · Sample record</DialogDescription></DialogHeader>
     <dl className="grid gap-5 rounded-lg border bg-muted/40 p-4 text-base sm:grid-cols-2">
       <div><dt className="text-muted-foreground">Tenant status</dt><dd className="mt-2"><StatusBadge status={TENANT_STATUS_LABELS[tenant.status]} /></dd></div>
@@ -98,11 +100,11 @@ function TenantDetails({ tenant, onClose }: { tenant: Tenant; onClose: () => voi
       <div className="min-w-0 sm:col-span-2"><dt className="text-muted-foreground">Contact details</dt><dd className="mt-2 break-all">{tenant.email}</dd><dd className="mt-1 break-words">{tenant.phone}</dd><dd className="mt-2 leading-relaxed">{tenant.address}</dd></div>
     </dl>
     <section><h2 className="mb-3 text-lg font-semibold">Rooms rented</h2><ul className="space-y-3">{assignments.map(a => <li key={a.id} className="rounded-lg border p-4 text-base"><p className="font-semibold">Room {data.rooms.find(r => r.id === a.roomId)?.name}</p><p className="mt-2">Agreed rent: <AnimatedNumber value={formatMoney(a.agreedRentCents)} /></p><p className="mt-2 text-sm text-muted-foreground">{formatDate(a.startDate)} – {a.endDate ? formatDate(a.endDate) : 'Still renting'}</p></li>)}</ul></section>
-    <form onSubmit={event => { event.preventDefault(); dispatch({ type: 'tenant/noteUpdated', tenantId: tenant.id, notes }); onClose() }}>
+    <form onSubmit={event => { event.preventDefault(); dispatch({ type: 'tenant/noteUpdated', tenantId: tenant.id, notes }); requestClose() }}>
       <label htmlFor="tenant-notes" className="text-base font-semibold">Notes</label><p id="notes-help" className="mt-2 text-sm text-muted-foreground">Write a short reminder. Try this using sample information.</p>
       <textarea id="tenant-notes" aria-describedby="notes-help" value={notes} onChange={e => setNotes(e.target.value)} maxLength={500} rows={3} className="mt-3 w-full resize-y rounded-lg border bg-card p-4 text-base" placeholder="For example: prefers a text reminder." />
       <p className="mt-1 text-right text-sm text-muted-foreground">{notes.length} / 500 characters</p>
-      <DialogFooter className="mt-5"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">Save note</Button></DialogFooter>
+      <DialogFooter className="mt-5"><Button type="button" variant="outline" onClick={requestClose}>Cancel</Button><Button type="submit">Save note</Button></DialogFooter>
     </form>
   </DialogContent></Dialog>
 }

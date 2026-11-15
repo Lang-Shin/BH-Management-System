@@ -16,11 +16,11 @@ export function OutstandingBalances({ data, asOf }: { data: PrototypeAppState; a
   return <>
     <Card><CardHeader><CardTitle>Outstanding balances</CardTitle><CardDescription>Largest room balances · all issued bills</CardDescription></CardHeader><CardContent>
       <ul className="divide-y" aria-label="Outstanding room balances">{rooms.map(room => <li key={room.id} className="outstanding-room-row">
-        <div className="min-w-0"><p className="text-base font-semibold">{room.context.label}</p><button type="button" className="pending-room-link" aria-label={`View pending payments for ${room.context.label}`} onClick={event => { trigger.current = event.currentTarget; setSelectedId(room.id) }}>View pending payments</button></div>
+        <div className="min-w-0"><p className="text-base font-semibold">{room.context.label}</p><button type="button" className="pending-room-link" aria-label={`View pending payments for ${room.context.label}`} onClick={event => { trigger.current = event.currentTarget; setSelectedId(room.id) }}><span className="animated-forest-underline">View pending payments</span></button></div>
         <p className="shrink-0 text-base font-bold tabular-nums"><AnimatedNumber value={formatMoney(room.outstanding)} /></p>
       </li>)}</ul>
       {rooms.length === 0 && <p className="text-sm text-muted-foreground">No outstanding balances.</p>}
     </CardContent></Card>
-    {selected && <PendingPaymentsDialog data={data} room={selected} asOf={asOf} onClose={() => setSelectedId(null)} onReturnFocus={() => trigger.current?.focus()} />}
+    {selected && <PendingPaymentsDialog key={selected.id} data={data} room={selected} asOf={asOf} onClose={() => setSelectedId(null)} onReturnFocus={() => trigger.current?.focus()} />}
   </>
 }

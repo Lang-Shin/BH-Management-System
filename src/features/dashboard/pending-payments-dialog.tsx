@@ -1,5 +1,6 @@
 import { ChevronDown, DoorOpen, Droplets, House, WashingMachine, Zap } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useAnimatedDialogClose } from '@/components/ui/use-animated-dialog-close'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/shared/status-badge'
 import type { PrototypeAppState } from '@/domain/types/models'
@@ -21,9 +22,10 @@ export function PendingPaymentsDialog({ data, room, asOf, onClose, onReturnFocus
   const categories = pendingPaymentCategories(data, room.charges, asOf)
   const total = categories.reduce((sum, category) => sum + category.outstanding, 0)
   const count = categories.reduce((sum, category) => sum + category.chargeCount, 0)
+  const { open, requestClose, onOpenChange, onAnimationEnd } = useAnimatedDialogClose(onClose)
 
-  return <Dialog open onOpenChange={open => { if (!open) onClose() }}>
-    <DialogContent className="pending-payments-dialog" onCloseAutoFocus={event => { event.preventDefault(); onReturnFocus() }}>
+  return <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent className="pending-payments-dialog" onAnimationEnd={onAnimationEnd} onCloseAutoFocus={event => { event.preventDefault(); onReturnFocus() }}>
       <DialogHeader className="pending-dialog-heading">
         <div className="flex items-center gap-3 pr-5"><span className="pending-room-icon"><DoorOpen aria-hidden="true" /></span><DialogTitle>{room.context.label} · Pending payments</DialogTitle></div>
         <DialogDescription>Older unpaid months appear first. These amounts are what is still left to pay.</DialogDescription>
@@ -59,7 +61,7 @@ export function PendingPaymentsDialog({ data, room, asOf, onClose, onReturnFocus
         })}
         <p className="mt-4 text-xs text-muted-foreground">Fully paid months are hidden. Each category lists its older unpaid months first. {categories.some(category => category.optional) ? 'Washing is optional and cannot be used while unpaid.' : 'Washing is optional. If a washing bill is not paid, the washing machine cannot be used.'}</p>
       </div>
-      <DialogFooter className="pending-dialog-footer"><Button aria-label="Close pending payments" onClick={onClose}>Close</Button></DialogFooter>
+      <DialogFooter className="pending-dialog-footer"><Button aria-label="Close pending payments" onClick={requestClose}>Close</Button></DialogFooter>
     </DialogContent>
   </Dialog>
 }

@@ -23,7 +23,7 @@ function PaymentCategoryBoxes({ data, payment, asOf }: { data: PrototypeAppState
   const categories = paymentCategories.filter(item => paidCategories.has(item.category))
 
   return <details className="dashboard-transaction-disclosure">
-    <summary className="dashboard-transaction-summary"><span>See all transaction</span><ChevronDown aria-hidden="true" /></summary>
+    <summary className="dashboard-transaction-summary"><span className="animated-forest-underline">See all transaction</span><ChevronDown aria-hidden="true" /></summary>
     {categories.length > 0 ? <ul className="dashboard-payment-checklist" aria-label={`Payment categories for ${payment.id}`}>
       {categories.map(({ category, label }) => <li
         key={category}
