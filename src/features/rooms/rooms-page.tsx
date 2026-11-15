@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { usePrototype } from '@/hooks/use-prototype'
 import { roomOccupancy, roomOccupants, selectRoomSummary, type RoomOccupancy } from '@/domain/calculations/summary'
 import { DEMO_DATE } from '@/data/fixtures/demo'
+import { AddRoomDialog } from './add-room-dialog'
 
 type Filter = 'ALL' | RoomOccupancy
 const filters: { value: Filter; label: string }[] = [
@@ -27,7 +28,7 @@ export default function Rooms() {
   const filterIndex = filters.findIndex(item => item.value === filter)
 
   return <>
-    <PageHeader title="Rooms" description="A room is occupied when someone rents it, even if some beds are unused." />
+    <PageHeader title="Rooms" description="A room is occupied when someone rents it, even if some beds are unused." action={<AddRoomDialog />} />
     <RoomSummary summary={summary} />
     <div className="mb-6 flex flex-wrap items-center justify-between gap-4"><div className="room-segmented-control" role="group" aria-label="Show rooms" style={{ '--filter-index': filterIndex, '--filter-column': filterIndex % 2, '--filter-row': Math.floor(filterIndex / 2) } as CSSProperties}>{filters.map(item => <Button key={item.value} variant="ghost" className="room-filter" aria-pressed={filter === item.value} onClick={() => setFilter(item.value)}>{item.label}</Button>)}</div><p role="status" className="text-sm text-muted-foreground">Showing <AnimatedNumber value={rooms.length} /> of <AnimatedNumber value={data.rooms.length} /> rooms</p></div>
     <p role="status" className="sr-only">{notice}</p>

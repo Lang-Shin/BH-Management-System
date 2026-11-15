@@ -110,6 +110,30 @@ describe('admin workspace integration', () => {
     expect(screen.getByText(/Showing/)).toHaveTextContent('Showing 10 of 10 tenants')
   })
 
+  it('previews adding a room without changing room records or counts', async () => {
+    const user = userEvent.setup()
+    renderApp('/rooms')
+    const trigger = await screen.findByRole('button', { name: 'Add room' })
+    const savedRooms = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}').data.rooms
+    await user.click(trigger)
+    const dialog = await screen.findByRole('dialog', { name: 'Add a room' })
+    await user.type(within(dialog).getByLabelText('Room number or name'), '107')
+    await user.selectOptions(within(dialog).getByLabelText('Room status'), 'maintenance')
+    await user.click(within(dialog).getByRole('button', { name: 'Add room' }))
+
+    const success = await screen.findByRole('dialog', { name: 'Room added successfully' })
+    await user.click(within(success).getByRole('button', { name: 'Got it' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.queryByRole('article', { name: 'Room 107' })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('article')).toHaveLength(6)
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}').data.rooms).toEqual(savedRooms)
+
+    await user.click(trigger)
+    expect(within(screen.getByRole('dialog', { name: 'Add a room' })).getByLabelText('Room number or name')).toHaveValue('')
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
   it('opens mobile navigation, changes route, and dismisses the drawer', async () => {
     const user = userEvent.setup()
     renderApp('/dashboard')
