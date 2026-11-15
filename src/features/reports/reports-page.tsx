@@ -32,10 +32,10 @@ export default function Reports() {
     </section>
     <section className="mt-8" aria-labelledby="monthly-reports"><h2 id="monthly-reports" className="mb-2 text-xl font-semibold">Monthly summary</h2><p className="mb-5 text-base text-muted-foreground">Money received may include payments for older bills or money paid in advance.</p><DataTable rows={periods} caption="Monthly summary" columns={[
       { key: 'period', label: 'Month', render: p => p.label },
-      { key: 'billed', label: 'Total bills', align: 'right', render: p => <AnimatedNumber value={formatMoney(p.summary.billed)} /> },
-      { key: 'applied', label: 'Paid for these bills', align: 'right', render: p => <AnimatedNumber value={formatMoney(p.summary.applied)} /> },
-      { key: 'balance', label: 'Still to pay', align: 'right', render: p => <AnimatedNumber value={formatMoney(p.summary.outstanding)} /> },
-      { key: 'received', label: 'Money received', align: 'right', render: p => <AnimatedNumber value={formatMoney(p.summary.received)} /> },
+      { key: 'billed', label: 'Total bills', align: 'right', render: p => formatMoney(p.summary.billed) },
+      { key: 'applied', label: 'Paid for these bills', align: 'right', render: p => formatMoney(p.summary.applied) },
+      { key: 'balance', label: 'Still to pay', align: 'right', render: p => formatMoney(p.summary.outstanding) },
+      { key: 'received', label: 'Money received', align: 'right', render: p => formatMoney(p.summary.received) },
     ]} /></section>
     <Card className="mt-8 shadow-none"><CardHeader><CardTitle>House settings</CardTitle><CardDescription>You can view these settings. Changing them will be added later.</CardDescription></CardHeader><CardContent><dl className="grid gap-6 text-base sm:grid-cols-2">{([
       ['Currency', 'Philippine peso (₱)'],

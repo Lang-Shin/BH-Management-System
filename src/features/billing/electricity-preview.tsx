@@ -23,7 +23,7 @@ export function ElectricityPreview({ data, periodId }: { data: PrototypeAppState
     <h2 className="mt-6 mb-4 text-xl font-semibold">Past meter readings</h2><DataTable rows={data.meterReadings} caption="Past meter readings" columns={[
       { key: 'meter', label: 'Meter', render: r => data.electricityMeters.find(m => m.id === r.meterId)?.label },
       { key: 'date', label: 'Date', render: r => formatDate(r.readOn) },
-      { key: 'reading', label: 'Reading', render: r => <AnimatedNumber value={`${r.readingMilliKwh / 1000} kWh`} /> },
+      { key: 'reading', label: 'Reading', render: r => `${r.readingMilliKwh / 1000} kWh` },
     ]} />
   </details>
 }

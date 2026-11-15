@@ -49,7 +49,7 @@ export default function Dashboard() {
       { key: 'tenant', label: 'Tenant', render: c => data.tenants.find(t => t.id === c.tenantId)?.name },
       { key: 'category', label: 'Bill for', render: c => CATEGORY_LABELS[c.category] },
       { key: 'due', label: 'Pay by', render: c => formatDate(c.dueDate) },
-      { key: 'balance', label: 'Outstanding', align: 'right', render: c => <AnimatedNumber value={formatMoney(chargeBalance(data, c, DEMO_DATE))} /> },
+      { key: 'balance', label: 'Outstanding', align: 'right', render: c => formatMoney(chargeBalance(data, c, DEMO_DATE)) },
       { key: 'status', label: 'Status', render: c => <StatusBadge status={CHARGE_STATUS_LABELS[chargeStatus(data, c, DEMO_DATE)]} /> },
     ]} /></section>
   </>

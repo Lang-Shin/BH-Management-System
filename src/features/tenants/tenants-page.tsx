@@ -58,7 +58,7 @@ export default function Tenants() {
       { key: 'name', label: 'Tenant', render: t => <div><p className="font-semibold">{t.name}</p>{t.notes && <p className="mt-2 text-sm text-muted-foreground">Note saved</p>}</div> },
       { key: 'room', label: 'Room', render: t => roomName(t.id) ? <span className="inline-flex rounded-md border bg-muted px-2 py-1 text-xs font-semibold">Room {roomName(t.id)}</span> : <span className="text-muted-foreground">No room rented now</span> },
       { key: 'status', label: 'Tenant status', render: t => <StatusBadge status={TENANT_STATUS_LABELS[t.status]} /> },
-      { key: 'balance', label: 'Still to pay', render: t => { const a = tenantAccount(data, t.id, DEMO_DATE); return <div><p className="font-semibold"><AnimatedNumber value={formatMoney(a.balance)} /></p><div className="mt-2"><StatusBadge status={ACCOUNT_STATUS_LABELS[a.status] ?? a.status} /></div>{a.credit > 0 && <p className="mt-2 text-sm">Advance: <AnimatedNumber value={formatMoney(a.credit)} /></p>}</div> } },
+      { key: 'balance', label: 'Still to pay', render: t => { const a = tenantAccount(data, t.id, DEMO_DATE); return <div><p className="font-semibold">{formatMoney(a.balance)}</p><div className="mt-2"><StatusBadge status={ACCOUNT_STATUS_LABELS[a.status] ?? a.status} /></div>{a.credit > 0 && <p className="mt-2 text-sm">Advance: {formatMoney(a.credit)}</p>}</div> } },
       { key: 'actions', label: 'Details', render: t => <Button variant="outline" onClick={() => setSelectedId(t.id)} aria-label={`View ${t.name}`}>View details</Button> },
     ]} />
     {search && <Button variant="outline" onClick={() => setSearch('')} className="mt-4">Clear search</Button>}
