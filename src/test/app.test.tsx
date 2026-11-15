@@ -91,6 +91,25 @@ describe('admin workspace integration', () => {
     expect(screen.getByLabelText('Notes')).toHaveValue('Fictional reminder')
   })
 
+  it('previews adding a tenant without saving a new record', async () => {
+    const user = userEvent.setup()
+    renderApp('/tenants')
+    await user.click(await screen.findByRole('button', { name: 'Add tenant' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Add a tenant' })
+    expect(within(dialog).getByLabelText('Full name')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Email address')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Room')).toBeInTheDocument()
+    await user.type(within(dialog).getByLabelText('Full name'), 'Test Tenant')
+    await user.click(within(dialog).getByRole('button', { name: 'Add tenant' }))
+
+    const success = await screen.findByRole('dialog', { name: 'Tenant added successfully' })
+    expect(within(success).getByText(/No new tenant was saved/)).toBeInTheDocument()
+    await user.click(within(success).getByRole('button', { name: 'Got it' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.queryByText('Test Tenant')).not.toBeInTheDocument()
+    expect(screen.getByText(/Showing/)).toHaveTextContent('Showing 10 of 10 tenants')
+  })
+
   it('opens mobile navigation, changes route, and dismisses the drawer', async () => {
     const user = userEvent.setup()
     renderApp('/dashboard')
