@@ -3,13 +3,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { DataTable } from '@/components/shared/data-table'
 import { AnimatedNumber } from '@/components/shared/animated-number'
 import { formatDate, formatMoney } from '@/lib/format'
+import { chargeRoom } from '@/domain/calculations/room-finance'
 
 export function ElectricityPreview({ data, periodId }: { data: PrototypeAppState; periodId: string }) {
   const charge = data.charges.find(c => c.category === 'ELECTRICITY' && c.billingPeriodId === periodId && c.state === 'ISSUED')
   return <details className="mt-7 rounded-xl border bg-card p-5 sm:p-6"><summary className="min-h-12 cursor-pointer py-2 text-lg font-semibold">View electricity readings and prices</summary>
     <div className="mt-5 grid gap-5 2xl:grid-cols-2"><Card className="shadow-none"><CardHeader><CardTitle>Electricity bill</CardTitle><CardDescription>See how this sample amount was worked out.</CardDescription></CardHeader><CardContent>
       {charge?.category === 'ELECTRICITY' ? <><dl className="grid gap-5 text-base sm:grid-cols-2">{([
-        ['Tenant', data.tenants.find(t => t.id === charge.tenantId)?.name],
+        ['Room context', chargeRoom(data, charge).label],
+        ['Charge owner', data.tenants.find(t => t.id === charge.tenantId)?.name],
         ['Meter', data.electricityMeters.find(m => m.id === charge.electricity.meterId)?.label],
         ['Last reading', <AnimatedNumber value={`${charge.electricity.previousReadingMilliKwh / 1000} kWh`} />],
         ['New reading', <AnimatedNumber value={`${charge.electricity.currentReadingMilliKwh / 1000} kWh`} />],

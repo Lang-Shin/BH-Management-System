@@ -14,6 +14,8 @@ import { CATEGORY_LABELS, CHARGE_STATUS_LABELS } from '@/lib/labels'
 import { BillingStatusMatrix } from './billing-status-matrix'
 import { ElectricityPreview } from './electricity-preview'
 import { PaymentCalculator } from './payment-calculator'
+import { chargeRoom } from '@/domain/calculations/room-finance'
+import { ChargeDetails } from '@/components/shared/charge-details'
 
 export default function Billing() {
   const { data } = usePrototype()
@@ -31,15 +33,17 @@ export default function Billing() {
       <StatCard label="Already paid" value={formatMoney(summary.applied)} detail="Payments used to pay these bills." icon={Wallet} />
       <StatCard label="Still to pay" value={formatMoney(summary.outstanding)} detail={<><AnimatedNumber value={summary.overdue} /> bills are past their due date.</>} icon={CircleAlert} />
     </section>
-    <h2 className="mb-2 text-xl font-semibold">Who has paid?</h2><p className="mb-5 text-base text-muted-foreground">“No bill” means there is nothing to pay for that item.</p>
+    <h2 className="mb-2 text-xl font-semibold">Who has paid?</h2><p className="mb-5 text-base text-muted-foreground">Room totals group individual obligations, not joint room bills. “No bill” means no charge for that category. Open charge details for owners, dates and applied payments. Utility room context is derived from historical period assignments; ambiguous rooms need review.</p>
     <BillingStatusMatrix data={data} periodId={periodId} asOf={DEMO_DATE} outstandingOnly={outstandingOnly} />
     <details className="mt-7 rounded-xl border bg-card p-5 sm:p-6"><summary className="min-h-12 cursor-pointer py-2 text-lg font-semibold">View bill amounts and due dates</summary><div className="mt-5"><DataTable rows={charges} caption="Bill amounts and due dates" columns={[
-      { key: 'tenant', label: 'Tenant', render: c => data.tenants.find(t => t.id === c.tenantId)?.name },
+      { key: 'room', label: 'Room', render: c => <span className="font-semibold">{chargeRoom(data, c).label}</span> },
+      { key: 'tenant', label: 'Charge owner / ID', render: c => <div className="max-w-xs whitespace-normal"><p>{data.tenants.find(t => t.id === c.tenantId)?.name}</p><p className="mt-1 break-all text-xs text-muted-foreground">{c.id}</p></div> },
       { key: 'bill', label: 'Bill for', render: c => CATEGORY_LABELS[c.category] },
       { key: 'amount', label: 'Bill amount', align: 'right', render: c => formatMoney(c.amountCents) },
       { key: 'paid', label: 'Paid', render: c => <div><p>{formatMoney(chargePaid(data, c.id, DEMO_DATE))}</p><div className="mt-2"><StatusBadge status={CHARGE_STATUS_LABELS[chargeStatus(data, c, DEMO_DATE)]} /></div></div> },
       { key: 'balance', label: 'Still to pay', align: 'right', render: c => <span className="font-semibold">{formatMoney(chargeBalance(data, c, DEMO_DATE))}</span> },
       { key: 'due', label: 'Pay by', render: c => <div>{formatDate(c.dueDate)}{c.dueDate < DEMO_DATE && chargeBalance(data, c, DEMO_DATE) > 0 && <div className="mt-2"><StatusBadge status="Late payment" /></div>}</div> },
+      { key: 'details', label: 'Allocations', render: c => <ChargeDetails data={data} charges={[c]} asOf={DEMO_DATE} /> },
     ]} /></div></details>
     <ElectricityPreview data={data} periodId={periodId} />
     <WorkflowPlaceholders title="More billing tools" items={[

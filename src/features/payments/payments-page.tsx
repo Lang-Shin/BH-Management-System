@@ -13,6 +13,7 @@ import { creditRemaining, selectSummary } from '@/domain/calculations/summary'
 import { DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
 import { formatDate, formatMoney } from '@/lib/format'
 import { ReceiptDialog } from './receipt-dialog'
+import { paymentRooms } from '@/domain/calculations/room-finance'
 
 export default function Payments() {
   const { data } = usePrototype()
@@ -42,8 +43,9 @@ export default function Payments() {
     <details className="mt-7 rounded-xl border bg-card p-5 sm:p-6"><summary className="min-h-12 cursor-pointer py-2 text-lg font-semibold">View receipt list</summary><p className="my-5 text-sm text-muted-foreground">These receipt numbers are examples. Making or printing receipts will be added later.</p>
     {receipt && <Card className="mb-5 max-w-lg bg-muted/40"><CardHeader><div className="flex flex-wrap items-center justify-between gap-2"><CardTitle>Sample receipt preview</CardTitle><StatusBadge status="Recorded" /></div><CardDescription>Halili BH · {receipt.receiptNumber}</CardDescription></CardHeader><CardContent><dl className="grid grid-cols-2 gap-4 text-sm"><div><dt className="text-muted-foreground">Received from</dt><dd className="mt-1 font-semibold">{data.tenants.find(t => t.id === receiptPayment?.tenantId)?.name ?? 'Unknown tenant'}</dd></div><div><dt className="text-muted-foreground">Date</dt><dd className="mt-1">{formatDate(receipt.issuedOn)}</dd></div><div className="col-span-2 border-t pt-4"><dt className="text-muted-foreground">Amount paid</dt><dd className="mt-1 text-2xl font-bold tabular-nums"><AnimatedNumber value={formatMoney(receipt.amountCents)} /></dd></div></dl><p className="mt-4 text-xs text-muted-foreground">Demonstration preview · Not an official receipt</p></CardContent></Card>}
     <DataTable rows={data.receipts} caption="Sample receipts" columns={[
+      { key: 'room', label: 'Room context', render: r => { const payment = data.payments.find(p => p.id === r.paymentId); return <span className="font-semibold">{payment ? paymentRooms(data, payment, r.issuedOn, r.allocationIds).label : 'Room needs review'}</span> } },
       { key: 'number', label: 'Receipt number', render: r => r.receiptNumber },
-      { key: 'tenant', label: 'Tenant', render: r => data.tenants.find(t => t.id === data.payments.find(p => p.id === r.paymentId)?.tenantId)?.name },
+      { key: 'tenant', label: 'Received from', render: r => data.tenants.find(t => t.id === data.payments.find(p => p.id === r.paymentId)?.tenantId)?.name },
       { key: 'date', label: 'Receipt date', render: r => formatDate(r.issuedOn) },
       { key: 'amount', label: 'Amount paid', align: 'right', render: r => formatMoney(r.amountCents) },
       { key: 'actions', label: 'Actions', render: r => <Button variant="outline" aria-label={`View receipt ${r.receiptNumber}`} onClick={event => { receiptTrigger.current = event.currentTarget; setSelectedReceiptId(r.id) }}>View receipt</Button> },

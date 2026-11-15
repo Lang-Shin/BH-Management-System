@@ -1,4 +1,11 @@
-import { ReceiptText, Wallet, CircleAlert } from 'lucide-react'
+import { useState } from 'react'
+import { ReceiptText, Wallet, CircleAlert, Download } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { StatusBadge } from '@/components/shared/status-badge'
+import { ChargeDetails } from '@/components/shared/charge-details'
+import { selectRoomFinance } from '@/domain/calculations/room-finance'
+import { CHARGE_STATUS_LABELS } from '@/lib/labels'
+import { roomReportCsv } from './room-report'
 import { PageHeader, PreviewNotice, StatCard } from '@/components/shared/page'
 import { AnimatedNumber } from '@/components/shared/animated-number'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -18,9 +25,22 @@ const changeLabels: Record<AuditEvent['action'], string> = {
 
 export default function Reports() {
   const { data, storageWarning } = usePrototype()
+  const [roomPeriod, setRoomPeriod] = useState(DEMO_PERIOD)
+  const roomRows = selectRoomFinance(data, DEMO_DATE, roomPeriod)
+  const roomTotals = selectSummary(data, DEMO_DATE, roomPeriod)
   const summary = selectSummary(data, DEMO_DATE, DEMO_PERIOD)
   const periods = data.billingPeriods.map(period => ({ ...period, summary: selectSummary(data, DEMO_DATE, period.id) }))
   const currentRate = [...data.electricityRates].filter(r => r.effectiveFrom <= DEMO_DATE).sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0]
+
+  function downloadRoomReport() {
+    const blob = new Blob(['\uFEFF', roomReportCsv(data, DEMO_DATE, roomPeriod)], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `bhms-room-summary-${roomPeriod}-${DEMO_DATE}.csv`
+    link.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
 
   return <>
     <PageHeader title="Reports & Settings" description="See your monthly totals and find the house settings." />
@@ -37,6 +57,20 @@ export default function Reports() {
       { key: 'balance', label: 'Still to pay', align: 'right', render: p => formatMoney(p.summary.outstanding) },
       { key: 'received', label: 'Money received', align: 'right', render: p => formatMoney(p.summary.received) },
     ]} /></section>
+    <section className="mt-8" aria-labelledby="room-report-title">
+      <h2 id="room-report-title" className="text-xl font-semibold">Room financial summary</h2>
+      <p className="mt-2 text-sm text-muted-foreground">Individual charges grouped by historical room context, not joint liability. Applied money excludes unallocated advances. Room needs review means the original room cannot be identified safely.</p>
+      <div className="my-5 flex flex-wrap items-end justify-between gap-4"><div><label htmlFor="room-report-period" className="mb-2 block text-sm font-semibold">Report month</label><select id="room-report-period" value={roomPeriod} onChange={event => setRoomPeriod(event.target.value)} className="min-h-12 max-w-full rounded-lg border bg-card px-3">{data.billingPeriods.map(period => <option key={period.id} value={period.id}>{period.label}</option>)}</select></div><Button variant="outline" onClick={downloadRoomReport}><Download aria-hidden="true" />Download room CSV</Button></div>
+      <DataTable rows={roomRows} caption="Room financial summary" columns={[
+        { key: 'room', label: 'Room', render: row => <span className="font-semibold">{row.context.label}</span> },
+        { key: 'billed', label: 'Total billed', align: 'right', render: row => formatMoney(row.billed) },
+        { key: 'paid', label: 'Applied to bills', align: 'right', render: row => formatMoney(row.paid) },
+        { key: 'outstanding', label: 'Outstanding', align: 'right', render: row => formatMoney(row.outstanding) },
+        { key: 'status', label: 'Payment status', render: row => <StatusBadge status={CHARGE_STATUS_LABELS[row.status]} /> },
+        { key: 'details', label: 'Underlying charges', render: row => <ChargeDetails data={data} charges={row.charges} asOf={DEMO_DATE} /> },
+      ]} />
+      <p className="mt-4 text-sm" aria-label="Room report reconciliation">All room/context totals: billed {formatMoney(roomTotals.billed)} · applied {formatMoney(roomTotals.applied)} · outstanding {formatMoney(roomTotals.outstanding)}. Includes any room-needs-review rows. Cash received is reported separately in Monthly summary.</p>
+    </section>
     <Card className="mt-8 shadow-none"><CardHeader><CardTitle>House settings</CardTitle><CardDescription>You can view these settings. Changing them will be added later.</CardDescription></CardHeader><CardContent><dl className="grid gap-6 text-base sm:grid-cols-2">{([
       ['Currency', 'Philippine peso (₱)'],
       ['Rent', 'Based on the agreed rent for each tenant'],
@@ -55,7 +89,7 @@ export default function Reports() {
       <p className="mt-5 text-sm text-muted-foreground">Your changes are saved only in this browser. This is not a backup.</p>
     </details>
     <WorkflowPlaceholders title="More report tools" items={[
-      { title: 'Print or save a report', description: 'Downloading or printing reports will be available later.' },
+      { title: 'Print other reports', description: 'A room summary CSV is available above. Printing and other report formats will be available later.' },
       { title: 'Save a backup', description: 'Making a backup copy and bringing back saved records will be added later.' },
     ]} />
   </>

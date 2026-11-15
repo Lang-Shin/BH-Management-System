@@ -5,6 +5,7 @@ import { StatusBadge } from '@/components/shared/status-badge'
 import type { PrototypeAppState, Receipt } from '@/domain/types/models'
 import { formatDate, formatMoney } from '@/lib/format'
 import { CATEGORY_LABELS } from '@/lib/labels'
+import { chargeRoom, paymentRooms } from '@/domain/calculations/room-finance'
 
 export function ReceiptDialog({ data, receipt, onClose, onReturnFocus }: {
   data: PrototypeAppState
@@ -27,6 +28,7 @@ export function ReceiptDialog({ data, receipt, onClose, onReturnFocus }: {
       </DialogHeader>
       <div><StatusBadge status={receipt.state === 'ISSUED' ? 'Recorded' : 'Voided'} /></div>
       <dl className="grid min-w-0 grid-cols-2 gap-3 rounded-2xl border bg-muted/40 p-4 text-sm">
+        <div className="col-span-2"><dt className="text-muted-foreground">Room context</dt><dd className="mt-1 font-semibold">{payment ? paymentRooms(data, payment, receipt.issuedOn, receipt.allocationIds).label : 'Room needs review'}</dd></div>
         <div className="min-w-0"><dt className="text-muted-foreground">Received from</dt><dd className="mt-1 break-words font-semibold">{tenant?.name ?? 'Unknown tenant'}</dd></div>
         <div><dt className="text-muted-foreground">Receipt date</dt><dd className="mt-1">{formatDate(receipt.issuedOn)}</dd></div>
         <div><dt className="text-muted-foreground">Payment method</dt><dd className="mt-1">{payment ? payment.method === 'cash' ? 'Cash' : 'Bank transfer' : 'Not available'}</dd></div>
@@ -39,7 +41,7 @@ export function ReceiptDialog({ data, receipt, onClose, onReturnFocus }: {
             const charge = data.charges.find(item => item.id === allocation.chargeId)
             const period = data.billingPeriods.find(item => item.id === charge?.billingPeriodId)
             return <li key={allocation.id} className="flex flex-wrap justify-between gap-3 py-2 text-sm">
-              <div><p className="font-semibold">{charge ? CATEGORY_LABELS[charge.category] : 'Bill'}</p>{period && <p className="mt-1 text-xs text-muted-foreground">{period.label}</p>}{allocation.state === 'REVERSED' && <p className="mt-1 text-xs text-muted-foreground">Allocation later reversed</p>}</div>
+              <div className="min-w-0"><p className="font-semibold">{charge ? CATEGORY_LABELS[charge.category] : 'Bill'} · {charge ? chargeRoom(data, charge).label : 'Room needs review'}</p>{period && <p className="mt-1 text-xs text-muted-foreground">{period.label}</p>}<p className="mt-1 break-all text-xs text-muted-foreground">Charge: {allocation.chargeId} · Allocation: {allocation.id}</p>{allocation.state === 'REVERSED' && <p className="mt-1 text-xs text-muted-foreground">Allocation later reversed</p>}</div>
               <span className="font-semibold tabular-nums">{formatMoney(allocation.amountCents)}</span>
             </li>
           })}

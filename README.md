@@ -33,8 +33,8 @@ npm run preview    # Serve the built application locally
 | `/tenants` | Search, fictional profiles, assignment history, tenant/account statuses, demo notes |
 | `/rooms` | Occupied, available, and under-repair rooms; current tenants; bed counts for information only |
 | `/billing` | Billing: choose a month, see who has paid, check due dates, and view electricity details |
-| `/payments` | Read-only payment allocations, partial-payment examples, advance credit, sample receipt snapshots and receipt-detail dialogs |
-| `/reports` | Sample monthly collection reports, billing policies, audit log, export/backup/recovery placeholders |
+| `/payments` | Room-first individual payment transactions with payer/allocation details, individual advance credit, sample receipt snapshots and receipt-detail dialogs |
+| `/reports` | Monthly totals, reconciled room reports and room-summary CSV, billing policies, audit log, backup/recovery placeholders |
 
 - Fixed desktop sidebar and accessible mobile/tablet navigation drawer.
 - Light iOS-inspired details: frosted header/dialog surfaces, luminous rounded inner cards with layered shadows, softer controls, button press feedback, and segmented room filters. Solid surface fallbacks support reduced transparency.
@@ -49,6 +49,8 @@ npm run preview    # Serve the built application locally
 - Oat Milk (`#EEE5D4`), Forest Green (`#1D4A35`), and Tomato Red (`#F2462E`) follow a 60–30–10 visual hierarchy: warm surfaces, forest sidebar/headings, and tomato action accents. Compact typography, comfortable controls, and stacked phone records are retained. See the [landlord UI notes](docs/landlord-ui.md) and [TASK 1A.1 redesign report](docs/task-1a-1-report.md).
 
 ### Demo data and persistence
+
+Financial summaries group distinct charges by their historical room context; they do not create shared charges or imply joint tenant liability. Rent uses its recorded assignment. Utilities use the billed period’s single room context; ambiguous or missing historical attribution appears as **Room needs review** and stays in totals. Expand charge/payment details to see original tenants, payers, periods and IDs. Multi-room payments stay single transactions with allocation breakdowns, and unallocated money is not applied bill income. Reports and the room CSV use the same room-finance selector. See [TASK 1A.4 findings and verification](docs/task-1a-4-report.md).
 
 The app is branded **Halili BH**. Its demonstration records are fictional: **10 tenants** (9 active, 1 moved out), **6 rooms**, 2 sample billing periods, 23 category charges, 10 payments, explicit allocations, an advance credit, and sample receipt references. Emails use `example.com`; phone strings are deliberately non-dialable demo numbers, and addresses use fictional Demo City locations. The snapshot is **November 13, 2026**, and amounts use **PHP with two decimal places**.
 
