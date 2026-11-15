@@ -1,6 +1,8 @@
 import type { Charge, ChargeStatus, Payment, PrototypeAppState } from '@/domain/types/models'
 import { chargeBalance, chargePaid, chargeStatus, issuedCharges } from './summary'
 
+const categoryOrder: Charge['category'][] = ['RENT', 'ELECTRICITY', 'WATER', 'WASHING_MACHINE']
+
 export interface FinancialRoom {
   id: string
   roomId: string | null
@@ -73,24 +75,26 @@ export function selectRoomFinance(data: PrototypeAppState, asOf: string, periodI
 }
 
 export interface RoomDueGroup extends RoomFinance {
-  category: Charge['category']
+  categories: Charge['category'][]
   dueDate: string
   periodId: string
 }
 
 export function selectRoomDues(data: PrototypeAppState, asOf: string): RoomDueGroup[] {
-  const groups = new Map<string, { context: FinancialRoom; charges: Charge[]; category: Charge['category']; dueDate: string; periodId: string }>()
+  const groups = new Map<string, { context: FinancialRoom; charges: Charge[]; dueDate: string; periodId: string }>()
   for (const charge of issuedCharges(data, asOf)) {
     if (charge.dueDate < asOf || chargeBalance(data, charge, asOf) <= 0) continue
     const context = chargeRoom(data, charge)
-    // Separate status/period/date/category, and retain obligations in drill-down.
-    const id = JSON.stringify([context.id, charge.billingPeriodId, charge.category, charge.dueDate, chargeStatus(data, charge, asOf)])
-    const group = groups.get(id) ?? { context, charges: [], category: charge.category, dueDate: charge.dueDate, periodId: charge.billingPeriodId }
+    // Combine categories sharing a room and due date; keep periods and dates separate.
+    const id = JSON.stringify([context.id, charge.billingPeriodId, charge.dueDate])
+    const group = groups.get(id) ?? { context, charges: [], dueDate: charge.dueDate, periodId: charge.billingPeriodId }
     group.charges.push(charge)
     groups.set(id, group)
   }
-  return [...groups].map(([id, group]) => ({ id, ...group, ...financialTotals(data, group.charges, asOf) }))
-    .sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.context.label.localeCompare(b.context.label, 'en', { numeric: true }) || a.id.localeCompare(b.id))
+  return [...groups].map(([id, group]) => {
+    const categories = categoryOrder.filter(category => group.charges.some(charge => charge.category === category))
+    return { id, ...group, categories, ...financialTotals(data, group.charges, asOf) }
+  }).sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.context.label.localeCompare(b.context.label, 'en', { numeric: true }) || a.id.localeCompare(b.id))
 }
 
 export interface PaymentRoomPresentation {

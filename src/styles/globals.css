@@ -563,6 +563,14 @@
   .pending-dialog-footer { padding: 12px 16px; }
 }
 
+.upcoming-bill-button { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding-block: 6px; color: var(--forest-green); font-size: 14px; font-weight: 650; line-height: 1.4; transition: font-size 180ms ease; }
+.upcoming-bill-button > svg { flex: none; width: 16px; height: 16px; }
+.upcoming-bill-button:hover,
+.upcoming-bill-button:focus-visible { font-size: 15px; }
+@media (prefers-reduced-motion: reduce) {
+  .upcoming-bill-button { transition: none; }
+}
+
 .dashboard-transaction-disclosure { width: 10.5rem; max-width: 100%; white-space: normal; text-align: left; }
 .dashboard-transaction-summary {
   display: flex;

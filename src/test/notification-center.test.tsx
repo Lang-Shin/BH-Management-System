@@ -21,8 +21,8 @@ describe('notification center', () => {
     const panel = await screen.findByRole('dialog', { name: 'Notifications' })
     expect(within(panel).getByText('7 bills are past due')).toBeInTheDocument()
     expect(within(panel).getByText(/₱10,800\.00 still to pay/)).toBeInTheDocument()
-    expect(within(panel).getByText('9 bills are due in the next 7 days')).toBeInTheDocument()
-    expect(within(panel).getByText(/₱14,750\.00 still to pay/)).toBeInTheDocument()
+    expect(within(panel).getByText('7 bills are due in the next 7 days')).toBeInTheDocument()
+    expect(within(panel).getByText(/₱14,450\.00 still to pay/)).toBeInTheDocument()
     expect(within(panel).getByText('Room 106 is under repair')).toBeInTheDocument()
     expect(within(panel).getByText('₱500.00 advance payment is held')).toBeInTheDocument()
 

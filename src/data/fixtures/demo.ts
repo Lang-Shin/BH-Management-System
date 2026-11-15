@@ -48,6 +48,7 @@ export function createDemoData(): PrototypeAppState {
     charges.push({ ...base, id: `water-${index + 1}`, category: 'WATER', description: 'Manually entered sample water charge', amountCents: 15_000, entryMethod: 'MANUAL' })
   }
   charges.push({ id: 'washing-2', tenantId: 'tenant-2', billingPeriodId: DEMO_PERIOD, category: 'WASHING_MACHINE', description: 'Optional manually entered sample charge', amountCents: 8_000, issuedOn: '2026-11-01', dueDate: '2026-11-20', state: 'ISSUED', entryMethod: 'MANUAL', correction: null })
+  charges.push({ id: 'washing-7', tenantId: 'tenant-7', billingPeriodId: DEMO_PERIOD, category: 'WASHING_MACHINE', description: 'Optional washing charge paid while rent remains unpaid', amountCents: 8_000, issuedOn: '2026-11-01', dueDate: '2026-11-20', state: 'ISSUED', entryMethod: 'MANUAL', correction: null })
   charges.push({ id: 'rent-old', tenantId: 'tenant-10', billingPeriodId: 'period-oct', category: 'RENT', description: 'Historical agreed rent', amountCents: 300_000, agreedRentCents: 300_000, roomAssignmentId: 'assignment-10', issuedOn: '2026-10-31', dueDate: '2026-11-05', state: 'ISSUED', correction: null })
   charges.push({ id: 'water-old', tenantId: 'tenant-10', billingPeriodId: 'period-oct', category: 'WATER', description: 'Historical manual water charge', amountCents: 10_000, entryMethod: 'MANUAL', issuedOn: '2026-10-31', dueDate: '2026-11-05', state: 'ISSUED', correction: null })
   charges.push(...[
@@ -57,6 +58,11 @@ export function createDemoData(): PrototypeAppState {
     ...base, category: 'ELECTRICITY', description: 'Illustrative charge only; meter ownership and shared allocation unconfirmed', state: 'ISSUED', correction: null,
     electricity: { meterId: 'meter-demo-a', previousReadingId, currentReadingId, previousReadingMilliKwh, currentReadingMilliKwh, consumptionMilliKwh: currentReadingMilliKwh - previousReadingMilliKwh, rateId, appliedRateCentsPerKwh, appliedRateEffectiveFrom },
   })))
+
+  const novemberElectricity = charges.find(charge => charge.id === 'electricity-1')
+  if (novemberElectricity?.category === 'ELECTRICITY') {
+    charges.push({ ...novemberElectricity, id: 'electricity-6', tenantId: 'tenant-6', description: 'November sample electricity paid while rent remains unpaid' })
+  }
 
   const octoberBase = { billingPeriodId: 'period-oct', issuedOn: '2026-10-31', dueDate: '2026-11-05', state: 'ISSUED' as const, correction: null }
   charges.push(
@@ -87,6 +93,8 @@ export function createDemoData(): PrototypeAppState {
     { id: 'payment-2-washing', tenantId: 'tenant-2', paidOn: '2026-11-06', items: [['washing-2', 8_000]] },
     { id: 'payment-3', tenantId: 'tenant-3', paidOn: '2026-11-05', items: [['rent-3', 350_000], ['water-3', 15_000]] },
     { id: 'payment-7', tenantId: 'tenant-7', paidOn: '2026-11-07', items: [['rent-7', 350_000]] },
+    { id: 'payment-6-utilities', tenantId: 'tenant-6', paidOn: '2026-11-10', items: [['water-6', 15_000], ['electricity-6', 15_600]] },
+    { id: 'payment-7-utilities', tenantId: 'tenant-7', paidOn: '2026-11-12', items: [['water-7', 15_000], ['washing-7', 8_000]] },
   ] satisfies { id: string; tenantId: string; paidOn: string; items: [string, number][] }[]
   examples.forEach((example, index) => {
     payments.push({ id: example.id, tenantId: example.tenantId, paidOn: example.paidOn, amountCents: example.items.reduce((sum, [, amount]) => sum + amount, 0), method: index % 2 ? 'cash' : 'bank-transfer', state: 'RECORDED', correction: null })

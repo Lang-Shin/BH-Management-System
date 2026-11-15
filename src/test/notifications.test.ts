@@ -36,10 +36,10 @@ describe('notification selector', () => {
         href: '/billing',
       },
       {
-        id: 'due-soon:2026-11-20:9:1475000',
+        id: 'due-soon:2026-11-20:7:1445000',
         kind: 'due-soon',
-        title: '9 bills are due in the next 7 days',
-        description: `${formatMoney(1_475_000)} still to pay.`,
+        title: '7 bills are due in the next 7 days',
+        description: `${formatMoney(1_445_000)} still to pay.`,
         href: '/billing',
       },
       {

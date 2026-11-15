@@ -1,5 +1,6 @@
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CircleAlert, ReceiptText, TrendingUp, Banknote, ArrowRight } from 'lucide-react'
+import { ArrowRight, Banknote, ChevronRight, CircleAlert, ReceiptText, TrendingUp } from 'lucide-react'
 import { PageHeader, StatCard } from '@/components/shared/page'
 import { AnimatedNumber } from '@/components/shared/animated-number'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -10,17 +11,21 @@ import { BillPaymentChart, RoomOccupancyChart } from './dashboard-analytics'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { usePrototype } from '@/hooks/use-prototype'
 import { selectSummary } from '@/domain/calculations/summary'
-import { selectRoomDues } from '@/domain/calculations/room-finance'
+import { selectRoomDues, selectRoomFinance } from '@/domain/calculations/room-finance'
 import { OutstandingBalances } from './outstanding-balances'
-import { ChargeDetails } from '@/components/shared/charge-details'
+import { PendingPaymentsDialog } from './pending-payments-dialog'
 import { DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
-import { formatDate, formatMoney } from '@/lib/format'
-import { CATEGORY_LABELS, CHARGE_STATUS_LABELS } from '@/lib/labels'
+import { formatMoney } from '@/lib/format'
+import { CHARGE_STATUS_LABELS } from '@/lib/labels'
 
 export default function Dashboard() {
   const { data } = usePrototype()
   const summary = selectSummary(data, DEMO_DATE, DEMO_PERIOD)
   const upcoming = selectRoomDues(data, DEMO_DATE)
+  const rooms = selectRoomFinance(data, DEMO_DATE)
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
+  const billTrigger = useRef<HTMLButtonElement | null>(null)
+  const selectedRoom = rooms.find(room => room.id === selectedRoomId)
   const recent = data.payments.filter(p => p.state === 'RECORDED' && p.paidOn <= DEMO_DATE)
     .sort((a, b) => b.paidOn.localeCompare(a.paidOn)).slice(0, 5)
   const collectionRate = summary.billed > 0 ? summary.applied / summary.billed * 100 : 0
@@ -44,14 +49,13 @@ export default function Dashboard() {
     <section aria-labelledby="recent-payments"><div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 id="recent-payments" className="text-lg font-bold">Recent payments</h2><Button variant="ghost" asChild><Link to="/payments">View all <ArrowRight /></Link></Button></div><PaymentHistoryTable data={data} payments={recent} compact transactionDisplay="categories" caption="Recent payments" /></section>
     <OutstandingBalances data={data} asOf={DEMO_DATE} />
     </div>
-    <section aria-labelledby="upcoming-dues" className="mt-8"><h2 id="upcoming-dues" className="mb-2 text-lg font-bold">Upcoming due dates</h2><p className="mb-4 text-sm text-muted-foreground">The next <AnimatedNumber value={Math.min(6, upcoming.length)} /> room/category groups to check. Different periods, due dates and payment statuses stay separate.</p><DataTable rows={upcoming.slice(0, 6)} caption="Bills due soon" columns={[
+    <section aria-labelledby="upcoming-dues" className="mt-8"><h2 id="upcoming-dues" className="mb-2 text-lg font-bold">Upcoming due dates</h2><p className="mb-4 text-sm text-muted-foreground">The next <AnimatedNumber value={Math.min(6, upcoming.length)} /> room due-date groups to check. Choose <strong className="font-semibold text-foreground">Show Bill</strong> to see every pending month and category for that room.</p><DataTable rows={upcoming.slice(0, 6)} caption="Bills due soon" columns={[
       { key: 'room', label: 'Room', render: c => <span className="font-semibold">{c.context.label}</span> },
-      { key: 'category', label: 'Bill for', render: c => CATEGORY_LABELS[c.category] },
-      { key: 'due', label: 'Pay by', render: c => formatDate(c.dueDate) },
+      { key: 'bill', label: 'Bill for', render: c => <button type="button" className="upcoming-bill-button" aria-label={`Show Bill for ${c.context.label}`} onClick={event => { billTrigger.current = event.currentTarget; setSelectedRoomId(c.context.id) }}>Show Bill<ChevronRight aria-hidden="true" /></button> },
       { key: 'period', label: 'Month', render: c => data.billingPeriods.find(period => period.id === c.periodId)?.label },
       { key: 'balance', label: 'Outstanding', align: 'right', render: c => formatMoney(c.outstanding) },
       { key: 'status', label: 'Status', render: c => <StatusBadge status={CHARGE_STATUS_LABELS[c.status]} /> },
-      { key: 'details', label: 'Underlying charges', render: c => <ChargeDetails data={data} charges={c.charges} asOf={DEMO_DATE} /> },
     ]} /></section>
+    {selectedRoom && <PendingPaymentsDialog data={data} room={selectedRoom} asOf={DEMO_DATE} onClose={() => setSelectedRoomId(null)} onReturnFocus={() => billTrigger.current?.focus()} />}
   </>
 }

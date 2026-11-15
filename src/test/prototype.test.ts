@@ -11,7 +11,7 @@ describe('shared fictional financial model', () => {
     const data = createDemoData()
     expect(isPrototypeData(data)).toBe(true)
     expect(selectSummary(data, DEMO_DATE, DEMO_PERIOD)).toEqual({ tenants: 9, totalRooms: 6, occupiedRooms: 4, availableRooms: 1, maintenanceRooms: 1,
-      billed: 2_958_600, applied: 768_600, received: 1_545_400, outstanding: 2_190_000, credit: 50_000, overdue: 4, paid: 7, partial: 0, unpaid: 13 })
+      billed: 2_982_200, applied: 822_200, received: 1_599_000, outstanding: 2_160_000, credit: 50_000, overdue: 4, paid: 11, partial: 0, unpaid: 11 })
     const received = data.payments.reduce((sum, p) => sum + p.amountCents, 0)
     const allocated = data.paymentAllocations.reduce((sum, a) => sum + a.amountCents, 0)
     expect(received - allocated).toBe(50_000)
@@ -31,7 +31,7 @@ describe('shared fictional financial model', () => {
     expect(chargeStatus(data, electricity, DEMO_DATE)).toBe('PAID')
     expect(chargeBalance(data, electricity, DEMO_DATE)).toBe(0)
     expect(creditRemaining(data, data.tenantCredits[0]!, DEMO_DATE)).toBe(50_000)
-    expect(tenantAccount(data, 'tenant-6', DEMO_DATE)).toMatchObject({ balance: 365_000, credit: 50_000 })
+    expect(tenantAccount(data, 'tenant-6', DEMO_DATE)).toMatchObject({ balance: 350_000, credit: 50_000 })
     expect(data.charges.some(c => c.tenantId === 'tenant-1' && c.category === 'WASHING_MACHINE')).toBe(false)
   })
 
@@ -54,7 +54,7 @@ describe('shared fictional financial model', () => {
     const october = selectSummary(data, DEMO_DATE, 'period-oct')
     expect(october).toMatchObject({ billed: 1_091_800, applied: 726_800, received: 0, outstanding: 365_000 })
     expect(selectSummary(data, '2026-11-01', DEMO_PERIOD).received).toBe(0)
-    expect(selectSummary(data, '2026-11-21', DEMO_PERIOD).overdue).toBe(13)
+    expect(selectSummary(data, '2026-11-21', DEMO_PERIOD).overdue).toBe(11)
   })
 
   const invalidCases: { name: string; change: (data: PrototypeAppState) => void }[] = [

@@ -76,16 +76,16 @@ All amounts below derive from fixture records, not dashboard-specific constants.
 | --- | ---: |
 | November rent charges (Room 101 two shares of PHP 1,750; Room 102 PHP 3,500; seven other tenant charges at PHP 3,500) | PHP 28,000.00 |
 | November manually entered water (9 × PHP 150) | PHP 1,350.00 |
-| November electricity example | PHP 156.00 |
-| Optional November washing machine charge | PHP 80.00 |
-| **November issued charges** | **PHP 29,586.00** |
-| Explicitly allocated to November charges | PHP 7,686.00 |
-| **November outstanding** | **PHP 21,900.00** |
+| November electricity examples (2 × PHP 156) | PHP 312.00 |
+| Optional November washing machine charges (2 × PHP 80) | PHP 160.00 |
+| **November issued charges** | **PHP 29,822.00** |
+| Explicitly allocated to November charges | PHP 8,222.00 |
+| **November outstanding** | **PHP 21,600.00** |
 | October charges paid during November | PHP 7,268.00 |
 | Unapplied advance received in November | PHP 500.00 |
-| **Cash received during November** | **PHP 15,454.00** |
+| **Cash received during November** | **PHP 15,990.00** |
 
-Seven November charges are paid and thirteen are unpaid. Four are overdue at the fixed demo date; the remaining outstanding charges are due November 20. Room 101 has unpaid October/November rent but paid utilities. Room 102 has unpaid November rent and unpaid October/November water. The moved-out tenant’s October account is fully settled while their assignment and charge history remain visible.
+Eleven November charges are paid and eleven are unpaid. Four are overdue at the fixed demo date; the remaining outstanding charges are due November 20. Room 101 has unpaid October/November rent but paid utilities. Room 102 has unpaid November rent and unpaid October/November water. Room 103 has water, electricity, and washing paid for the November 20 due-date group while rent remains unpaid. The moved-out tenant’s October account is fully settled while their assignment and charge history remain visible.
 
 The fixture factory generates fresh objects for reset/tests; it is not an executable bill-generation workflow. Contacts are invented, with reserved `example.com` email addresses and deliberately non-dialable `DEMO +63 000 ...` phone strings.
 
