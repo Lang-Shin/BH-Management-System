@@ -11,6 +11,10 @@ function PaidLabel() {
   return <span className="paid-indicator"><span className="paid-indicator-icon"><Check aria-hidden="true" /></span><span>Paid</span></span>
 }
 
+function PaidCategoryLabel() {
+  return <span className="font-semibold text-primary">PAID</span>
+}
+
 function UnsettledLabel({ partial = false }: { partial?: boolean }) {
   const Icon = partial ? CircleDashed : Clock3
   return <span className="billing-state-pill" data-state={partial ? 'partial' : 'unpaid'}><span className="billing-state-icon"><Icon aria-hidden="true" /></span><span>{partial ? 'PARTLY PAID' : 'NOT PAID'}</span></span>
@@ -45,8 +49,8 @@ export function BillingStatusMatrix({ data, periodId, asOf, outstandingOnly }: {
       const items = room.charges.filter(charge => charge.category === category)
       if (!items.length) return <NoBillLabel />
       const totals = financialTotals(data, items, asOf)
-      if (category === 'ELECTRICITY') return totals.outstanding > 0 ? <UnsettledLabel /> : <PaidLabel />
-      return totals.outstanding > 0 ? <p className="font-semibold tabular-nums">{formatMoney(totals.outstanding)}</p> : <PaidLabel />
+      if (category === 'ELECTRICITY') return totals.outstanding > 0 ? <UnsettledLabel /> : <PaidCategoryLabel />
+      return totals.outstanding > 0 ? <p className="font-semibold tabular-nums">{formatMoney(totals.outstanding)}</p> : <PaidCategoryLabel />
     } })),
     { key: 'status', label: 'Status', render: room => <RoomStatus status={roomStatus(data, room, asOf)} /> },
   ]} />
