@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { CircleAlert, ReceiptText, TrendingUp, Banknote, ArrowRight } from 'lucide-react'
 import { PageHeader, StatCard } from '@/components/shared/page'
+import { AnimatedNumber } from '@/components/shared/animated-number'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
@@ -32,23 +33,23 @@ export default function Dashboard() {
       <StatCard label="Total outstanding" value={formatMoney(summary.outstanding)} detail="Still to pay for November." icon={CircleAlert} />
       <StatCard label="Collection rate" value={`${collectionRate.toFixed(1)}%`} detail="Collected ÷ billed for November." icon={TrendingUp} />
     </section>
-    <details className="mt-3 text-sm text-muted-foreground"><summary className="min-h-12 cursor-pointer py-3 font-medium">How are collections counted?</summary><p className="max-w-3xl pb-3 leading-relaxed">Total collected is the money allocated to November’s bills. Money received during November is {formatMoney(summary.received)} and can include older bills or advance payments. Collection rate uses allocated payments, so these measures can differ.</p></details>
+    <details className="mt-3 text-sm text-muted-foreground"><summary className="min-h-12 cursor-pointer py-3 font-medium">How are collections counted?</summary><p className="max-w-3xl pb-3 leading-relaxed">Total collected is the money allocated to November’s bills. Money received during November is <AnimatedNumber value={formatMoney(summary.received)} /> and can include older bills or advance payments. Collection rate uses allocated payments, so these measures can differ.</p></details>
     <div className="my-6 grid items-start gap-6 xl:grid-cols-2">
       <Card><CardHeader><CardTitle>Rooms at a glance</CardTitle><CardDescription>Occupancy across your boarding house.</CardDescription></CardHeader><CardContent><RoomOccupancyChart summary={summary} /><Button variant="outline" className="mt-6" asChild><Link to="/rooms">View rooms <ArrowRight /></Link></Button></CardContent></Card>
       <Card><CardHeader><CardTitle>Bill payments</CardTitle><CardDescription>Rent, electricity, water, and washing are counted separately.</CardDescription></CardHeader><CardContent>
         <BillPaymentChart summary={summary} />
-        <p className="mt-5 text-base">{summary.overdue} bills are past their due date.</p><p className="mt-3 text-sm text-muted-foreground">Advance payments kept for later: <strong className="text-foreground">{formatMoney(summary.credit)}</strong>.</p>
+        <p className="mt-5 text-base"><AnimatedNumber value={summary.overdue} /> bills are past their due date.</p><p className="mt-3 text-sm text-muted-foreground">Advance payments kept for later: <strong className="text-foreground"><AnimatedNumber value={formatMoney(summary.credit)} /></strong>.</p>
       </CardContent></Card>
     </div>
     <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
     <section aria-labelledby="recent-payments"><div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 id="recent-payments" className="text-lg font-bold">Recent payments</h2><Button variant="ghost" asChild><Link to="/payments">View all <ArrowRight /></Link></Button></div><PaymentHistoryTable data={data} payments={recent} compact caption="Recent payments" /></section>
-    <Card><CardHeader><CardTitle>Outstanding balances</CardTitle><CardDescription>Largest tenant balances · all issued bills</CardDescription></CardHeader><CardContent><ul className="divide-y">{balances.map(tenant => <li key={tenant.id} className="flex flex-wrap items-center justify-between gap-2 py-3"><div><p className="text-sm font-semibold">{tenant.name}</p><p className="mt-1 text-xs text-muted-foreground">{tenant.account.status === 'Overdue' ? 'Includes overdue bills' : 'Payment pending'}</p></div><p className="text-sm font-bold tabular-nums">{formatMoney(tenant.account.balance)}</p></li>)}</ul>{balances.length === 0 && <p className="text-sm text-muted-foreground">No outstanding balances.</p>}</CardContent></Card>
+    <Card><CardHeader><CardTitle>Outstanding balances</CardTitle><CardDescription>Largest tenant balances · all issued bills</CardDescription></CardHeader><CardContent><ul className="divide-y">{balances.map(tenant => <li key={tenant.id} className="flex flex-wrap items-center justify-between gap-2 py-3"><div><p className="text-sm font-semibold">{tenant.name}</p><p className="mt-1 text-xs text-muted-foreground">{tenant.account.status === 'Overdue' ? 'Includes overdue bills' : 'Payment pending'}</p></div><p className="text-sm font-bold tabular-nums"><AnimatedNumber value={formatMoney(tenant.account.balance)} /></p></li>)}</ul>{balances.length === 0 && <p className="text-sm text-muted-foreground">No outstanding balances.</p>}</CardContent></Card>
     </div>
-    <section aria-labelledby="upcoming-dues" className="mt-8"><h2 id="upcoming-dues" className="mb-2 text-lg font-bold">Upcoming due dates</h2><p className="mb-4 text-sm text-muted-foreground">The next {Math.min(6, upcoming.length)} bills to check. Fully paid bills are not shown.</p><DataTable rows={upcoming.slice(0, 6)} caption="Bills due soon" columns={[
+    <section aria-labelledby="upcoming-dues" className="mt-8"><h2 id="upcoming-dues" className="mb-2 text-lg font-bold">Upcoming due dates</h2><p className="mb-4 text-sm text-muted-foreground">The next <AnimatedNumber value={Math.min(6, upcoming.length)} /> bills to check. Fully paid bills are not shown.</p><DataTable rows={upcoming.slice(0, 6)} caption="Bills due soon" columns={[
       { key: 'tenant', label: 'Tenant', render: c => data.tenants.find(t => t.id === c.tenantId)?.name },
       { key: 'category', label: 'Bill for', render: c => CATEGORY_LABELS[c.category] },
       { key: 'due', label: 'Pay by', render: c => formatDate(c.dueDate) },
-      { key: 'balance', label: 'Outstanding', align: 'right', render: c => formatMoney(chargeBalance(data, c, DEMO_DATE)) },
+      { key: 'balance', label: 'Outstanding', align: 'right', render: c => <AnimatedNumber value={formatMoney(chargeBalance(data, c, DEMO_DATE))} /> },
       { key: 'status', label: 'Status', render: c => <StatusBadge status={CHARGE_STATUS_LABELS[chargeStatus(data, c, DEMO_DATE)]} /> },
     ]} /></section>
   </>

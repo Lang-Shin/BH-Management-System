@@ -40,6 +40,7 @@ npm run preview    # Serve the built application locally
 - Light iOS-inspired details: frosted header/dialog surfaces, luminous rounded inner cards with layered shadows, softer controls, button press feedback, and segmented room filters. Solid surface fallbacks support reduced transparency.
 - Responsive cards and horizontally scrollable data tables.
 - Dashboard analytics include a room-occupancy doughnut and a bill-status stacked bar, with counts and percentage legends from the current summary data. Charts animate on each Dashboard visit and respect reduced motion.
+- Numeric totals, balances, counts, percentages, and electricity quantities count up from zero over 1.2 seconds across all six pages. Values animate when revealed (including expanded details) and on page revisits or value changes. Formatting, final accessible text, and printed values remain exact; reduced motion shows final values immediately.
 - Top header, active-route links, document titles, keyboard focus styles, skip link, dialogs, and status announcements.
 - Eagerly loaded admin modules avoid route-loading flashes; route content enters with a smooth 360ms fade, 14px rise, subtle scale and blur while the header title slides in and the shell stays mounted. Reduced-motion users receive no route animation. Shared loading/empty/error UI and the unknown-route fallback remain available.
 - **Restore sample records** is under **Reports & Settings → More settings and sample records**. It requires confirmation and replaces only the sample dataset.

@@ -1,5 +1,6 @@
 import { ReceiptText, Wallet, CircleAlert } from 'lucide-react'
 import { PageHeader, PreviewNotice, StatCard } from '@/components/shared/page'
+import { AnimatedNumber } from '@/components/shared/animated-number'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { DataTable } from '@/components/shared/data-table'
 import { WorkflowPlaceholders } from '@/components/shared/workflow-placeholders'
@@ -31,19 +32,19 @@ export default function Reports() {
     </section>
     <section className="mt-8" aria-labelledby="monthly-reports"><h2 id="monthly-reports" className="mb-2 text-xl font-semibold">Monthly summary</h2><p className="mb-5 text-base text-muted-foreground">Money received may include payments for older bills or money paid in advance.</p><DataTable rows={periods} caption="Monthly summary" columns={[
       { key: 'period', label: 'Month', render: p => p.label },
-      { key: 'billed', label: 'Total bills', align: 'right', render: p => formatMoney(p.summary.billed) },
-      { key: 'applied', label: 'Paid for these bills', align: 'right', render: p => formatMoney(p.summary.applied) },
-      { key: 'balance', label: 'Still to pay', align: 'right', render: p => formatMoney(p.summary.outstanding) },
-      { key: 'received', label: 'Money received', align: 'right', render: p => formatMoney(p.summary.received) },
+      { key: 'billed', label: 'Total bills', align: 'right', render: p => <AnimatedNumber value={formatMoney(p.summary.billed)} /> },
+      { key: 'applied', label: 'Paid for these bills', align: 'right', render: p => <AnimatedNumber value={formatMoney(p.summary.applied)} /> },
+      { key: 'balance', label: 'Still to pay', align: 'right', render: p => <AnimatedNumber value={formatMoney(p.summary.outstanding)} /> },
+      { key: 'received', label: 'Money received', align: 'right', render: p => <AnimatedNumber value={formatMoney(p.summary.received)} /> },
     ]} /></section>
-    <Card className="mt-8 shadow-none"><CardHeader><CardTitle>House settings</CardTitle><CardDescription>You can view these settings. Changing them will be added later.</CardDescription></CardHeader><CardContent><dl className="grid gap-6 text-base sm:grid-cols-2">{[
+    <Card className="mt-8 shadow-none"><CardHeader><CardTitle>House settings</CardTitle><CardDescription>You can view these settings. Changing them will be added later.</CardDescription></CardHeader><CardContent><dl className="grid gap-6 text-base sm:grid-cols-2">{([
       ['Currency', 'Philippine peso (₱)'],
       ['Rent', 'Based on the agreed rent for each tenant'],
       ['When rent is due', 'To be confirmed'],
-      ['Electricity price', currentRate ? `${formatMoney(currentRate.rateCentsPerKwh)} per kWh, starting ${formatDate(currentRate.effectiveFrom)}` : 'No price set'],
+      ['Electricity price', currentRate ? <><AnimatedNumber value={formatMoney(currentRate.rateCentsPerKwh)} /> per kWh, starting {formatDate(currentRate.effectiveFrom)}</> : 'No price set'],
       ['Sharing the electricity bill', 'Who uses each meter and how to share the bill still need to be agreed'],
       ['Water and washing', 'Water amounts are entered by hand. Washing is an optional extra bill.'],
-    ].map(([label, value]) => <div key={label} className="rounded-lg border bg-muted/40 p-4"><dt className="text-xs font-semibold text-muted-foreground">{label}</dt><dd className="mt-2 text-sm leading-relaxed font-medium">{value}</dd></div>)}</dl></CardContent></Card>
+    ] as const).map(([label, value]) => <div key={label} className="rounded-lg border bg-muted/40 p-4"><dt className="text-xs font-semibold text-muted-foreground">{label}</dt><dd className="mt-2 text-sm leading-relaxed font-medium">{value}</dd></div>)}</dl></CardContent></Card>
     <details open={Boolean(storageWarning)} className="mt-7 rounded-xl border bg-card p-5 sm:p-6"><summary className="min-h-12 cursor-pointer py-2 text-lg font-semibold">More settings and sample records</summary>
       <section className="mt-5" aria-labelledby="sample-records"><h2 id="sample-records" className="mb-3 text-xl font-semibold">Start again with sample records</h2><p className="mb-5 max-w-2xl text-base text-muted-foreground">Restore the original sample records and remove your saved notes and room changes. This is only for trying the app.</p><ResetDemoButton /></section>
       <section className="mt-7" aria-labelledby="audit-log"><h2 id="audit-log" className="mb-3 text-xl font-semibold">Record of changes</h2><DataTable rows={data.auditEvents} caption="Record of changes" columns={[

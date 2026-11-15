@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ReceiptText, CircleAlert, Wallet } from 'lucide-react'
 import { PageHeader, PreviewNotice, StatCard } from '@/components/shared/page'
+import { AnimatedNumber } from '@/components/shared/animated-number'
 import { DataTable } from '@/components/shared/data-table'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { WorkflowPlaceholders } from '@/components/shared/workflow-placeholders'
@@ -27,16 +28,16 @@ export default function Billing() {
     <section className="mb-7 grid gap-5 xl:grid-cols-3" aria-label="Bills overview">
       <StatCard label="Total bills" value={formatMoney(summary.billed)} detail="All bills for the month you chose." icon={ReceiptText} />
       <StatCard label="Already paid" value={formatMoney(summary.applied)} detail="Payments used to pay these bills." icon={Wallet} />
-      <StatCard label="Still to pay" value={formatMoney(summary.outstanding)} detail={`${summary.overdue} bills are past their due date.`} icon={CircleAlert} />
+      <StatCard label="Still to pay" value={formatMoney(summary.outstanding)} detail={<><AnimatedNumber value={summary.overdue} /> bills are past their due date.</>} icon={CircleAlert} />
     </section>
     <h2 className="mb-2 text-xl font-semibold">Who has paid?</h2><p className="mb-5 text-base text-muted-foreground">“No bill” means there is nothing to pay for that item.</p>
     <BillingStatusMatrix data={data} periodId={periodId} asOf={DEMO_DATE} outstandingOnly={outstandingOnly} />
     <details className="mt-7 rounded-xl border bg-card p-5 sm:p-6"><summary className="min-h-12 cursor-pointer py-2 text-lg font-semibold">View bill amounts and due dates</summary><div className="mt-5"><DataTable rows={charges} caption="Bill amounts and due dates" columns={[
       { key: 'tenant', label: 'Tenant', render: c => data.tenants.find(t => t.id === c.tenantId)?.name },
       { key: 'bill', label: 'Bill for', render: c => CATEGORY_LABELS[c.category] },
-      { key: 'amount', label: 'Bill amount', align: 'right', render: c => formatMoney(c.amountCents) },
-      { key: 'paid', label: 'Paid', render: c => <div><p>{formatMoney(chargePaid(data, c.id, DEMO_DATE))}</p><div className="mt-2"><StatusBadge status={CHARGE_STATUS_LABELS[chargeStatus(data, c, DEMO_DATE)]} /></div></div> },
-      { key: 'balance', label: 'Still to pay', align: 'right', render: c => <span className="font-semibold">{formatMoney(chargeBalance(data, c, DEMO_DATE))}</span> },
+      { key: 'amount', label: 'Bill amount', align: 'right', render: c => <AnimatedNumber value={formatMoney(c.amountCents)} /> },
+      { key: 'paid', label: 'Paid', render: c => <div><p><AnimatedNumber value={formatMoney(chargePaid(data, c.id, DEMO_DATE))} /></p><div className="mt-2"><StatusBadge status={CHARGE_STATUS_LABELS[chargeStatus(data, c, DEMO_DATE)]} /></div></div> },
+      { key: 'balance', label: 'Still to pay', align: 'right', render: c => <span className="font-semibold"><AnimatedNumber value={formatMoney(chargeBalance(data, c, DEMO_DATE))} /></span> },
       { key: 'due', label: 'Pay by', render: c => <div>{formatDate(c.dueDate)}{c.dueDate < DEMO_DATE && chargeBalance(data, c, DEMO_DATE) > 0 && <div className="mt-2"><StatusBadge status="Late payment" /></div>}</div> },
     ]} /></div></details>
     <ElectricityPreview data={data} periodId={periodId} />

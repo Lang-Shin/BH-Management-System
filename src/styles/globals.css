@@ -312,6 +312,17 @@
 
 .page-title { animation: title-enter 260ms var(--route-ease) backwards; }
 
+/* Reserve the final value's width, expose it to assistive technology, and animate
+   only generated visual text so intermediate values never enter live regions. */
+.animated-number { display: inline-grid; vertical-align: baseline; font-variant-numeric: tabular-nums; }
+.animated-number > span { grid-area: 1 / 1; }
+.animated-number-final { opacity: 0; pointer-events: none; }
+.animated-number-visual::after { content: attr(data-value); }
+@media print {
+  .animated-number-final { opacity: 1; }
+  .animated-number-visual { display: none; }
+}
+
 .back-to-top-arrow {
   display: inline-flex;
   align-items: center;

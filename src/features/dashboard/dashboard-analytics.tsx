@@ -1,4 +1,5 @@
 import type { selectRoomSummary, selectSummary } from '@/domain/calculations/summary'
+import { AnimatedNumber } from '@/components/shared/animated-number'
 
 type Segment = { label: string; value: number; color: string }
 const percentage = (value: number, total: number) => total > 0 ? value / total * 100 : 0
@@ -7,7 +8,7 @@ function AnalyticsLegend({ segments, total }: { segments: Segment[]; total: numb
   return <dl className="min-w-0 flex-1 divide-y">
     {segments.map(segment => <div key={segment.label} className="flex items-center justify-between gap-3 py-3">
       <dt className="flex items-center gap-2 text-sm"><span aria-hidden="true" className="size-2.5 shrink-0 rounded-sm" style={{ background: segment.color }} />{segment.label}</dt>
-      <dd className="whitespace-nowrap text-sm tabular-nums"><strong className="font-bold">{segment.value}</strong><span className="ml-2 text-muted-foreground">({percentage(segment.value, total).toFixed(1)}%)</span></dd>
+      <dd className="whitespace-nowrap text-sm tabular-nums"><strong className="font-bold"><AnimatedNumber value={segment.value} /></strong><span className="ml-2 text-muted-foreground">(<AnimatedNumber value={`${percentage(segment.value, total).toFixed(1)}%`} />)</span></dd>
     </div>)}
   </dl>
 }
@@ -33,13 +34,13 @@ export function RoomOccupancyChart({ summary }: { summary: ReturnType<typeof sel
           })}
         </svg>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <strong className="text-3xl font-bold tracking-tight tabular-nums">{percentage(summary.occupiedRooms, summary.totalRooms).toFixed(0)}%</strong>
+          <strong className="text-3xl font-bold tracking-tight tabular-nums"><AnimatedNumber value={`${percentage(summary.occupiedRooms, summary.totalRooms).toFixed(0)}%`} /></strong>
           <span className="text-sm text-muted-foreground">occupied</span>
         </div>
       </div>
       <AnalyticsLegend segments={segments} total={summary.totalRooms} />
     </div>
-    <figcaption className="mt-4 text-sm text-muted-foreground">{summary.totalRooms > 0 ? `${summary.occupiedRooms} of ${summary.totalRooms} rooms occupied · ${summary.availableRooms} ready to rent` : 'No rooms recorded yet.'}</figcaption>
+    <figcaption className="mt-4 text-sm text-muted-foreground">{summary.totalRooms > 0 ? <><AnimatedNumber value={summary.occupiedRooms} /> of <AnimatedNumber value={summary.totalRooms} /> rooms occupied · <AnimatedNumber value={summary.availableRooms} /> ready to rent</> : 'No rooms recorded yet.'}</figcaption>
   </figure>
 }
 
@@ -52,13 +53,13 @@ export function BillPaymentChart({ summary }: { summary: ReturnType<typeof selec
   const total = summary.paid + summary.partial + summary.unpaid
 
   return <figure aria-label="Bill payment analytics" className="m-0">
-    <div className="mb-5 flex items-baseline gap-2"><strong className="text-3xl font-bold tracking-tight tabular-nums">{percentage(summary.paid, total).toFixed(0)}%</strong><span className="text-sm text-muted-foreground">of bills fully paid</span></div>
+    <div className="mb-5 flex items-baseline gap-2"><strong className="text-3xl font-bold tracking-tight tabular-nums"><AnimatedNumber value={`${percentage(summary.paid, total).toFixed(0)}%`} /></strong><span className="text-sm text-muted-foreground">of bills fully paid</span></div>
     <div aria-hidden="true" className="overflow-hidden rounded-full bg-muted">
       <div className="analytics-payment-bar flex h-4">
         {segments.map(segment => <span key={segment.label} style={{ width: `${percentage(segment.value, total)}%`, background: segment.color }} />)}
       </div>
     </div>
     <AnalyticsLegend segments={segments} total={total} />
-    <figcaption className="mt-3 text-sm text-muted-foreground">{total > 0 ? `${total} issued bills this month · counts, not payment amounts` : 'No issued bills for this month.'}</figcaption>
+    <figcaption className="mt-3 text-sm text-muted-foreground">{total > 0 ? <><AnimatedNumber value={total} /> issued bills this month · counts, not payment amounts</> : 'No issued bills for this month.'}</figcaption>
   </figure>
 }
