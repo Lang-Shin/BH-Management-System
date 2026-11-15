@@ -260,6 +260,10 @@ describe('admin workspace integration', () => {
     expect(within(room105).getAllByRole('cell')[5]).toHaveTextContent('Paid')
     expect(within(room105).getAllByRole('cell')[5]?.querySelector('.paid-indicator')).not.toBeNull()
     expect(within(matrix).queryByRole('row', { name: /Room 106/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('figure', { name: 'Billing room payment status' })).toHaveTextContent('1 of 3 rooms fully paid')
+    await user.click(screen.getByRole('button', { name: 'Show unpaid bills' }))
+    expect(within(matrix).getAllByRole('row')).toHaveLength(3)
+    expect(screen.getByRole('figure', { name: 'Billing room payment status' })).toHaveTextContent('0 of 2 rooms fully paid')
   })
 
   it('shows room-first Dashboard summaries with simple payment category boxes', async () => {

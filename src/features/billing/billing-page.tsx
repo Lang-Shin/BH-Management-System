@@ -16,6 +16,8 @@ import { ElectricityPreview } from './electricity-preview'
 import { PaymentCalculator } from './payment-calculator'
 import { chargeRoom } from '@/domain/calculations/room-finance'
 import { ChargeDetails } from '@/components/shared/charge-details'
+import { BillingStatusChart } from './billing-status-chart'
+import { selectBillingRooms } from './billing-room-status'
 
 export default function Billing() {
   const { data } = usePrototype()
@@ -23,6 +25,7 @@ export default function Billing() {
   const [outstandingOnly, setOutstandingOnly] = useState(false)
   const summary = selectSummary(data, DEMO_DATE, periodId)
   const charges = issuedCharges(data, DEMO_DATE, periodId).filter(c => !outstandingOnly || chargeBalance(data, c, DEMO_DATE) > 0)
+  const billingRooms = selectBillingRooms(data, periodId, DEMO_DATE, outstandingOnly)
 
   return <>
     <PageHeader title="Billing" description="Check rent, electricity, water, and washing payments in one place." action={<PaymentCalculator key={periodId} periodLabel={data.billingPeriods.find(period => period.id === periodId)?.label ?? 'Sample billing period'} />} />
@@ -33,6 +36,7 @@ export default function Billing() {
       <StatCard label="Already paid" value={formatMoney(summary.applied)} detail="Payments used to pay these bills." icon={Wallet} />
       <StatCard label="Still to pay" value={formatMoney(summary.outstanding)} detail={<><AnimatedNumber value={summary.overdue} /> bills are past their due date.</>} icon={CircleAlert} />
     </section>
+    <BillingStatusChart key={`${periodId}:${outstandingOnly}`} rooms={billingRooms} periodLabel={data.billingPeriods.find(period => period.id === periodId)?.label ?? 'Selected billing period'} outstandingOnly={outstandingOnly} />
     <BillingStatusMatrix data={data} periodId={periodId} asOf={DEMO_DATE} outstandingOnly={outstandingOnly} />
     <details className="mt-7 rounded-xl border bg-card p-5 sm:p-6"><summary className="min-h-12 cursor-pointer py-2 text-lg font-semibold">View bill amounts and due dates</summary><div className="mt-5"><DataTable rows={charges} caption="Bill amounts and due dates" columns={[
       { key: 'room', label: 'Room', render: c => <span className="font-semibold">{chargeRoom(data, c).label}</span> },
