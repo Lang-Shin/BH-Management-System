@@ -160,6 +160,8 @@
 }
 
 .room-segmented-control {
+  position: relative;
+  isolation: isolate;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 4px;
@@ -171,7 +173,23 @@
   box-shadow: inset 0 1px 3px color-mix(in srgb, var(--forest-green) 5%, transparent);
 }
 
+.room-segmented-control::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: calc((100% - 14px) / 2);
+  height: calc((100% - 14px) / 2);
+  border-radius: 13px;
+  background: var(--card);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 65%), 0 2px 5px color-mix(in srgb, var(--forest-green) 12%, transparent);
+  transform: translate(calc(var(--filter-column, 0) * (100% + 4px)), calc(var(--filter-row, 0) * (100% + 4px)));
+  transition: transform 320ms var(--route-ease);
+  pointer-events: none;
+}
+
 .room-filter {
+  position: relative;
   min-width: 0;
   padding-inline: 14px;
   border-radius: 13px;
@@ -179,14 +197,25 @@
 }
 
 .room-filter[aria-pressed="true"] {
-  background: var(--card);
+  background: transparent;
   color: var(--forest-green);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 65%), 0 2px 5px color-mix(in srgb, var(--forest-green) 12%, transparent);
 }
 
 @media (width >= 40rem) {
   .room-segmented-control { grid-template-columns: repeat(4, minmax(0, 1fr)); width: auto; }
+  .room-segmented-control::before {
+    width: calc((100% - 22px) / 4);
+    height: calc(100% - 10px);
+    transform: translateX(calc(var(--filter-index, 0) * (100% + 4px)));
+  }
 }
+
+@keyframes room-card-enter {
+  from { opacity: 0; transform: translateY(12px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.room-result-card,
+.room-filter-empty { animation: room-card-enter 360ms var(--route-ease) var(--room-card-delay, 0ms) backwards; }
 
 .room-metric {
   position: relative;
@@ -500,6 +529,9 @@
 .sidebar-logout:active > svg { transform: scale(1); }
 
 @media (prefers-reduced-motion: reduce) {
+  .room-segmented-control::before { transition: none; }
+  .room-result-card,
+  .room-filter-empty { animation: none; }
   .back-to-top-arrow > svg { transition: none; }
   .back-to-top-arrow:hover > svg,
   .back-to-top-arrow:focus-visible > svg,
