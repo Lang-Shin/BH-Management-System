@@ -117,17 +117,17 @@ export default function Tenants() {
   const assignments = activeAssignments(data, DEMO_DATE)
   const roomName = (tenantId: string) => data.rooms.find(r => r.id === assignments.find(a => a.tenantId === tenantId)?.roomId)?.name
   const query = search.trim().toLowerCase()
-  const tenants = data.tenants.filter(t => `${t.name} ${t.email} ${roomName(t.id) ?? ''}`.toLowerCase().includes(query))
+  const activeTenants = data.tenants.filter(t => t.status === 'ACTIVE')
+  const tenants = activeTenants.filter(t => `${t.name} ${t.email} ${roomName(t.id) ?? ''}`.toLowerCase().includes(query))
 
   return <>
     <PageHeader title="Tenants" description="Find a tenant, check their room, or see what they still need to pay." action={<AddTenantDialog />} />
     <PreviewNotice>You can open a tenant’s details, try saving a note, or preview the add-tenant form.</PreviewNotice>
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-4"><div className="w-full sm:max-w-md"><label htmlFor="tenant-search" className="mb-2 block text-base font-semibold">Find a tenant</label><div className="relative"><Search className="pointer-events-none absolute top-4 left-4 size-5 text-muted-foreground" aria-hidden="true" /><Input id="tenant-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Type a name or room number" className="h-14 bg-card pl-12 text-base" type="search" /></div></div><p className="text-sm text-muted-foreground" role="status">Showing <AnimatedNumber value={tenants.length} /> of <AnimatedNumber value={data.tenants.length} /> tenants</p></div>
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-4"><div className="w-full sm:max-w-md"><label htmlFor="tenant-search" className="mb-2 block text-base font-semibold">Find a tenant</label><div className="relative"><Search className="pointer-events-none absolute top-4 left-4 size-5 text-muted-foreground" aria-hidden="true" /><Input id="tenant-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Type a name or room number" className="h-14 bg-card pl-12 text-base" type="search" /></div></div><p className="text-sm text-muted-foreground" role="status">Showing <AnimatedNumber value={tenants.length} /> of <AnimatedNumber value={activeTenants.length} /> tenants</p></div>
     <DataTable rows={tenants} caption="Tenant list" columns={[
       { key: 'name', label: 'Tenant', render: t => <div><p className="font-semibold">{t.name}</p>{t.notes && <p className="mt-2 text-sm text-muted-foreground">Note saved</p>}</div> },
       { key: 'room', label: 'Room', render: t => roomName(t.id) ? <span className="inline-flex rounded-md border bg-muted px-2 py-1 text-xs font-semibold">Room {roomName(t.id)}</span> : <span className="text-muted-foreground">No room rented now</span> },
       { key: 'status', label: 'Tenant status', render: t => <StatusBadge status={TENANT_STATUS_LABELS[t.status]} /> },
-      { key: 'balance', label: 'Still to pay', render: t => { const a = tenantAccount(data, t.id, DEMO_DATE); return <div><p className="font-semibold">{formatMoney(a.balance)}</p><div className="mt-2"><StatusBadge status={ACCOUNT_STATUS_LABELS[a.status] ?? a.status} /></div>{a.credit > 0 && <p className="mt-2 text-sm">Advance: {formatMoney(a.credit)}</p>}</div> } },
       { key: 'actions', label: 'Details', render: t => <Button variant="outline" onClick={() => setSelectedId(t.id)} aria-label={`View ${t.name}`}>View details</Button> },
     ]} />
     {search && <Button variant="outline" onClick={() => setSearch('')} className="mt-4">Clear search</Button>}

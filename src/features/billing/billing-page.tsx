@@ -33,7 +33,6 @@ export default function Billing() {
       <StatCard label="Already paid" value={formatMoney(summary.applied)} detail="Payments used to pay these bills." icon={Wallet} />
       <StatCard label="Still to pay" value={formatMoney(summary.outstanding)} detail={<><AnimatedNumber value={summary.overdue} /> bills are past their due date.</>} icon={CircleAlert} />
     </section>
-    <h2 className="mb-2 text-xl font-semibold">Who has paid?</h2><p className="mb-5 text-base text-muted-foreground">Room totals group individual obligations, not joint room bills. “No bill” means no charge for that category. Open charge details for owners, dates and applied payments. Utility room context is derived from historical period assignments; ambiguous rooms need review.</p>
     <BillingStatusMatrix data={data} periodId={periodId} asOf={DEMO_DATE} outstandingOnly={outstandingOnly} />
     <details className="mt-7 rounded-xl border bg-card p-5 sm:p-6"><summary className="min-h-12 cursor-pointer py-2 text-lg font-semibold">View bill amounts and due dates</summary><div className="mt-5"><DataTable rows={charges} caption="Bill amounts and due dates" columns={[
       { key: 'room', label: 'Room', render: c => <span className="font-semibold">{chargeRoom(data, c).label}</span> },

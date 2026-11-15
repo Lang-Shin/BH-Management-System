@@ -241,15 +241,38 @@ describe('room financial presentation and reconciliation', () => {
     expect(receipt.allocationIds).toEqual(oldAllocations.map(allocation => allocation.id))
   })
 
-  it('keeps a shared-room category partly paid until all included charges are settled', () => {
+  it('shows the remaining shared-room Rent and PARTLY PAID room status', () => {
     const data = createDemoData()
     const room = selectRoomFinance(data, DEMO_DATE, DEMO_PERIOD).find(row => row.id === 'room-3')!
     expect(financialTotals(data, room.charges.filter(charge => charge.category === 'RENT'), DEMO_DATE)).toMatchObject({ billed: 1050000, paid: 700000, outstanding: 350000, status: 'PARTIALLY_PAID' })
     render(<BillingStatusMatrix data={data} periodId={DEMO_PERIOD} asOf={DEMO_DATE} outstandingOnly={false} />)
     const row = screen.getByRole('row', { name: /Room 103/ })
-    expect(within(row).getByText('Partly paid')).toBeInTheDocument()
-    expect(within(row).getAllByText('Paid')).toHaveLength(3)
+    const cells = within(row).getAllByRole('cell')
+    expect(cells[1]).toHaveTextContent('₱3,500.00')
+    expect(cells[2]).toHaveTextContent('PAID')
+    expect(cells[3]).toHaveTextContent('PAID')
+    expect(cells[4]).toHaveTextContent('PAID')
+    expect(cells[5]).toHaveTextContent('PARTLY PAID')
+    expect(row).not.toHaveTextContent(/left to pay|not yet paid/i)
     expect(within(screen.getByRole('region', { name: 'Who has paid' })).getAllByRole('row')).toHaveLength(5)
+    expect(screen.queryByRole('columnheader', { name: 'Underlying charges' })).not.toBeInTheDocument()
+  })
+
+  it('shows NOT PAID for electricity and an amount for unpaid washing', () => {
+    const data = createDemoData()
+    const electricity = data.charges.find(charge => charge.id === 'electricity-1')!
+    const washing = data.charges.find(charge => charge.id === 'washing-2')!
+    data.charges.push({ ...electricity, id: 'electricity-extra-unpaid', tenantId: 'tenant-1' })
+    data.charges.push({ ...washing, id: 'washing-extra-unpaid', tenantId: 'tenant-1' })
+    render(<BillingStatusMatrix data={data} periodId={DEMO_PERIOD} asOf={DEMO_DATE} outstandingOnly={false} />)
+    const row = screen.getByRole('row', { name: /Room 101/ })
+    const cells = within(row).getAllByRole('cell')
+    expect(cells[1]).toHaveTextContent('₱3,500.00')
+    expect(cells[2]).toHaveTextContent('NOT PAID')
+    expect(cells[2]).not.toHaveTextContent('₱')
+    expect(cells[3]).toHaveTextContent('PAID')
+    expect(cells[4]).toHaveTextContent('₱80.00')
+    expect(cells[5]).toHaveTextContent('PARTLY PAID')
   })
 
   it.each(['period-oct', DEMO_PERIOD])('exports the same room totals and charge IDs as the %s report', periodId => {

@@ -107,7 +107,8 @@ describe('admin workspace integration', () => {
     await user.click(within(success).getByRole('button', { name: 'Got it' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(screen.queryByText('Test Tenant')).not.toBeInTheDocument()
-    expect(screen.getByText(/Showing/)).toHaveTextContent('Showing 10 of 10 tenants')
+    expect(screen.getByText(/Showing/)).toHaveTextContent('Showing 9 of 9 tenants')
+    expect(screen.queryByText('Quinn Mendoza')).not.toBeInTheDocument()
   })
 
   it('previews adding a room without changing room records or counts', async () => {
@@ -212,21 +213,50 @@ describe('admin workspace integration', () => {
     expect(screen.getAllByRole('link', { name: 'Back to Dashboard' })[0]).toHaveAttribute('href', '/dashboard')
   })
 
-  it('shows category applicability separately from unpaid status and can switch sample periods', async () => {
+  it('shows only amounts, PAID, NOT PAID, or NO BILL in the room-payment table', async () => {
     const user = userEvent.setup()
     renderApp('/billing')
     const matrix = await screen.findByRole('region', { name: 'Who has paid' })
+    expect(within(matrix).queryByRole('columnheader', { name: 'Underlying charges' })).not.toBeInTheDocument()
+    expect(within(matrix).getByRole('columnheader', { name: 'Status' })).toBeInTheDocument()
+    expect(matrix).not.toHaveTextContent(/left to pay|not yet paid/i)
+
     const room101 = within(matrix).getByRole('row', { name: /Room 101/ })
-    expect(within(room101).getAllByText('Not yet paid')).toHaveLength(1)
-    expect(within(room101).getAllByText('Paid')).toHaveLength(3)
+    let cells = within(room101).getAllByRole('cell')
+    expect(cells[1]).toHaveTextContent('₱3,500.00')
+    expect(cells[2]).toHaveTextContent('PAID')
+    expect(cells[3]).toHaveTextContent('PAID')
+    expect(cells[4]).toHaveTextContent('PAID')
+    expect(cells[5]).toHaveTextContent('PARTLY PAID')
+
+    const room102 = within(matrix).getByRole('row', { name: /Room 102/ })
+    cells = within(room102).getAllByRole('cell')
+    expect(cells[1]).toHaveTextContent('₱3,500.00')
+    expect(cells[2]).toHaveTextContent('NO BILL')
+    expect(cells[3]).toHaveTextContent('₱150.00')
+    expect(cells[4]).toHaveTextContent('NO BILL')
+    expect(cells[5]).toHaveTextContent('NOT PAID')
+
     const room103 = within(matrix).getByRole('row', { name: /Room 103/ })
-    expect(within(room103).queryByText('No bill')).not.toBeInTheDocument()
-    expect(within(room103).getByText('Partly paid')).toBeInTheDocument()
-    expect(within(room103).getAllByText('Paid')).toHaveLength(3)
+    cells = within(room103).getAllByRole('cell')
+    expect(cells[1]).toHaveTextContent('₱3,500.00')
+    expect(cells[2]).toHaveTextContent('PAID')
+    expect(cells[3]).toHaveTextContent('PAID')
+    expect(cells[4]).toHaveTextContent('PAID')
+    expect(cells[5]).toHaveTextContent('PARTLY PAID')
+
     const room104 = within(matrix).getByRole('row', { name: /Room 104/ })
-    expect(within(room104).getAllByText('Not yet paid')).toHaveLength(2)
+    cells = within(room104).getAllByRole('cell')
+    expect(cells[1]).toHaveTextContent('₱10,500.00')
+    expect(cells[2]).toHaveTextContent('NO BILL')
+    expect(cells[3]).toHaveTextContent('₱450.00')
+    expect(cells[4]).toHaveTextContent('NO BILL')
+    expect(cells[5]).toHaveTextContent('NOT PAID')
+
     await user.selectOptions(screen.getByLabelText('Choose a month'), 'period-oct')
-    expect(within(matrix).getByRole('row', { name: /Room 105/ })).toBeInTheDocument()
+    const room105 = within(matrix).getByRole('row', { name: /Room 105/ })
+    expect(room105).toBeInTheDocument()
+    expect(within(room105).getAllByRole('cell')[5]).toHaveTextContent('PAID')
     expect(within(matrix).queryByRole('row', { name: /Room 106/ })).not.toBeInTheDocument()
   })
 
