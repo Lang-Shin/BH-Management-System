@@ -13,6 +13,7 @@ import { formatDate, formatMoney } from '@/lib/format'
 import { CATEGORY_LABELS, CHARGE_STATUS_LABELS } from '@/lib/labels'
 import { BillingStatusMatrix } from './billing-status-matrix'
 import { ElectricityPreview } from './electricity-preview'
+import { PaymentCalculator } from './payment-calculator'
 
 export default function Billing() {
   const { data } = usePrototype()
@@ -22,7 +23,7 @@ export default function Billing() {
   const charges = issuedCharges(data, DEMO_DATE, periodId).filter(c => !outstandingOnly || chargeBalance(data, c, DEMO_DATE) > 0)
 
   return <>
-    <PageHeader title="Billing" description="Check rent, electricity, water, and washing payments in one place." />
+    <PageHeader title="Billing" description="Check rent, electricity, water, and washing payments in one place." action={<PaymentCalculator key={periodId} periodLabel={data.billingPeriods.find(period => period.id === periodId)?.label ?? 'Sample billing period'} />} />
     <PreviewNotice>You can look through these bills. Creating and changing bills will be added later.</PreviewNotice>
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4"><div className="max-w-full"><label htmlFor="billing-period" className="mb-2 block text-base font-semibold">Choose a month</label><select id="billing-period" value={periodId} onChange={e => setPeriodId(e.target.value)} className="min-h-14 max-w-full rounded-lg border bg-card px-4 py-3 text-base">{data.billingPeriods.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}</select></div><Button variant={outstandingOnly ? 'default' : 'outline'} aria-pressed={outstandingOnly} onClick={() => setOutstandingOnly(v => !v)}>{outstandingOnly ? 'Show all bills' : 'Show unpaid bills'}</Button></div>
     <section className="mb-7 grid gap-5 xl:grid-cols-3" aria-label="Bills overview">
