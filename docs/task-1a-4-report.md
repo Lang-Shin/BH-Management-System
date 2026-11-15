@@ -1,5 +1,7 @@
 # TASK 1A.4 — Room-based financial presentation
 
+> **Later demo-fixture update:** The fictional ledger now uses a Room 101 two-tenant PHP 3,500 shared-rent example, a single-tenant Room 102, and explicit October/November rent and water arrears. Current authoritative totals are in the README, [domain foundation notes](domain-foundation.md), and the passing test suite. The reconciliation table later in this historical report describes the fixture at the time TASK 1A.4 was completed.
+
 ## Pre-implementation investigation (recorded before implementation)
 
 - Initial Git status: ` M src/features/dashboard/dashboard-page.tsx`. Its existing removal of “How are collections counted?” is owner work and will be preserved. HEAD: `c5db3d2 feat(ui): implemented view receipt in Payments & Receipts page`.

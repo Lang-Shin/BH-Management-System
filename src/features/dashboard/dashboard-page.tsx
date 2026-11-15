@@ -10,7 +10,8 @@ import { BillPaymentChart, RoomOccupancyChart } from './dashboard-analytics'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { usePrototype } from '@/hooks/use-prototype'
 import { selectSummary } from '@/domain/calculations/summary'
-import { selectRoomDues, selectRoomFinance } from '@/domain/calculations/room-finance'
+import { selectRoomDues } from '@/domain/calculations/room-finance'
+import { OutstandingBalances } from './outstanding-balances'
 import { ChargeDetails } from '@/components/shared/charge-details'
 import { DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
 import { formatDate, formatMoney } from '@/lib/format'
@@ -23,8 +24,6 @@ export default function Dashboard() {
   const recent = data.payments.filter(p => p.state === 'RECORDED' && p.paidOn <= DEMO_DATE)
     .sort((a, b) => b.paidOn.localeCompare(a.paidOn)).slice(0, 5)
   const collectionRate = summary.billed > 0 ? summary.applied / summary.billed * 100 : 0
-  const balances = selectRoomFinance(data, DEMO_DATE).filter(room => room.outstanding > 0)
-    .sort((a, b) => b.outstanding - a.outstanding || a.id.localeCompare(b.id)).slice(0, 4)
 
   return <>
     <PageHeader title="Overview" description="November 2026 · Your rooms and payments at a glance." action={<Button asChild><Link to="/billing">View billing <ArrowRight /></Link></Button>} />
@@ -43,7 +42,7 @@ export default function Dashboard() {
     </div>
     <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
     <section aria-labelledby="recent-payments"><div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 id="recent-payments" className="text-lg font-bold">Recent payments</h2><Button variant="ghost" asChild><Link to="/payments">View all <ArrowRight /></Link></Button></div><PaymentHistoryTable data={data} payments={recent} compact transactionDisplay="categories" caption="Recent payments" /></section>
-    <Card><CardHeader><CardTitle>Outstanding balances</CardTitle><CardDescription>Largest room totals · all issued bills · individual obligations retained</CardDescription></CardHeader><CardContent><ul className="divide-y" aria-label="Outstanding room balances">{balances.map(room => <li key={room.id} className="py-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold">{room.context.label}</p><p className="text-sm font-bold tabular-nums"><AnimatedNumber value={formatMoney(room.outstanding)} /></p></div><div className="mt-2 flex flex-wrap items-center gap-2"><StatusBadge status={room.overdue > 0 ? 'Late payment' : CHARGE_STATUS_LABELS[room.status]} /><span className="text-xs text-muted-foreground">{room.unpaid} unpaid · {room.partial} partly paid charges</span></div><ChargeDetails data={data} charges={room.charges} asOf={DEMO_DATE} /></li>)}</ul>{balances.length === 0 && <p className="text-sm text-muted-foreground">No outstanding balances.</p>}</CardContent></Card>
+    <OutstandingBalances data={data} asOf={DEMO_DATE} />
     </div>
     <section aria-labelledby="upcoming-dues" className="mt-8"><h2 id="upcoming-dues" className="mb-2 text-lg font-bold">Upcoming due dates</h2><p className="mb-4 text-sm text-muted-foreground">The next <AnimatedNumber value={Math.min(6, upcoming.length)} /> room/category groups to check. Different periods, due dates and payment statuses stay separate.</p><DataTable rows={upcoming.slice(0, 6)} caption="Bills due soon" columns={[
       { key: 'room', label: 'Room', render: c => <span className="font-semibold">{c.context.label}</span> },

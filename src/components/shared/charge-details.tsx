@@ -4,9 +4,9 @@ import { chargeRoom } from '@/domain/calculations/room-finance'
 import { formatDate, formatMoney } from '@/lib/format'
 import { CATEGORY_LABELS } from '@/lib/labels'
 
-export function ChargeDetails({ data, charges, asOf }: { data: PrototypeAppState; charges: Charge[]; asOf: string }) {
+export function ChargeDetails({ data, charges, asOf, summaryLabel }: { data: PrototypeAppState; charges: Charge[]; asOf: string; summaryLabel?: string }) {
   return <details className="min-w-0 max-w-md whitespace-normal text-left">
-    <summary className="min-h-12 cursor-pointer py-3 text-sm font-semibold">{charges.length} charge {charges.length === 1 ? 'detail' : 'details'}</summary>
+    <summary className="min-h-12 cursor-pointer py-3 text-sm font-semibold">{summaryLabel ?? `${charges.length} charge ${charges.length === 1 ? 'detail' : 'details'}`}</summary>
     <p className="mb-3 text-xs text-muted-foreground">Grouped for display only. Each charge stays recorded against its original tenant; joint responsibility is not assumed.</p>
     <ul className="space-y-3">{charges.map(charge => {
       const context = chargeRoom(data, charge)

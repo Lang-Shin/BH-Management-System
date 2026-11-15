@@ -52,8 +52,10 @@ describe('room financial presentation and reconciliation', () => {
   it('shows a historical single-occupancy room once, even after move-out', () => {
     const data = createDemoData()
     const rows = selectRoomFinance(data, DEMO_DATE, 'period-oct')
-    expect(rows).toHaveLength(1)
-    expect(rows[0]).toMatchObject({ context: { label: 'Room 105' }, billed: 324400, paid: 324400, outstanding: 0, status: 'PAID' })
+    expect(rows).toHaveLength(3)
+    expect(rows.find(row => row.id === 'room-5')).toMatchObject({ context: { label: 'Room 105' }, billed: 324400, paid: 324400, outstanding: 0, status: 'PAID' })
+    expect(rows.find(row => row.id === 'room-1')).toMatchObject({ billed: 402400, paid: 52400, outstanding: 350000 })
+    expect(rows.find(row => row.id === 'room-2')).toMatchObject({ billed: 365000, paid: 350000, outstanding: 15000 })
   })
 
   it('groups distinct tenant obligations in one shared-room summary without duplication', () => {
@@ -61,9 +63,9 @@ describe('room financial presentation and reconciliation', () => {
     const rows = selectRoomFinance(data, DEMO_DATE, DEMO_PERIOD)
     expect(rows).toHaveLength(4)
     const shared = rows.find(row => row.id === 'room-1')!
-    expect(shared).toMatchObject({ billed: 1118600, paid: 930000, outstanding: 188600, partial: 2, overdue: 1, status: 'PARTIALLY_PAID' })
-    expect(new Set(shared.charges.map(charge => charge.tenantId)).size).toBe(3)
-    expect(shared.charges).toHaveLength(8)
+    expect(shared).toMatchObject({ billed: 403600, paid: 53600, outstanding: 350000, partial: 0, overdue: 2, status: 'PARTIALLY_PAID' })
+    expect(new Set(shared.charges.map(charge => charge.tenantId)).size).toBe(2)
+    expect(shared.charges).toHaveLength(6)
     const ids = rows.flatMap(row => row.charges.map(charge => charge.id))
     expect(new Set(ids).size).toBe(ids.length)
     expect(ids.sort()).toEqual(issuedCharges(data, DEMO_DATE, DEMO_PERIOD).map(charge => charge.id).sort())
@@ -80,7 +82,7 @@ describe('room financial presentation and reconciliation', () => {
     expect(rows.reduce((sum, row) => sum + row.outstanding, 0)).toBe(original.outstanding)
     expect(rows.every(row => row.outstanding >= 0 && row.billed === row.paid + row.outstanding)).toBe(true)
     expect(JSON.stringify(data)).toBe(before)
-    expect(selectSummary(data, DEMO_DATE, DEMO_PERIOD)).toMatchObject({ billed: 3308600, applied: 1630000, outstanding: 1678600, received: 2004400, credit: 50000 })
+    expect(selectSummary(data, DEMO_DATE, DEMO_PERIOD)).toMatchObject({ billed: 2958600, applied: 768600, outstanding: 2190000, received: 1545400, credit: 50000 })
   })
 
   it('applies a partial payment only to the room of its referenced charge', () => {
@@ -90,13 +92,13 @@ describe('room financial presentation and reconciliation', () => {
     data.paymentAllocations.push({ id: 'extra-allocation', paymentId: 'extra', chargeId: 'rent-2', amountCents: 10000, allocatedOn: DEMO_DATE, state: 'ACTIVE', creditId: null, reversalAuditEventId: null })
     expect(isPrototypeData(data)).toBe(true)
     const rows = selectRoomFinance(data, DEMO_DATE, DEMO_PERIOD)
-    expect(rows.find(row => row.id === 'room-1')?.outstanding).toBe(178600)
+    expect(rows.find(row => row.id === 'room-1')?.outstanding).toBe(340000)
     expect(rows.filter(row => row.id !== 'room-1')).toEqual(original.filter(row => row.id !== 'room-1'))
   })
 
   it('does not count advance credits toward bills and uses payment-date context only for unallocated money', () => {
     const data = createDemoData()
-    expect(selectRoomFinance(data, DEMO_DATE, DEMO_PERIOD).find(row => row.id === 'room-3')).toMatchObject({ paid: 350000, outstanding: 380000 })
+    expect(selectRoomFinance(data, DEMO_DATE, DEMO_PERIOD).find(row => row.id === 'room-3')).toMatchObject({ paid: 715000, outstanding: 380000 })
     const advance = paymentRooms(data, data.payments.find(payment => payment.id === 'payment-advance')!, DEMO_DATE)
     expect(advance).toMatchObject({ label: 'Room 103', unallocated: 50000, allocations: [] })
     expect(advance.note).toContain('context only')
@@ -108,7 +110,7 @@ describe('room financial presentation and reconciliation', () => {
     expect(isPrototypeData(data)).toBe(true)
     for (const charge of data.charges.filter(charge => charge.tenantId === 'tenant-10')) expect(chargeRoom(data, charge).label).toBe('Room 105')
     expect(paymentRooms(data, data.payments.find(payment => payment.id === 'payment-old')!, DEMO_DATE).label).toBe('Room 105')
-    expect(selectRoomFinance(data, DEMO_DATE, 'period-oct')[0]?.billed).toBe(324400)
+    expect(selectRoomFinance(data, DEMO_DATE, 'period-oct')[0]?.billed).toBe(402400)
   })
 
   it('does not guess a utility room when a tenant moved within the billed period', () => {
@@ -174,7 +176,7 @@ describe('room financial presentation and reconciliation', () => {
 
   it('does not count voided payments or reversed allocations as collected bill money', () => {
     const data = createDemoData()
-    const payment = data.payments.find(item => item.id === 'payment-1-rent')!
+    const payment = data.payments.find(item => item.id === 'payment-1-water')!
     payment.state = 'VOIDED'
     data.receipts.find(item => item.paymentId === payment.id)!.state = 'VOIDED'
     const allocation = data.paymentAllocations.find(item => item.paymentId === payment.id)!
@@ -182,8 +184,8 @@ describe('room financial presentation and reconciliation', () => {
     allocation.reversalAuditEventId = 'reversal'
     data.auditEvents.push({ id: 'reversal', actorId: 'admin', occurredOn: DEMO_DATE, action: 'ALLOCATION_REVERSED', entityType: 'PAYMENT_ALLOCATION', entityId: allocation.id, reason: 'Test void', beforeSnapshot: '{}', afterSnapshot: '{}' })
     expect(isPrototypeData(data)).toBe(true)
-    expect(selectRoomFinance(data, DEMO_DATE, DEMO_PERIOD).find(row => row.id === 'room-1')).toMatchObject({ paid: 580000, outstanding: 538600, status: 'PARTIALLY_PAID' })
-    expect(selectSummary(data, DEMO_DATE, DEMO_PERIOD)).toMatchObject({ applied: 1280000, received: 1654400 })
+    expect(selectRoomFinance(data, DEMO_DATE, DEMO_PERIOD).find(row => row.id === 'room-1')).toMatchObject({ paid: 38600, outstanding: 365000, status: 'PARTIALLY_PAID' })
+    expect(selectSummary(data, DEMO_DATE, DEMO_PERIOD)).toMatchObject({ applied: 753600, received: 1530400 })
   })
 
   it('does not attribute an unallocated remainder or future allocation to current bill collections', () => {
@@ -205,28 +207,30 @@ describe('room financial presentation and reconciliation', () => {
     data.roomAssignments.push({ id: 'transfer-1', tenantId: 'tenant-1', roomId: 'room-2', startDate: '2026-11-15', endDate: null, agreedRentCents: 350000 })
     const rent = data.charges.find(charge => charge.id === 'rent-1')!
     if (rent.category !== 'RENT') throw new Error('Rent fixture missing')
-    data.charges.push({ ...rent, id: 'rent-after-transfer', roomAssignmentId: 'transfer-1', issuedOn: '2026-11-16', dueDate: '2026-11-20' })
-    const oldAllocation = data.paymentAllocations.find(item => item.paymentId === 'payment-1-rent')!
-    oldAllocation.state = 'REVERSED'
-    oldAllocation.reversalAuditEventId = 'transfer-reversal'
-    data.auditEvents.push({ id: 'transfer-reversal', actorId: 'admin', occurredOn: '2026-11-16', action: 'ALLOCATION_REVERSED', entityType: 'PAYMENT_ALLOCATION', entityId: oldAllocation.id, reason: 'Test reallocation', beforeSnapshot: '{}', afterSnapshot: '{}' })
-    data.paymentAllocations.push({ ...oldAllocation, id: 'new-allocation', chargeId: 'rent-after-transfer', allocatedOn: '2026-11-16', state: 'ACTIVE', reversalAuditEventId: null })
+    data.charges.push({ ...rent, id: 'rent-after-transfer', amountCents: 175000, agreedRentCents: 175000, roomAssignmentId: 'transfer-1', issuedOn: '2026-11-16', dueDate: '2026-11-20' })
+    const oldAllocations = data.paymentAllocations.filter(item => item.paymentId === 'payment-oct-1')
+    oldAllocations.forEach((allocation, index) => {
+      allocation.state = 'REVERSED'
+      allocation.reversalAuditEventId = `transfer-reversal-${index}`
+      data.auditEvents.push({ id: allocation.reversalAuditEventId, actorId: 'admin', occurredOn: '2026-11-16', action: 'ALLOCATION_REVERSED', entityType: 'PAYMENT_ALLOCATION', entityId: allocation.id, reason: 'Test reallocation', beforeSnapshot: '{}', afterSnapshot: '{}' })
+    })
+    data.paymentAllocations.push({ id: 'new-allocation', paymentId: 'payment-oct-1', chargeId: 'rent-after-transfer', amountCents: 29400, allocatedOn: '2026-11-16', state: 'ACTIVE', creditId: null, reversalAuditEventId: null })
     expect(isPrototypeData(data)).toBe(true)
-    const payment = data.payments.find(item => item.id === 'payment-1-rent')!
+    const payment = data.payments.find(item => item.id === 'payment-oct-1')!
     const receipt = data.receipts.find(item => item.paymentId === payment.id)!
     expect(paymentRooms(data, payment, '2026-11-20').label).toBe('Room 102')
     expect(paymentRooms(data, payment, receipt.issuedOn, receipt.allocationIds).label).toBe('Room 101')
-    expect(receipt.allocationIds).toEqual([oldAllocation.id])
+    expect(receipt.allocationIds).toEqual(oldAllocations.map(allocation => allocation.id))
   })
 
   it('keeps a shared-room category partly paid until all included charges are settled', () => {
     const data = createDemoData()
     const room = selectRoomFinance(data, DEMO_DATE, DEMO_PERIOD).find(row => row.id === 'room-3')!
-    expect(financialTotals(data, room.charges.filter(charge => charge.category === 'RENT'), DEMO_DATE)).toMatchObject({ billed: 700000, paid: 350000, outstanding: 350000, status: 'PARTIALLY_PAID' })
+    expect(financialTotals(data, room.charges.filter(charge => charge.category === 'RENT'), DEMO_DATE)).toMatchObject({ billed: 1050000, paid: 700000, outstanding: 350000, status: 'PARTIALLY_PAID' })
     render(<BillingStatusMatrix data={data} periodId={DEMO_PERIOD} asOf={DEMO_DATE} outstandingOnly={false} />)
     const row = screen.getByRole('row', { name: /Room 103/ })
-    expect(within(row).getByText('Partly paid')).toBeInTheDocument()
-    expect(row).toHaveTextContent('No bill')
+    expect(within(row).getAllByText('Partly paid')).toHaveLength(2)
+    expect(within(row).getAllByText('No bill')).toHaveLength(2)
     expect(within(screen.getByRole('region', { name: 'Who has paid' })).getAllByRole('row')).toHaveLength(5)
   })
 

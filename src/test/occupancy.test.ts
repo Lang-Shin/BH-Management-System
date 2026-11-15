@@ -12,17 +12,18 @@ describe('room-based occupancy', () => {
 
   it('counts rented rooms once and keeps repairs separate from available rooms', () => {
     const data = createDemoData()
-    expect(roomOccupants(data, 'room-1', DEMO_DATE)).toHaveLength(3)
-    expect(roomOccupants(data, 'room-2', DEMO_DATE)).toHaveLength(2)
+    expect(roomOccupants(data, 'room-1', DEMO_DATE)).toHaveLength(2)
+    expect(roomOccupants(data, 'room-2', DEMO_DATE)).toHaveLength(1)
+    expect(roomOccupants(data, 'room-3', DEMO_DATE)).toHaveLength(3)
     expect(selectRoomSummary(data, DEMO_DATE)).toEqual({ totalRooms: 6, occupiedRooms: 4, availableRooms: 1, maintenanceRooms: 1 })
   })
 
   it('treats one person renting a three-bed room as occupied, not available', () => {
     const data = createDemoData()
-    data.roomAssignments = data.roomAssignments.filter(a => a.roomId !== 'room-1' || a.tenantId === 'tenant-1')
-    expect(data.rooms[0]?.capacity).toBe(3)
-    expect(roomOccupants(data, 'room-1', DEMO_DATE)).toHaveLength(1)
-    expect(roomOccupancy(data, data.rooms[0]!, DEMO_DATE)).toBe('OCCUPIED')
+    data.roomAssignments = data.roomAssignments.filter(a => a.roomId !== 'room-3' || a.tenantId === 'tenant-3')
+    expect(data.rooms[2]?.capacity).toBe(3)
+    expect(roomOccupants(data, 'room-3', DEMO_DATE)).toHaveLength(1)
+    expect(roomOccupancy(data, data.rooms[2]!, DEMO_DATE)).toBe('OCCUPIED')
     expect(selectRoomSummary(data, DEMO_DATE).availableRooms).toBe(1)
   })
 

@@ -29,17 +29,17 @@ describe('notification selector', () => {
 
     expect(notifications).toEqual([
       {
-        id: 'overdue:2:190000',
+        id: 'overdue:7:1080000',
         kind: 'overdue',
-        title: '2 bills are past due',
-        description: `${formatMoney(190_000)} still to pay. Open Billing to see who owes what.`,
+        title: '7 bills are past due',
+        description: `${formatMoney(1_080_000)} still to pay. Open Billing to see who owes what.`,
         href: '/billing',
       },
       {
-        id: 'due-soon:2026-11-20:11:1488600',
+        id: 'due-soon:2026-11-20:9:1475000',
         kind: 'due-soon',
-        title: '11 bills are due in the next 7 days',
-        description: `${formatMoney(1_488_600)} still to pay.`,
+        title: '9 bills are due in the next 7 days',
+        description: `${formatMoney(1_475_000)} still to pay.`,
         href: '/billing',
       },
       {
@@ -76,10 +76,10 @@ describe('notification selector', () => {
     const data = createDemoData()
     const notifications = selectNotifications(data, DEMO_DATE)
     expect(notifications.find(item => item.kind === 'overdue')).toMatchObject({
-      title: '2 bills are past due',
-      description: `${formatMoney(190_000)} still to pay. Open Billing to see who owes what.`,
+      title: '7 bills are past due',
+      description: `${formatMoney(1_080_000)} still to pay. Open Billing to see who owes what.`,
     })
-    expect(notifications.find(item => item.kind === 'overdue')?.description).not.toContain(formatMoney(514_400))
+    expect(notifications.find(item => item.kind === 'overdue')?.description).not.toContain(formatMoney(1_404_400))
 
     expect(selectNotifications(dataWithSingleCharge('2026-11-12', 1_000, 'VOIDED'), DEMO_DATE)).toEqual([])
   })
