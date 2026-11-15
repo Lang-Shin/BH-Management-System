@@ -4,3 +4,13 @@ import { afterEach, vi } from 'vitest'
 
 afterEach(() => { cleanup(); localStorage.clear(); vi.restoreAllMocks() })
 Object.defineProperty(window, 'scrollTo', { value: vi.fn(), writable: true })
+
+class ResizeObserverMock {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+if (!('ResizeObserver' in globalThis)) {
+  Object.defineProperty(globalThis, 'ResizeObserver', { value: ResizeObserverMock, writable: true })
+}
