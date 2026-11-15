@@ -532,6 +532,23 @@
 .paid-indicator-icon { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 9px; background: var(--forest-green); color: var(--oat-milk); box-shadow: inset 0 1px 0 rgb(255 255 255 / 30%), 0 2px 5px -3px color-mix(in srgb, var(--forest-green) 55%, transparent); }
 .paid-indicator-icon > svg { width: 16px; height: 16px; stroke-width: 3; }
 
+.billing-paid-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--forest-green) 24%, var(--card));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--forest-green) 5%, var(--card));
+  color: var(--forest-green);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.billing-paid-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
 .billing-state-pill {
   display: inline-flex;
   align-items: center;

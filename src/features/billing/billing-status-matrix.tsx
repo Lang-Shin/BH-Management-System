@@ -12,7 +12,7 @@ function PaidLabel() {
 }
 
 function PaidCategoryLabel() {
-  return <span className="font-semibold text-primary">PAID</span>
+  return <span className="billing-paid-badge"><span aria-hidden="true" className="billing-paid-dot" />PAID</span>
 }
 
 function UnsettledLabel({ partial = false }: { partial?: boolean }) {

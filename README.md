@@ -32,7 +32,7 @@ npm run preview    # Serve the built application locally
 | `/dashboard` | Dashboard (titled Overview): simple money totals, bill payments, recent payments, upcoming bills, and room counts |
 | `/tenants` | Search, fictional profiles, assignment history, tenant/account statuses, demo notes |
 | `/rooms` | Occupied, available, and under-repair rooms; current tenants; bed counts for information only |
-| `/billing` | Billing: choose a month; category cells show unpaid amounts for Rent/Water/Washing, plain PAID text, NOT PAID for Electricity, or NO BILL; the room-level Status retains its styled Paid/PARTLY PAID/NOT PAID indicators; check due dates and view electricity details |
+| `/billing` | Billing: choose a month; category cells show unpaid amounts for Rent/Water/Washing, Forest Green PAID dot badges, NOT PAID for Electricity, or NO BILL; the room-level Status retains its styled Paid/PARTLY PAID/NOT PAID indicators; check due dates and view electricity details |
 | `/payments` | Room-first individual payment transactions with payer/allocation details, individual advance credit, sample receipt snapshots and receipt-detail dialogs |
 | `/reports` | Monthly totals, reconciled room reports and room-summary CSV, billing policies, audit log, backup/recovery placeholders |
 
