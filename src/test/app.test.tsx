@@ -228,19 +228,35 @@ describe('admin workspace integration', () => {
     expect(within(matrix).queryByRole('row', { name: /Room 101/ })).not.toBeInTheDocument()
   })
 
-  it('shows room-first Dashboard summaries and retains payer identity in transaction details', async () => {
+  it('shows room-first Dashboard summaries with simple payment category boxes', async () => {
     const user = userEvent.setup()
     renderApp('/dashboard')
     const recent = await screen.findByRole('table', { name: 'Recent payments' })
     expect(within(recent).getByRole('columnheader', { name: 'Room' })).toBeInTheDocument()
     expect(within(recent).getAllByRole('row')).toHaveLength(6)
     expect(recent).toHaveTextContent('Room 103')
+    expect(within(recent).queryByText('Payment details')).not.toBeInTheDocument()
+
+    const advanceRow = within(recent).getByText('Nov 12, 2026').closest('tr')!
+    expect(within(advanceRow).getByText('Advance payment — kept for a future bill')).not.toBeVisible()
+    await user.click(within(advanceRow).getByText('See all transaction'))
+    expect(within(advanceRow).getByText('Advance payment — kept for a future bill')).toBeVisible()
+    expect(within(advanceRow).queryAllByRole('listitem')).toHaveLength(0)
+
+    const electricityRow = within(recent).getByText('Nov 11, 2026').closest('tr')!
+    await user.click(within(electricityRow).getByText('See all transaction'))
+    const boxes = within(electricityRow).getAllByRole('listitem')
+    expect(boxes).toHaveLength(1)
+    expect(boxes.filter(box => box.getAttribute('data-paid') === 'true').map(box => box.getAttribute('data-category'))).toEqual(['ELECTRICITY'])
+    expect(within(electricityRow).queryByText('Rent')).not.toBeInTheDocument()
+    expect(within(electricityRow).queryByText('Water')).not.toBeInTheDocument()
+    expect(within(electricityRow).queryByText('Washing')).not.toBeInTheDocument()
+    await user.click(within(advanceRow).getByText('See all transaction'))
+    expect(within(advanceRow).getByText('Advance payment — kept for a future bill')).not.toBeVisible()
+
     const balances = screen.getByRole('list', { name: 'Outstanding room balances' })
     expect(within(balances).getAllByText('Room 103')[0]).toBeInTheDocument()
     expect(balances).toHaveTextContent('₱7,300.00')
-    const firstPayment = within(recent).getAllByText('Payment details')[0]!
-    await user.click(firstPayment)
-    expect(within(recent).getByText('Payer: Jordan Flores')).toBeVisible()
     const dues = screen.getByRole('region', { name: 'Bills due soon' })
     expect(within(dues).getByRole('columnheader', { name: 'Room' })).toBeInTheDocument()
     expect(within(dues).getByRole('columnheader', { name: 'Month' })).toBeInTheDocument()

@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { createDemoData, DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
 import { chargeRoom, financialTotals, paymentRooms, selectRoomDues, selectRoomFinance } from '@/domain/calculations/room-finance'
@@ -28,6 +29,26 @@ function csvRows(text: string) {
 }
 
 describe('room financial presentation and reconciliation', () => {
+  it('shows only electricity and water from the latest transaction, excluding rent paid earlier', async () => {
+    const data = blankLedger()
+    data.charges = createDemoData().charges.filter(charge => ['rent-1', 'electricity-1', 'water-1'].includes(charge.id))
+    const earlier = { id: 'earlier-rent', tenantId: 'tenant-1', amountCents: 350000, paidOn: '2026-11-03', method: 'cash' as const, state: 'RECORDED' as const, correction: null }
+    const latest = { ...earlier, id: 'latest-utilities', amountCents: 30600, paidOn: DEMO_DATE }
+    data.payments = [earlier, latest]
+    data.paymentAllocations = data.charges.map(charge => ({ id: `allocated-${charge.id}`, paymentId: charge.category === 'RENT' ? earlier.id : latest.id, chargeId: charge.id, amountCents: charge.amountCents, allocatedOn: charge.category === 'RENT' ? earlier.paidOn : latest.paidOn, state: 'ACTIVE' as const, creditId: null, reversalAuditEventId: null }))
+    expect(isPrototypeData(data)).toBe(true)
+    const before = JSON.stringify(data)
+    const user = userEvent.setup()
+    render(<PaymentHistoryTable data={data} payments={[latest]} compact transactionDisplay="categories" />)
+    await user.click(screen.getByText('See all transaction'))
+    const boxes = screen.getAllByRole('listitem')
+    expect(boxes.map(box => box.getAttribute('data-category'))).toEqual(['ELECTRICITY', 'WATER'])
+    expect(boxes.every(box => box.getAttribute('data-paid') === 'true')).toBe(true)
+    expect(screen.queryByText('Rent')).not.toBeInTheDocument()
+    expect(screen.queryByText('Washing')).not.toBeInTheDocument()
+    expect(JSON.stringify(data)).toBe(before)
+  })
+
   it('shows a historical single-occupancy room once, even after move-out', () => {
     const data = createDemoData()
     const rows = selectRoomFinance(data, DEMO_DATE, 'period-oct')

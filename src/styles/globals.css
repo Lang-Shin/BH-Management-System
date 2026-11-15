@@ -528,6 +528,68 @@
 .sidebar-logout:active > span { transform: scale(1); }
 .sidebar-logout:active > svg { transform: scale(1); }
 
+.dashboard-transaction-disclosure { width: 10.5rem; max-width: 100%; white-space: normal; text-align: left; }
+.dashboard-transaction-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 48px;
+  padding-block: 10px;
+  list-style: none;
+  cursor: pointer;
+  color: var(--forest-green);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.4;
+  transition: font-size 180ms ease;
+}
+.dashboard-transaction-summary::-webkit-details-marker { display: none; }
+.dashboard-transaction-summary > span { min-width: 0; }
+.dashboard-transaction-summary > svg { flex: none; width: 16px; height: 16px; transition: transform 180ms ease; }
+.dashboard-transaction-summary:hover,
+.dashboard-transaction-summary:focus-visible { font-size: 15px; }
+.dashboard-transaction-disclosure[open] > .dashboard-transaction-summary > svg { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-transaction-summary,
+  .dashboard-transaction-summary > svg { transition: none; }
+}
+.dashboard-payment-checklist {
+  display: grid;
+  gap: 6px;
+  width: 10.5rem;
+  max-width: 100%;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, white 65%, var(--border));
+  border-radius: 18px;
+  background: var(--oat-milk);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 90%), 0 3px 8px -5px color-mix(in srgb, var(--forest-green) 25%, transparent);
+  text-align: left;
+}
+.dashboard-payment-checklist .payment-checklist-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+  color: var(--forest-green);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+.dashboard-payment-checklist .payment-checklist-square {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border: 1px solid color-mix(in srgb, var(--forest-green) 75%, black);
+  border-radius: 8px;
+  background: var(--forest-green);
+  color: var(--oat-milk);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 35%), inset 0 -1px 0 rgb(0 0 0 / 12%), 0 2px 4px -2px color-mix(in srgb, var(--forest-green) 45%, transparent);
+}
+.dashboard-payment-checklist .payment-checklist-square > svg { width: 15px; height: 15px; stroke-width: 2.5; }
+.dashboard-payment-checklist .payment-checklist-label { min-width: 0; white-space: normal; }
+
 .payment-launcher {
   display: flex;
   align-items: center;

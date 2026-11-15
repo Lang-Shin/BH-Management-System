@@ -1,4 +1,5 @@
-import type { Payment, PrototypeAppState } from '@/domain/types/models'
+import { Check, ChevronDown } from 'lucide-react'
+import type { ChargeCategory, Payment, PrototypeAppState } from '@/domain/types/models'
 import { DataTable, type Column } from './data-table'
 import { formatDate, formatMoney } from '@/lib/format'
 import { CATEGORY_LABELS } from '@/lib/labels'
@@ -7,7 +8,40 @@ import { paymentRooms } from '@/domain/calculations/room-finance'
 import { DEMO_DATE } from '@/data/fixtures/demo'
 import { TransactionDetails } from './transaction-details'
 
-export function PaymentHistoryTable({ data, payments, caption = 'Payment history', compact = false, asOf = DEMO_DATE }: { data: PrototypeAppState; payments: Payment[]; caption?: string; compact?: boolean; asOf?: string }) {
+const paymentCategories: { category: ChargeCategory; label: string }[] = [
+  { category: 'RENT', label: 'Rent' },
+  { category: 'ELECTRICITY', label: 'Electricity' },
+  { category: 'WATER', label: 'Water' },
+  { category: 'WASHING_MACHINE', label: 'Washing' },
+]
+
+function PaymentCategoryBoxes({ data, payment, asOf }: { data: PrototypeAppState; payment: Payment; asOf: string }) {
+  const paidCategories = new Set(data.paymentAllocations
+    .filter(allocation => allocation.paymentId === payment.id && allocation.state === 'ACTIVE' && allocation.allocatedOn <= asOf)
+    .map(allocation => data.charges.find(charge => charge.id === allocation.chargeId)?.category)
+    .filter((category): category is ChargeCategory => Boolean(category)))
+  const categories = paymentCategories.filter(item => paidCategories.has(item.category))
+
+  return <details className="dashboard-transaction-disclosure">
+    <summary className="dashboard-transaction-summary"><span>See all transaction</span><ChevronDown aria-hidden="true" /></summary>
+    {categories.length > 0 ? <ul className="dashboard-payment-checklist" aria-label={`Payment categories for ${payment.id}`}>
+      {categories.map(({ category, label }) => <li
+        key={category}
+        data-category={category}
+        data-paid="true"
+        title={`${label}: paid toward this category in this transaction`}
+        className="payment-checklist-row"
+      >
+        <span className="payment-checklist-square" aria-hidden="true"><Check /></span>
+        <span className="payment-checklist-label">{label}</span>
+        <span className="sr-only"> paid in this transaction</span>
+      </li>
+      )}
+    </ul> : <p className="dashboard-payment-checklist text-sm text-muted-foreground">{data.tenantCredits.some(credit => credit.sourcePaymentId === payment.id) ? 'Advance payment — kept for a future bill' : 'No bill categories paid in this transaction.'}</p>}
+  </details>
+}
+
+export function PaymentHistoryTable({ data, payments, caption = 'Payment history', compact = false, asOf = DEMO_DATE, transactionDisplay = 'details' }: { data: PrototypeAppState; payments: Payment[]; caption?: string; compact?: boolean; asOf?: string; transactionDisplay?: 'details' | 'categories' }) {
   const columns: Column<Payment>[] = [
     { key: 'room', label: 'Room', render: p => { const context = paymentRooms(data, p, asOf); return <div className="max-w-xs whitespace-normal"><p className="font-semibold">{context.label}</p>{(context.unallocated > 0 || context.allocations.some(item => item.context.roomId === null)) && <p className="mt-1 text-xs text-muted-foreground">{context.note}</p>}</div> } },
     { key: 'date', label: 'Date paid', render: p => formatDate(p.paidOn) },
@@ -24,6 +58,8 @@ export function PaymentHistoryTable({ data, payments, caption = 'Payment history
     } },
     { key: 'receipt', label: 'Receipt number', render: p => <span className="text-sm">{data.receipts.find(r => r.paymentId === p.id && r.state === 'ISSUED')?.receiptNumber ?? 'No receipt yet'}</span> },
   )
-  columns.push({ key: 'details', label: 'Transaction', render: p => <TransactionDetails data={data} payment={p} asOf={asOf} /> })
+  columns.push({ key: 'details', label: 'Transaction', render: p => transactionDisplay === 'categories'
+    ? <PaymentCategoryBoxes data={data} payment={p} asOf={asOf} />
+    : <TransactionDetails data={data} payment={p} asOf={asOf} /> })
   return <DataTable rows={payments} caption={caption} columns={columns} />
 }
