@@ -468,6 +468,37 @@
   box-shadow: 0 0 12px 2px color-mix(in srgb, var(--tomato-red) 32%, transparent);
 }
 
+.sidebar-logout { transition: box-shadow 240ms ease, color 240ms ease; }
+.sidebar-logout > svg,
+.sidebar-logout > span { transition: transform 240ms var(--route-ease), filter 240ms ease, text-shadow 240ms ease; }
+.sidebar-logout > span { display: inline-block; transform-origin: left center; }
+.sidebar-logout:hover,
+.sidebar-logout:focus-visible {
+  color: #fff8ec;
+  box-shadow:
+    0 0 16px 3px color-mix(in srgb, var(--tomato-red) 55%, transparent),
+    0 0 32px 8px color-mix(in srgb, var(--tomato-red) 32%, transparent),
+    inset 0 0 18px color-mix(in srgb, var(--tomato-red) 28%, transparent);
+}
+.sidebar-logout:hover > span,
+.sidebar-logout:focus-visible > span {
+  transform: scale(1.12);
+  text-shadow:
+    0 0 4px color-mix(in srgb, var(--tomato-red) 100%, transparent),
+    0 0 14px color-mix(in srgb, var(--tomato-red) 85%, transparent),
+    0 0 30px color-mix(in srgb, var(--tomato-red) 60%, transparent);
+}
+.sidebar-logout:hover > svg,
+.sidebar-logout:focus-visible > svg {
+  transform: scale(1.15);
+  filter:
+    drop-shadow(0 0 4px color-mix(in srgb, var(--tomato-red) 100%, transparent))
+    drop-shadow(0 0 14px color-mix(in srgb, var(--tomato-red) 85%, transparent))
+    drop-shadow(0 0 28px color-mix(in srgb, var(--tomato-red) 60%, transparent));
+}
+.sidebar-logout:active > span { transform: scale(1); }
+.sidebar-logout:active > svg { transform: scale(1); }
+
 @media (prefers-reduced-motion: reduce) {
   .back-to-top-arrow > svg { transition: none; }
   .back-to-top-arrow:hover > svg,
@@ -477,6 +508,14 @@
   .dashboard-return:hover > span,
   .dashboard-return:focus-visible > span,
   .dashboard-return:active > span { transform: none; }
+  .sidebar-logout > svg,
+  .sidebar-logout > span { transition: none; }
+  .sidebar-logout:hover > svg,
+  .sidebar-logout:focus-visible > svg,
+  .sidebar-logout:active > svg,
+  .sidebar-logout:hover > span,
+  .sidebar-logout:focus-visible > span,
+  .sidebar-logout:active > span { transform: none; }
   .header-typewriter-caret { display: none; animation: none; }
   .room-metric,
   .room-metric-fill,

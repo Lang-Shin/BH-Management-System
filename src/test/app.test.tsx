@@ -120,10 +120,16 @@ describe('admin workspace integration', () => {
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 2)
   })
 
-  it('shows a log-out button in the sidebar without any sign-out behavior yet', async () => {
+  it('shows a log-out button that opens a centered clarification dialog without signing out', async () => {
+    const user = userEvent.setup()
     renderApp('/dashboard')
     const logout = await screen.findByRole('button', { name: 'Log out' })
     expect(logout).toHaveAttribute('type', 'button')
+    await user.click(logout)
+    const dialog = await screen.findByRole('dialog', { name: 'Log out of BHMS?' })
+    expect(within(dialog).getByText(/Signing out is not available in this sample yet/)).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Got it' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(screen.getByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument()
   })
 
