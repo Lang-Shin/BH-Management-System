@@ -1,4 +1,6 @@
+import { useRef, useState } from 'react'
 import { Wallet, Banknote, CircleDollarSign } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { PageHeader, PreviewNotice, StatCard } from '@/components/shared/page'
 import { AnimatedNumber } from '@/components/shared/animated-number'
 import { PaymentHistoryTable } from '@/components/shared/payment-history-table'
@@ -10,9 +12,13 @@ import { usePrototype } from '@/hooks/use-prototype'
 import { creditRemaining, selectSummary } from '@/domain/calculations/summary'
 import { DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
 import { formatDate, formatMoney } from '@/lib/format'
+import { ReceiptDialog } from './receipt-dialog'
 
 export default function Payments() {
   const { data } = usePrototype()
+  const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null)
+  const receiptTrigger = useRef<HTMLButtonElement | null>(null)
+  const selectedReceipt = data.receipts.find(item => item.id === selectedReceiptId)
   const summary = selectSummary(data, DEMO_DATE, DEMO_PERIOD)
   const payments = data.payments.filter(p => p.state === 'RECORDED' && p.paidOn <= DEMO_DATE).sort((a, b) => b.paidOn.localeCompare(a.paidOn))
   const receipt = [...data.receipts].filter(r => r.state === 'ISSUED').sort((a, b) => b.issuedOn.localeCompare(a.issuedOn))[0]
@@ -40,6 +46,7 @@ export default function Payments() {
       { key: 'tenant', label: 'Tenant', render: r => data.tenants.find(t => t.id === data.payments.find(p => p.id === r.paymentId)?.tenantId)?.name },
       { key: 'date', label: 'Receipt date', render: r => formatDate(r.issuedOn) },
       { key: 'amount', label: 'Amount paid', align: 'right', render: r => formatMoney(r.amountCents) },
+      { key: 'actions', label: 'Actions', render: r => <Button variant="outline" aria-label={`View receipt ${r.receiptNumber}`} onClick={event => { receiptTrigger.current = event.currentTarget; setSelectedReceiptId(r.id) }}>View receipt</Button> },
     ]} /></details>
     <WorkflowPlaceholders title="More payment tools" items={[
       { title: 'Record a payment', description: 'Saving a new full or part payment will be available later.' },
@@ -47,5 +54,6 @@ export default function Payments() {
       { title: 'Print or send a receipt', description: 'Making a receipt for a tenant will be added later.' },
       { title: 'Correct a payment', description: 'Corrections will keep the original record and a note explaining the change.' },
     ]} />
+    {selectedReceipt && <ReceiptDialog key={selectedReceipt.id} data={data} receipt={selectedReceipt} onClose={() => setSelectedReceiptId(null)} onReturnFocus={() => receiptTrigger.current?.focus()} />}
   </>
 }

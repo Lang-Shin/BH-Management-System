@@ -33,7 +33,7 @@ npm run preview    # Serve the built application locally
 | `/tenants` | Search, fictional profiles, assignment history, tenant/account statuses, demo notes |
 | `/rooms` | Occupied, available, and under-repair rooms; current tenants; bed counts for information only |
 | `/billing` | Billing: choose a month, see who has paid, check due dates, and view electricity details |
-| `/payments` | Read-only payment allocations, partial-payment examples, advance credit, sample receipt snapshots |
+| `/payments` | Read-only payment allocations, partial-payment examples, advance credit, sample receipt snapshots and receipt-detail dialogs |
 | `/reports` | Sample monthly collection reports, billing policies, audit log, export/backup/recovery placeholders |
 
 - Fixed desktop sidebar and accessible mobile/tablet navigation drawer.

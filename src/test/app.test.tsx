@@ -226,7 +226,40 @@ describe('admin workspace integration', () => {
     expect(within(matrix).queryByRole('row', { name: /Alex Rivera/ })).not.toBeInTheDocument()
   })
 
-  it('marks financial workflows as placeholders without payment or receipt action buttons', async () => {
+  it('views receipt snapshots and advance payments without changing records', async () => {
+    const user = userEvent.setup()
+    renderApp('/payments')
+    await user.click(await screen.findByText('View receipt list'))
+    const savedData = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}').data
+    const trigger = within(screen.getByRole('region', { name: 'Sample receipts' })).getByRole('button', { name: 'View receipt DEMO-RCT-001' })
+    await user.click(trigger)
+    const dialog = screen.getByRole('dialog', { name: 'Sample receipt · DEMO-RCT-001' })
+    expect(dialog).toHaveTextContent('Quinn Mendoza')
+    expect(dialog).toHaveTextContent('Nov 2, 2026')
+    expect(dialog).toHaveTextContent('₱3,244.00')
+    expect(dialog).toHaveTextContent('Bank transfer')
+    expect(within(dialog).getByRole('list')).toHaveTextContent('Rent')
+    expect(within(dialog).getByRole('list')).toHaveTextContent('Water')
+    expect(within(dialog).getByRole('list')).toHaveTextContent('Electricity')
+    expect(dialog).toHaveTextContent('Not an official receipt')
+    await user.click(within(dialog).getByRole('button', { name: 'Close receipt' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(() => expect(trigger).toHaveFocus())
+    await user.click(trigger)
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(trigger).toHaveFocus())
+
+    await user.click(screen.getByRole('button', { name: 'View receipt DEMO-RCT-010' }))
+    const advance = screen.getByRole('dialog', { name: 'Sample receipt · DEMO-RCT-010' })
+    expect(advance).toHaveTextContent('Jordan Flores')
+    expect(advance).toHaveTextContent('₱500.00')
+    expect(advance).toHaveTextContent('Advance payment — kept for a future bill')
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}').data).toEqual(savedData)
+  })
+
+  it('keeps recording, issuing, and correction workflows as placeholders', async () => {
     const user = userEvent.setup()
     renderApp('/payments')
     await user.click(await screen.findByText('More payment tools'))
