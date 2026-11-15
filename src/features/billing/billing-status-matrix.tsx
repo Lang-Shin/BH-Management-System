@@ -1,18 +1,19 @@
+import { Check, CircleDashed, Clock3 } from 'lucide-react'
 import type { ChargeCategory, PrototypeAppState } from '@/domain/types/models'
 import { financialTotals, selectRoomFinance } from '@/domain/calculations/room-finance'
 import { DataTable } from '@/components/shared/data-table'
-import { StatusBadge } from '@/components/shared/status-badge'
 import { CATEGORY_LABELS } from '@/lib/labels'
 import { formatMoney } from '@/lib/format'
 
 const categories: ChargeCategory[] = ['RENT', 'ELECTRICITY', 'WATER', 'WASHING_MACHINE']
 
 function PaidLabel() {
-  return <StatusBadge status="Paid" label="PAID" />
+  return <span className="paid-indicator"><span className="paid-indicator-icon"><Check aria-hidden="true" /></span><span>Paid</span></span>
 }
 
-function NotPaidLabel() {
-  return <StatusBadge status="Not yet paid" label="NOT PAID" />
+function UnsettledLabel({ partial = false }: { partial?: boolean }) {
+  const Icon = partial ? CircleDashed : Clock3
+  return <span className="billing-state-pill" data-state={partial ? 'partial' : 'unpaid'}><span className="billing-state-icon"><Icon aria-hidden="true" /></span><span>{partial ? 'PARTLY PAID' : 'NOT PAID'}</span></span>
 }
 
 function NoBillLabel() {
@@ -20,9 +21,8 @@ function NoBillLabel() {
 }
 
 function RoomStatus({ status }: { status: 'PAID' | 'PARTLY PAID' | 'NOT PAID' }) {
-  if (status === 'PAID') return <StatusBadge status="Paid" label="PAID" />
-  if (status === 'PARTLY PAID') return <StatusBadge status="Partly paid" label="PARTLY PAID" />
-  return <StatusBadge status="Not yet paid" label="NOT PAID" />
+  if (status === 'PAID') return <PaidLabel />
+  return <UnsettledLabel partial={status === 'PARTLY PAID'} />
 }
 
 function roomStatus(data: PrototypeAppState, room: ReturnType<typeof selectRoomFinance>[number], asOf: string): 'PAID' | 'PARTLY PAID' | 'NOT PAID' {
@@ -45,7 +45,7 @@ export function BillingStatusMatrix({ data, periodId, asOf, outstandingOnly }: {
       const items = room.charges.filter(charge => charge.category === category)
       if (!items.length) return <NoBillLabel />
       const totals = financialTotals(data, items, asOf)
-      if (category === 'ELECTRICITY') return totals.outstanding > 0 ? <NotPaidLabel /> : <PaidLabel />
+      if (category === 'ELECTRICITY') return totals.outstanding > 0 ? <UnsettledLabel /> : <PaidLabel />
       return totals.outstanding > 0 ? <p className="font-semibold tabular-nums">{formatMoney(totals.outstanding)}</p> : <PaidLabel />
     } })),
     { key: 'status', label: 'Status', render: room => <RoomStatus status={roomStatus(data, room, asOf)} /> },

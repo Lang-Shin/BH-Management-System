@@ -528,6 +528,45 @@
 .sidebar-logout:active > span { transform: scale(1); }
 .sidebar-logout:active > svg { transform: scale(1); }
 
+.paid-indicator { display: inline-flex; align-items: center; gap: 8px; min-height: 34px; padding: 3px 11px 3px 3px; border: 1px solid color-mix(in srgb, white 65%, var(--border)); border-radius: 999px; background: linear-gradient(145deg, color-mix(in srgb, white 65%, var(--card)), var(--oat-milk)); box-shadow: inset 0 1px 0 white, 0 3px 8px -6px color-mix(in srgb, var(--forest-green) 30%, transparent); color: var(--forest-green); font-size: 14px; font-weight: 650; line-height: 1; white-space: nowrap; }
+.paid-indicator-icon { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 9px; background: var(--forest-green); color: var(--oat-milk); box-shadow: inset 0 1px 0 rgb(255 255 255 / 30%), 0 2px 5px -3px color-mix(in srgb, var(--forest-green) 55%, transparent); }
+.paid-indicator-icon > svg { width: 16px; height: 16px; stroke-width: 3; }
+
+.billing-state-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 4px 12px 4px 4px;
+  border: 1px solid color-mix(in srgb, white 75%, var(--border));
+  border-radius: 999px;
+  background: linear-gradient(145deg, color-mix(in srgb, white 55%, var(--card)), var(--oat-milk));
+  box-shadow: inset 0 1px 0 white, inset 0 -1px 0 color-mix(in srgb, var(--border) 35%, transparent), 0 3px 7px -5px color-mix(in srgb, var(--forest-green) 30%, transparent);
+  color: var(--forest-green);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.3;
+  letter-spacing: 0.015em;
+  white-space: nowrap;
+}
+.billing-state-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: 1px solid color-mix(in srgb, var(--forest-green) 18%, var(--border));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--forest-green) 10%, var(--card));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 75%), 0 2px 4px -3px color-mix(in srgb, var(--forest-green) 40%, transparent);
+}
+.billing-state-icon > svg { width: 16px; height: 16px; stroke-width: 2; }
+.billing-state-pill[data-state="unpaid"] { color: #a52d1e; }
+.billing-state-pill[data-state="unpaid"] .billing-state-icon {
+  border-color: color-mix(in srgb, var(--tomato-red) 25%, var(--border));
+  background: color-mix(in srgb, var(--tomato-red) 12%, var(--card));
+}
+
 .outstanding-room-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 14px; }
 .pending-room-link { display: inline-flex; width: fit-content; min-height: 44px; padding-block: 6px; text-align: left; color: var(--muted-foreground); font-size: 14px; transition: color 180ms ease; }
 .pending-room-link:hover,
