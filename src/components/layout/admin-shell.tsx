@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Building2, Menu, CircleAlert, ArrowUp } from 'lucide-react'
+import { Building2, Menu, CircleAlert, ArrowUp, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { usePrototype } from '@/hooks/use-prototype'
@@ -16,7 +16,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     <Brand />
     <p className="mt-10 mb-3 px-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Workspace</p>
     <nav aria-label="Main navigation" className="space-y-1">{navigation.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} onClick={onNavigate} className="sidebar-link flex min-h-12 items-center gap-3 rounded-lg px-3 py-3 text-sm font-semibold"><Icon className="size-[18px] shrink-0" aria-hidden="true" /><span>{label}</span></NavLink>)}</nav>
-    <div className="mt-auto pt-12 text-xs text-muted-foreground"><p className="border-t px-3 pt-5">Boarding house management</p></div>
+    <div className="mt-auto pt-12">
+      <button type="button" className="sidebar-link flex min-h-12 w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-semibold"><LogOut className="size-[18px] shrink-0" aria-hidden="true" /><span>Log out</span></button>
+      <p className="mt-3 border-t px-3 pt-5 text-xs text-muted-foreground">Boarding house management</p>
+    </div>
   </div>
 }
 

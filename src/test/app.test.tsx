@@ -120,6 +120,13 @@ describe('admin workspace integration', () => {
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 2)
   })
 
+  it('shows a log-out button in the sidebar without any sign-out behavior yet', async () => {
+    renderApp('/dashboard')
+    const logout = await screen.findByRole('button', { name: 'Log out' })
+    expect(logout).toHaveAttribute('type', 'button')
+    expect(screen.getByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument()
+  })
+
   it('handles unknown deep links with a route back home', async () => {
     renderApp('/missing-page')
     expect(await screen.findByText('This page could not be found')).toBeInTheDocument()
