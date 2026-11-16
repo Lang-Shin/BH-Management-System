@@ -33,7 +33,7 @@ npm run preview    # Serve the built application locally
 | `/tenants` | Search, fictional profiles, assignment history, tenant/account statuses, demo notes |
 | `/rooms` | Occupied, available, and under-repair rooms; current tenants; bed counts for information only |
 | `/billing` | Billing: choose a month; category cells show unpaid amounts for Rent/Water/Washing, Forest Green PAID dot badges, NOT PAID for Electricity, or NO BILL; the room-level Status retains its styled Paid/PARTLY PAID/NOT PAID indicators; check due dates and view electricity details |
-| `/payments` | Room-first individual payment transactions with payer/allocation details, individual advance credit, sample receipt snapshots and receipt-detail dialogs |
+| `/payments` | Room-first payment history with See Transaction dialogs for payer/allocation details, individual advance credit, sample receipt snapshots and receipt-detail dialogs |
 | `/reports` | Monthly totals, reconciled room reports and room-summary CSV, billing policies, audit log, backup/recovery placeholders |
 
 - Fixed desktop sidebar and accessible mobile/tablet navigation drawer.
@@ -42,6 +42,7 @@ npm run preview    # Serve the built application locally
 - Dashboard analytics include a room-occupancy doughnut and a bill-status stacked bar, with counts and percentage legends from the current summary data. Charts animate on each Dashboard visit and respect reduced motion.
 - Billing includes a room-status doughnut matching the table’s PAID, PARTLY PAID, and NOT PAID counts for the selected month. It draws smoothly from zero over 1.2 seconds with no start delay when revealed, replays when the month changes, and respects reduced motion. It counts rooms rather than amounts or individual charges.
 - Billing has a **Filters** menu between the chart and room table, aligned above the table’s right edge. It offers SHOW ALL, PAID, PARTLY PAID, and NOT PAID with matching icons. The filtered table animates on change, SHOW ALL clears the filter, and changing the month resets it.
+- Payment History keeps allocation breakdowns out of the wide table. Each row’s **See Transaction** button opens a read-only dialog with room, date, amount, status, receipt, method, payer, actual allocated categories, and unallocated advances. The dialog fades and rises on open, animates closed, restores focus, supports Escape, and respects reduced motion without changing payment records.
 - Numeric totals, balances, counts, percentages, and electricity quantities outside tables count up from zero over 1.2 seconds across all six pages. Table values show their final numbers immediately. Animated values start when revealed (including expanded details) and on page revisits or value changes. Formatting, final accessible text, and printed values remain exact; reduced motion shows final values immediately.
 - A header notification bell summarizes the current sample records: bills past due, bills due within seven days of the fixed sample date, rooms under repair, and held advance credit. Items link to the related page, unread state is saved separately under `bhms:notifications:v1`, and restoring sample records clears it. These are informational sample alerts; no push or email reminders are sent.
 - Top header, active-route links, document titles, keyboard focus styles, skip link, dialogs, and status announcements.

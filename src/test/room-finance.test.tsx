@@ -166,7 +166,8 @@ describe('room financial presentation and reconciliation', () => {
     expect(chargeStatus(data, data.charges.find(charge => charge.id === 'rent-6')!, DEMO_DATE)).toBe('UNPAID')
   })
 
-  it('preserves a multi-room payment as one transaction and exposes exact allocation amounts and remainder', () => {
+  it('preserves a multi-room payment as one transaction and exposes exact allocation amounts and remainder', async () => {
+    const user = userEvent.setup()
     const data = blankLedger()
     transfer(data)
     data.charges = [
@@ -185,11 +186,15 @@ describe('room financial presentation and reconciliation', () => {
     const region = screen.getByRole('region', { name: 'Payment history' })
     expect(within(region).getAllByRole('row')).toHaveLength(2)
     expect(region).toHaveTextContent('Multiple rooms / contexts')
-    // DOM identity is retained in disclosure, not substituted in the payment record.
-    expect(region).toHaveTextContent('Payer: Quinn Mendoza')
-    expect(region).toHaveTextContent('Payment ID: multi')
-    expect(region).toHaveTextContent('old-rent')
-    expect(region).toHaveTextContent('new-rent')
+    expect(within(region).queryByRole('columnheader', { name: 'What was paid' })).not.toBeInTheDocument()
+    await user.click(within(region).getByRole('button', { name: /See Transaction/ }))
+    const dialog = screen.getByRole('dialog', { name: 'Transaction Details' })
+    expect(dialog).toHaveTextContent('Multiple rooms / contexts')
+    expect(dialog).toHaveTextContent('Paid by: Quinn Mendoza')
+    expect(dialog).toHaveTextContent('Payment ID: multi')
+    expect(dialog).toHaveTextContent('Rent')
+    expect(dialog).toHaveTextContent('Unallocated amount')
+    expect(dialog).toHaveTextContent('₱50.00')
   })
 
   it('does not count voided payments or reversed allocations as collected bill money', () => {
