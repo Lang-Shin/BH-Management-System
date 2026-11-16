@@ -28,8 +28,8 @@ function RoomStatus({ status }: { status: BillingRoomStatus }) {
   return <UnsettledLabel partial={status === 'PARTLY PAID'} />
 }
 
-export function BillingStatusMatrix({ data, periodId, asOf, outstandingOnly }: { data: PrototypeAppState; periodId: string; asOf: string; outstandingOnly: boolean }) {
-  const rooms = selectBillingRooms(data, periodId, asOf, outstandingOnly)
+export function BillingStatusMatrix({ data, periodId, asOf, outstandingOnly, statusFilter = null }: { data: PrototypeAppState; periodId: string; asOf: string; outstandingOnly: boolean; statusFilter?: BillingRoomStatus | null }) {
+  const rooms = selectBillingRooms(data, periodId, asOf, outstandingOnly).filter(room => !statusFilter || room.billingStatus === statusFilter)
   return <DataTable rows={rooms} caption="Who has paid" columns={[
     { key: 'room', label: 'Room', render: room => <div className="max-w-xs whitespace-normal"><p className="font-semibold">{room.context.label}</p><p className="mt-1 text-xs text-muted-foreground">{room.charges.length} individual charges</p></div> },
     ...billingCategories.map(category => ({ key: category, label: CATEGORY_LABELS[category], render: (room: typeof rooms[number]) => {

@@ -5,7 +5,6 @@ import { AnimatedNumber } from '@/components/shared/animated-number'
 import { DataTable } from '@/components/shared/data-table'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { WorkflowPlaceholders } from '@/components/shared/workflow-placeholders'
-import { Button } from '@/components/ui/button'
 import { usePrototype } from '@/hooks/use-prototype'
 import { chargeBalance, chargePaid, chargeStatus, issuedCharges, selectSummary } from '@/domain/calculations/summary'
 import { DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
@@ -18,26 +17,31 @@ import { chargeRoom } from '@/domain/calculations/room-finance'
 import { ChargeDetails } from '@/components/shared/charge-details'
 import { BillingStatusChart } from './billing-status-chart'
 import { selectBillingRooms } from './billing-room-status'
+import { BillingFiltersMenu } from './billing-filters-menu'
+import type { BillingRoomStatus } from './billing-room-status'
 
 export default function Billing() {
   const { data } = usePrototype()
   const [periodId, setPeriodId] = useState(DEMO_PERIOD)
-  const [outstandingOnly, setOutstandingOnly] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<BillingRoomStatus | null>(null)
   const summary = selectSummary(data, DEMO_DATE, periodId)
-  const charges = issuedCharges(data, DEMO_DATE, periodId).filter(c => !outstandingOnly || chargeBalance(data, c, DEMO_DATE) > 0)
-  const billingRooms = selectBillingRooms(data, periodId, DEMO_DATE, outstandingOnly)
+  const charges = issuedCharges(data, DEMO_DATE, periodId)
+  const billingRooms = selectBillingRooms(data, periodId, DEMO_DATE, false)
 
   return <>
     <PageHeader title="Billing" description="Check rent, electricity, water, and washing payments in one place." action={<PaymentCalculator key={periodId} periodLabel={data.billingPeriods.find(period => period.id === periodId)?.label ?? 'Sample billing period'} />} />
     <PreviewNotice>You can look through these bills. Creating and changing bills will be added later.</PreviewNotice>
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-4"><div className="max-w-full"><label htmlFor="billing-period" className="mb-2 block text-base font-semibold">Choose a month</label><select id="billing-period" value={periodId} onChange={e => setPeriodId(e.target.value)} className="min-h-14 max-w-full rounded-lg border bg-card px-4 py-3 text-base">{data.billingPeriods.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}</select></div><Button variant={outstandingOnly ? 'default' : 'outline'} aria-pressed={outstandingOnly} onClick={() => setOutstandingOnly(v => !v)}>{outstandingOnly ? 'Show all bills' : 'Show unpaid bills'}</Button></div>
+    <div className="mb-6"><div className="max-w-full"><label htmlFor="billing-period" className="mb-2 block text-base font-semibold">Choose a month</label><select id="billing-period" value={periodId} onChange={e => { setPeriodId(e.target.value); setStatusFilter(null) }} className="min-h-14 max-w-full rounded-lg border bg-card px-4 py-3 text-base">{data.billingPeriods.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}</select></div></div>
     <section className="mb-7 grid gap-5 xl:grid-cols-3" aria-label="Bills overview">
       <StatCard label="Total bills" value={formatMoney(summary.billed)} detail="All bills for the month you chose." icon={ReceiptText} />
       <StatCard label="Already paid" value={formatMoney(summary.applied)} detail="Payments used to pay these bills." icon={Wallet} />
       <StatCard label="Still to pay" value={formatMoney(summary.outstanding)} detail={<><AnimatedNumber value={summary.overdue} /> bills are past their due date.</>} icon={CircleAlert} />
     </section>
-    <BillingStatusChart key={`${periodId}:${outstandingOnly}`} rooms={billingRooms} periodLabel={data.billingPeriods.find(period => period.id === periodId)?.label ?? 'Selected billing period'} outstandingOnly={outstandingOnly} />
-    <BillingStatusMatrix data={data} periodId={periodId} asOf={DEMO_DATE} outstandingOnly={outstandingOnly} />
+    <BillingStatusChart key={periodId} rooms={billingRooms} periodLabel={data.billingPeriods.find(period => period.id === periodId)?.label ?? 'Selected billing period'} outstandingOnly={false} />
+    <div className="mb-3 flex justify-end"><BillingFiltersMenu value={statusFilter} onChange={setStatusFilter} /></div>
+    <div key={statusFilter ?? 'ALL'} className="billing-table-enter">
+      <BillingStatusMatrix data={data} periodId={periodId} asOf={DEMO_DATE} outstandingOnly={false} statusFilter={statusFilter} />
+    </div>
     <details className="mt-7 rounded-xl border bg-card p-5 sm:p-6"><summary className="min-h-12 cursor-pointer py-2 text-lg font-semibold">View bill amounts and due dates</summary><div className="mt-5"><DataTable rows={charges} caption="Bill amounts and due dates" columns={[
       { key: 'room', label: 'Room', render: c => <span className="font-semibold">{chargeRoom(data, c).label}</span> },
       { key: 'tenant', label: 'Charge owner / ID', render: c => <div className="max-w-xs whitespace-normal"><p>{data.tenants.find(t => t.id === c.tenantId)?.name}</p><p className="mt-1 break-all text-xs text-muted-foreground">{c.id}</p></div> },

@@ -541,6 +541,42 @@
 .paid-indicator-icon { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 9px; background: var(--forest-green); color: var(--oat-milk); box-shadow: inset 0 1px 0 rgb(255 255 255 / 30%), 0 2px 5px -3px color-mix(in srgb, var(--forest-green) 55%, transparent); }
 .paid-indicator-icon > svg { width: 16px; height: 16px; stroke-width: 3; }
 
+.billing-menu-trigger > svg { transition: transform 180ms var(--route-ease); }
+.billing-menu-trigger[data-state="open"] > svg { transform: rotate(180deg); }
+.billing-menu {
+  border-radius: 18px;
+  border-color: color-mix(in srgb, white 70%, var(--border));
+  background: var(--card);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 75%), 0 20px 44px -18px rgb(0 0 0 / 28%);
+}
+.billing-filter-menu { min-width: 15rem; }
+.billing-filter-menu [data-slot="dropdown-menu-checkbox-item"] { padding-left: 8px; gap: 10px; }
+.billing-filter-status-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: 1px solid color-mix(in srgb, var(--forest-green) 18%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--forest-green) 8%, var(--card));
+  color: var(--forest-green);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 80%);
+}
+.billing-filter-status-icon > svg { width: 17px; height: 17px; stroke-width: 2.25; }
+.billing-filter-status-icon[data-status="paid"] { border-color: var(--forest-green); background: var(--forest-green); color: var(--oat-milk); box-shadow: inset 0 1px 0 rgb(255 255 255 / 25%), 0 2px 5px -3px color-mix(in srgb, var(--forest-green) 50%, transparent); }
+.billing-filter-status-icon[data-status="unpaid"] { border-color: color-mix(in srgb, var(--tomato-red) 28%, var(--border)); background: color-mix(in srgb, var(--tomato-red) 13%, var(--card)); color: #a52d1e; }
+.billing-filter-status-icon[data-status="all"] { background: color-mix(in srgb, var(--forest-green) 5%, var(--card)); color: var(--forest-green); }
+@keyframes billing-table-enter {
+  from { opacity: 0; transform: translateY(8px) scale(0.995); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.billing-table-enter { animation: billing-table-enter 280ms var(--route-ease) backwards; }
+@media (prefers-reduced-motion: reduce) {
+  .billing-menu-trigger > svg { transition: none; }
+  .billing-table-enter { animation: none; }
+}
+
 .billing-paid-badge {
   display: inline-flex;
   align-items: center;
