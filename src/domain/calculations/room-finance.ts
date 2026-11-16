@@ -11,7 +11,7 @@ export interface FinancialRoom {
   note: string
 }
 
-function roomContext(data: PrototypeAppState, roomId: string, source: FinancialRoom['source'], note: string): FinancialRoom | null {
+export function roomContext(data: PrototypeAppState, roomId: string, source: FinancialRoom['source'], note: string): FinancialRoom | null {
   const room = data.rooms.find(item => item.id === roomId)
   return room ? { id: room.id, roomId: room.id, label: `Room ${room.name}`, source, note } : null
 }

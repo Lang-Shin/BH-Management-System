@@ -3,6 +3,7 @@ import type { PrototypeData } from '@/domain/types/models'
 import type { StateAction } from './actions'
 import { activeAssignments } from '@/domain/calculations/summary'
 import { prepareElectricityPayment } from '@/domain/calculations/electricity-payment'
+import { prepareRoomPayment } from '@/domain/calculations/room-payment'
 
 export function prototypeReducer(state: PrototypeData, action: StateAction): PrototypeData {
   switch (action.type) {
@@ -27,6 +28,13 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
     }
     case 'electricity/paymentConfirmed': {
       const result = prepareElectricityPayment(state, action.obligationId, action.currentReadingMilliKwh, action.paidOn)
+      return result.ok ? result.data : state
+    }
+    case 'room/paymentConfirmed': {
+      const result = prepareRoomPayment(state, {
+        roomId: action.roomId, periodId: action.periodId, selected: action.selected,
+        electricityReadingMilliKwh: action.electricityReadingMilliKwh, asOf: action.asOf,
+      })
       return result.ok ? result.data : state
     }
     case 'demo/reset':

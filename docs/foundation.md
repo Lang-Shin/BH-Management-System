@@ -58,7 +58,7 @@ Tailwind 4 uses its Vite plugin and CSS-first theme. There is no Tailwind 3 conf
 
 ### Intentional demonstration assumptions
 
-- Six destinations are Dashboard (titled Overview), Tenants, Rooms, Billing, Payments & Receipts, and Reports & Settings. All route URLs remain stable. Receipt generation is future scope; a labeled sample preview uses existing receipt data. Settings show read-only defaults rather than introducing configuration workflows.
+- Six destinations are Dashboard (titled Overview), Tenants, Rooms, Billing, Payments & Receipts, and Reports & Settings. All route URLs remain stable. Billing can record room-based sample payments and generate fictional receipt snapshots; production receipting and corrections remain future scope. Dashboard and Reports Pending Payments stay view-only. Settings show read-only defaults rather than introducing configuration workflows.
 - Property branding: Halili BH. The demonstration tenant and financial records remain fictional; display currency: PHP.
 - Fixed sample date: November 13, 2026, keeping overdue/upcoming examples deterministic.
 - There are 10 fictional tenants (7 active and 3 moved out), 6 rooms, 2 sample billing periods, 35 finalized category charges, 10 confirmed meter readings, 2 cumulative electricity obligations awaiting readings, and 14 sample payments. Room totals initially show 4 occupied, 1 available, and 1 under repair. Bed counts do not affect these totals.

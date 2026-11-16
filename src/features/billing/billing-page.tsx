@@ -30,7 +30,7 @@ export default function Billing() {
 
   return <>
     <PageHeader title="Billing" description="Check rent, electricity, water, and washing payments in one place." action={<PaymentCalculator key={periodId} periodId={periodId} periodLabel={data.billingPeriods.find(period => period.id === periodId)?.label ?? 'Sample billing period'} />} />
-    <PreviewNotice>Electricity bills are created only when you confirm a payment-time meter reading. Other bill-creation and correction workflows will be added later.</PreviewNotice>
+    <PreviewNotice>Electricity bills are created only when you confirm a payment-time meter reading. Calculate Payment settles existing rent, water, washing, and electricity bills; other bill-generation and correction workflows will be added later.</PreviewNotice>
     <div className="mb-6"><div className="max-w-full"><label htmlFor="billing-period" className="mb-2 block text-base font-semibold">Choose a month</label><select id="billing-period" value={periodId} onChange={e => { setPeriodId(e.target.value); setStatusFilter(null) }} className="min-h-14 max-w-full rounded-lg border bg-card px-4 py-3 text-base">{data.billingPeriods.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}</select></div></div>
     <section className="mb-7 grid gap-5 xl:grid-cols-3" aria-label="Bills overview">
       <StatCard label="Total bills" value={formatMoney(summary.billed)} detail="All bills for the month you chose." icon={ReceiptText} />

@@ -1,4 +1,3 @@
-import { useRef, useState } from 'react'
 import { ChevronDown, DoorOpen, Droplets, House, WashingMachine, Zap } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useAnimatedDialogClose } from '@/components/ui/use-animated-dialog-close'
@@ -10,7 +9,6 @@ import { CATEGORY_LABELS } from '@/lib/labels'
 import { formatDate, formatMoney } from '@/lib/format'
 import { pendingPaymentCategories } from './pending-payment-groups'
 import { unresolvedElectricity } from '@/domain/calculations/summary'
-import { ElectricityPaymentDialog } from '@/features/billing/electricity-payment-dialog'
 
 const icons = { RENT: House, ELECTRICITY: Zap, WATER: Droplets, WASHING_MACHINE: WashingMachine }
 const timingLabels = { earlier: 'Past month', current: 'Current month', upcoming: 'Upcoming month', review: 'Month needs review' }
@@ -23,9 +21,6 @@ export function PendingPaymentsDialog({ data, room, asOf, onClose, onReturnFocus
   onClose: () => void
   onReturnFocus: () => void
 }) {
-  const [electricityObligationId, setElectricityObligationId] = useState<string | null>(null)
-  const [notice, setNotice] = useState('')
-  const electricityTrigger = useRef<HTMLButtonElement | null>(null)
   const categories = pendingPaymentCategories(data, room.charges, asOf, room.context.roomId ?? undefined)
   const total = categories.reduce((sum, category) => sum + category.outstanding, 0)
   const unresolved = categories.reduce((sum, category) => sum + category.unresolved, 0)
@@ -34,8 +29,7 @@ export function PendingPaymentsDialog({ data, room, asOf, onClose, onReturnFocus
   const previousSettled = pendingElectricity ? data.meterReadings.find(reading => reading.id === pendingElectricity.previousReadingId) : undefined
   const { open, requestClose, onOpenChange, onAnimationEnd } = useAnimatedDialogClose(onClose)
 
-  return <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
+  return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="pending-payments-dialog" onAnimationEnd={onAnimationEnd} onCloseAutoFocus={event => { event.preventDefault(); onReturnFocus() }}>
       <DialogHeader className="pending-dialog-heading">
         <div className="flex items-center gap-3 pr-5"><span className="pending-room-icon"><DoorOpen aria-hidden="true" /></span><DialogTitle>{room.context.label} · Pending Payments</DialogTitle></div>
@@ -44,7 +38,6 @@ export function PendingPaymentsDialog({ data, room, asOf, onClose, onReturnFocus
         <div className="pending-total-summary"><div><p className="text-sm text-muted-foreground">{unresolved > 0 ? 'Known total still to pay' : 'Total still to pay'}</p><p className="mt-1 text-xs text-muted-foreground">{count} pending {count === 1 ? 'bill' : 'bills'}{unresolved > 0 ? ` · ${unresolved} awaiting meter reading` : ''} · As of {formatDate(asOf)} (sample)</p>{unresolved > 0 && <p className="mt-1 text-xs text-muted-foreground">Excludes electricity awaiting calculation.</p>}</div><p className="pending-total-amount">{total > 0 ? formatMoney(total) : unresolved > 0 ? 'Amount pending calculation' : formatMoney(0)}</p></div>
       </DialogHeader>
       <div className="pending-dialog-body">
-        {notice && <p role="status" className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</p>}
         {categories.length === 0 ? <p role="status" className="py-8 text-center text-muted-foreground">No pending payments for this room.</p> : categories.map(category => {
           const Icon = icons[category.category]
           const status = category.unresolved > 0 ? 'Not yet paid' : category.months.some(month => month.status === 'PARTIALLY_PAID') ? 'Partly paid' : 'Not yet paid'
@@ -65,7 +58,7 @@ export function PendingPaymentsDialog({ data, room, asOf, onClose, onReturnFocus
               </div>
               {category.category === 'ELECTRICITY' && category.unresolved > 0 && previousSettled && <div className="pending-electricity-action">
                 <p><span className="font-semibold">Last settled reading:</span> {formatKwh(previousSettled.readingMilliKwh)} · {formatDate(previousSettled.readOn)}</p>
-                <Button variant="outline" onClick={event => { electricityTrigger.current = event.currentTarget; setElectricityObligationId(pendingElectricity?.id ?? null) }} aria-label={`Enter meter reading for ${room.context.label} electricity`}>Enter meter reading</Button>
+                <p>Enter a reading from Billing → Calculate payment.</p>
               </div>}
               <details className="pending-month-details">
                 <summary><span>View bill details</span><ChevronDown aria-hidden="true" /></summary>
@@ -86,10 +79,5 @@ export function PendingPaymentsDialog({ data, room, asOf, onClose, onReturnFocus
       </div>
       <DialogFooter className="pending-dialog-footer"><Button aria-label="Close pending payments" onClick={requestClose}>Close</Button></DialogFooter>
     </DialogContent>
-    </Dialog>
-    {electricityObligationId && <ElectricityPaymentDialog obligationId={electricityObligationId}
-      onClose={() => setElectricityObligationId(null)}
-      onReturnFocus={() => { if (electricityTrigger.current?.isConnected) electricityTrigger.current.focus() }}
-      onConfirmed={receiptNumber => setNotice(`Electricity payment recorded · ${receiptNumber}. The settled reading has advanced.`)} />}
-  </>
+  </Dialog>
 }

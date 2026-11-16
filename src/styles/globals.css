@@ -826,6 +826,23 @@
 .payment-amount-field { display: flex; align-items: center; flex: 0 1 150px; min-width: 0; gap: 5px; color: var(--muted-foreground); }
 .payment-amount-field input { width: 100%; min-width: 0; min-height: 48px; padding: 8px 6px; border: 1px solid transparent; border-radius: 10px; text-align: right; color: var(--forest-green); background: transparent; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .payment-amount-field input[aria-invalid="true"] { border-color: #a52d1e; }
+.room-payment-options { display: grid; gap: 0; margin-top: 20px; padding: 0 14px; border: 1px solid var(--border); border-radius: 20px; background: color-mix(in srgb, white 35%, var(--card)); box-shadow: inset 0 1px 0 white; }
+.room-payment-option { padding: 14px 0; }
+.room-payment-option + .room-payment-option { border-top: 1px solid var(--border); }
+.room-payment-option-label { display: flex; align-items: center; gap: 12px; min-height: 44px; cursor: pointer; }
+.room-payment-option-label:has(input:disabled) { cursor: default; opacity: 0.72; }
+.room-payment-option-label input[type="checkbox"] { width: 20px; height: 20px; flex: none; accent-color: var(--forest-green); }
+.room-payment-option[data-state="PAID"] .room-payment-option-label { cursor: default; }
+.room-payment-electricity { display: grid; gap: 7px; margin: 10px 0 2px 44px; padding: 12px; border-radius: 14px; background: color-mix(in srgb, var(--forest-green) 6%, var(--card)); }
+.room-payment-electricity .electricity-reading-input { min-height: 44px; }
+.room-payment-confirm { padding: 28px; }
+.room-payment-summary { display: grid; gap: 10px; margin-top: 20px; padding: 16px; border: 1px solid var(--border); border-radius: 18px; background: var(--oat-milk); }
+.room-payment-summary > div { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.room-payment-summary dt { color: var(--muted-foreground); }
+.room-payment-summary dd { font-weight: 650; text-align: right; }
+.room-payment-summary-total { margin-top: 4px; border-top: 1px solid var(--border); padding-top: 12px; }
+.room-payment-summary-total dt,
+.room-payment-summary-total dd { color: var(--forest-green); font-size: 20px; font-weight: 800; }
 .payment-total-panel { position: sticky; bottom: 0; padding: 22px 28px; background: var(--forest-green); color: var(--oat-milk); border-radius: 24px 24px 0 0; box-shadow: 0 -8px 24px -16px var(--forest-green); }
 .payment-total-value { display: block; font-size: clamp(26px, 6vw, 36px); font-weight: 800; line-height: 1.3; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .payment-total-tag { padding: 5px 10px; border: 1px solid rgb(255 255 255 / 25%); border-radius: 999px; font-size: 12px; }
@@ -845,6 +862,11 @@
   .payment-input-row { gap: 8px; }
   .payment-input-row label { gap: 8px; }
   .payment-amount-field { flex-basis: 115px; }
+  .room-payment-options { padding-inline: 12px; }
+  .room-payment-option-label { align-items: flex-start; }
+  .room-payment-option-label > span:last-child { max-width: 45%; white-space: normal; }
+  .room-payment-electricity { margin-left: 0; }
+  .room-payment-confirm { padding: 20px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .payment-launcher { transition: none; }

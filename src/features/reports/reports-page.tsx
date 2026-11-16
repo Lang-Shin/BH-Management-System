@@ -22,6 +22,7 @@ const changeLabels: Record<AuditEvent['action'], string> = {
   DEMO_SEEDED: 'Sample records added', READING_CORRECTED: 'Meter reading corrected', CHARGE_CORRECTED: 'Bill corrected',
   PAYMENT_CORRECTED: 'Payment corrected', ALLOCATION_REVERSED: 'Payment removed from a bill',
   ELECTRICITY_PAYMENT_RECORDED: 'Electricity payment recorded',
+  ROOM_PAYMENT_RECORDED: 'Room payment recorded',
 }
 
 export default function Reports() {

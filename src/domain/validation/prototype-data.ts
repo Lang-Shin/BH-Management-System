@@ -54,7 +54,7 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
   if (!rows(value, 'receipts', r => id(r.paymentId) && id(r.receiptNumber) && date(r.issuedOn) && positive(r.amountCents)
     && oneOf(r.state, ['ISSUED', 'VOIDED']) && Array.isArray(r.allocationIds) && r.allocationIds.length <= 1000 && r.allocationIds.every(id))) return false
   if (!rows(value, 'auditEvents', r => id(r.actorId) && date(r.occurredOn) && id(r.entityId) && text(r.reason)
-    && oneOf(r.action, ['DEMO_SEEDED', 'READING_CORRECTED', 'CHARGE_CORRECTED', 'PAYMENT_CORRECTED', 'ALLOCATION_REVERSED', 'ELECTRICITY_PAYMENT_RECORDED'])
+    && oneOf(r.action, ['DEMO_SEEDED', 'READING_CORRECTED', 'CHARGE_CORRECTED', 'PAYMENT_CORRECTED', 'ALLOCATION_REVERSED', 'ELECTRICITY_PAYMENT_RECORDED', 'ROOM_PAYMENT_RECORDED'])
     && oneOf(r.entityType, ['PROTOTYPE', 'METER_READING', 'CHARGE', 'PAYMENT', 'PAYMENT_ALLOCATION'])
     && nullableText(r.beforeSnapshot) && nullableText(r.afterSnapshot))) return false
 

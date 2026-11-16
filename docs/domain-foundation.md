@@ -1,6 +1,6 @@
 # Preliminary domain and page foundations · TASK 1A sections 7–10
 
-This is a read-only financial demonstration, not a production billing system. Types are preliminary and may be refined after the landlord confirms the remaining rules. The existing demo note editor, room maintenance toggle, filters, and reset remain functional. None of them issue charges, allocate payments, create receipts, or perform financial corrections.
+This is a frontend financial demonstration, not a production billing system. Types are preliminary and may be refined after the landlord confirms the remaining rules. The existing demo note editor, room maintenance toggle, filters, reset, and Billing room-payment calculator are functional. Only the Billing calculator records charges, payments, allocations, and receipts; it does not provide production concurrency, authentication, or correction guarantees.
 
 ## Models and relationships
 
@@ -69,7 +69,7 @@ Meter ownership, shared-room allocation, meter rollover/replacement rules, fract
 
 Water is a sample PHP 100.00 manual charge per tenant, based on each billing period’s occupants; no water meter model or calculation is added. Washing machine charges are optional manual PHP 100.00-per-room entries, so two occupants share one room charge.
 
-Payments and allocations are separate. Room 101 is fully settled in the sample. Room 102’s historical rent remains fully unpaid while its known November rent, water, and washing are paid; its electricity remains unresolved until a payment-time reading is entered. Room 104 has no current payments and two skipped electricity months represented by one cumulative obligation. Jordan’s PHP 500.00 advance remains source-linked credit until explicitly allocated. The only saving workflow is electricity payment confirmation. Rent/water/washing entry, advance use, corrections, reversals, and general receipt issuance remain placeholders; the standalone payment calculator does not save or allocate money.
+Payments and allocations are separate. Room 101 is fully settled in the sample. Room 102’s historical rent remains fully unpaid while its known November rent, water, and washing are paid; its electricity remains unresolved until a payment-time reading is entered. Room 104 has no current payments and two skipped electricity months represented by one cumulative obligation. Jordan’s PHP 500.00 advance remains source-linked credit until explicitly allocated. Billing’s room calculator is the only saving workflow: it selects the room’s unpaid categories, calculates checkbox amounts, reviews the total, and records the confirmed payment. Because the existing model owns charges by tenant, a room confirmation with multiple payers produces one payment and receipt per payer. Dashboard and Reports Pending Payments are view-only. Advance use, corrections, reversals, and production receipt issuance remain placeholders.
 
 Confirmed electricity payments generate a receipt and retain the meter interval. Receipt references are fictional, not official tax receipts or generated documents. Their stored allocation IDs describe issuance-time allocation history rather than a dynamically recomputed receipt.
 
@@ -102,8 +102,8 @@ The fixture factory generates fresh objects for reset/tests; it is not an execut
 - **Dashboard:** financial overview, independent category payment status, five recent payments, upcoming charge due dates, and assignment-based occupancy.
 - **Tenants:** searchable directory, profiles, dated assignments/agreed amounts, tenant status, derived account balance/credit, and fictional contacts.
 - **Rooms:** private/shared configuration, full/partial/empty/maintenance states, dated occupants, and preserved history.
-- **Billing:** period selector, category matrix, detailed balances/status/due dates, effective-dated rates, payment-time meter entry, calculated cumulative preview, confirmed readings, and charge snapshots.
-- **Payments & Receipts:** payment/allocation history, confirmed electricity interval details, partial-payment examples, advance credit, and fictional receipt snapshots.
+- **Billing:** period selector, category matrix, detailed balances/status/due dates, effective-dated rates, room-based checkbox calculator, payment-time meter entry, calculated cumulative preview, review-before-save confirmation, confirmed readings, and charge snapshots. Billing is the only page that can create a payment.
+- **Payments & Receipts:** read-only payment/allocation history, confirmed electricity interval details, partial-payment examples, advance credit, and fictional receipt snapshots.
 - **Reports & Settings:** derived collection rows by sample period, confirmed/unconfirmed billing settings, seeded admin event, and explicit export/backup/recovery placeholders.
 
 Unfinished tools are collapsed under clearly marked “Coming later” sections, not decorative action buttons. localStorage is demo persistence, not production backup. Restore sample records is under Reports & Settings and replaces only the prototype snapshot with fresh fixtures after confirmation.
