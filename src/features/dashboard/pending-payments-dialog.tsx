@@ -27,10 +27,10 @@ export function PendingPaymentsDialog({ data, room, asOf, onClose, onReturnFocus
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="pending-payments-dialog" onAnimationEnd={onAnimationEnd} onCloseAutoFocus={event => { event.preventDefault(); onReturnFocus() }}>
       <DialogHeader className="pending-dialog-heading">
-        <div className="flex items-center gap-3 pr-5"><span className="pending-room-icon"><DoorOpen aria-hidden="true" /></span><DialogTitle>{room.context.label} · Pending payments</DialogTitle></div>
-        <DialogDescription>Older unpaid months appear first. These amounts are what is still left to pay.</DialogDescription>
+        <div className="flex items-center gap-3 pr-5"><span className="pending-room-icon"><DoorOpen aria-hidden="true" /></span><DialogTitle>{room.context.label} · Pending Payments</DialogTitle></div>
+        <DialogDescription>All unpaid billing periods — older unpaid months first.</DialogDescription>
         {room.context.roomId === null && <p className="text-xs text-muted-foreground">The historical room needs review. Original charge records remain in Billing.</p>}
-        <div className="pending-total-summary"><div><p className="text-sm text-muted-foreground">Total still to pay</p><p className="mt-1 text-xs text-muted-foreground">{count} pending {count === 1 ? 'bill' : 'bills'} · As of {formatDate(asOf)}</p></div><p className="pending-total-amount">{formatMoney(total)}</p></div>
+        <div className="pending-total-summary"><div><p className="text-sm text-muted-foreground">Total still to pay</p><p className="mt-1 text-xs text-muted-foreground">{count} pending {count === 1 ? 'bill' : 'bills'} · As of {formatDate(asOf)} (sample)</p></div><p className="pending-total-amount">{formatMoney(total)}</p></div>
       </DialogHeader>
       <div className="pending-dialog-body">
         {categories.length === 0 ? <p role="status" className="py-8 text-center text-muted-foreground">No pending payments for this room.</p> : categories.map(category => {
@@ -51,8 +51,8 @@ export function PendingPaymentsDialog({ data, room, asOf, onClose, onReturnFocus
               <details className="pending-month-details">
                 <summary><span>View bill details</span><ChevronDown aria-hidden="true" /></summary>
                 <ul aria-label={`${CATEGORY_LABELS[category.category]} pending months`}>{category.months.map(month => <li key={month.id} className="pending-month-row">
-                  <div className="min-w-0"><p className="font-semibold">{month.label}</p><p className="mt-0.5 text-xs text-muted-foreground">{timingLabels[month.timing]}{month.overdue > 0 ? ' · Past due' : ''}</p></div>
-                  <div className="shrink-0 text-right"><StatusBadge status={month.status === 'PARTIALLY_PAID' ? 'Partly paid' : 'Not yet paid'} /><p className="pending-month-amount mt-1 text-sm font-bold tabular-nums">{formatMoney(month.outstanding)} <span className="text-xs font-normal text-muted-foreground">left</span></p>{month.paid > 0 && <p className="mt-0.5 text-xs text-muted-foreground">Paid so far {formatMoney(month.paid)}</p>}</div>
+                  <div className="min-w-0"><p className="font-semibold">{month.label}</p><p className="mt-0.5 text-xs text-muted-foreground">{timingLabels[month.timing]}{month.overdue > 0 ? ' · Past due' : ''}</p><p className="mt-1 text-xs text-muted-foreground">{month.dueDates.length > 0 ? `Due ${month.dueDates.map(formatDate).join(' / ')}` : 'Due date not recorded'} · Billed {formatMoney(month.billed)}{month.paid > 0 ? ` · Paid ${formatMoney(month.paid)}` : ''}</p></div>
+                  <div className="shrink-0 text-right"><StatusBadge status={month.status === 'PARTIALLY_PAID' ? 'Partly paid' : 'Not yet paid'} /><p className="pending-month-amount mt-1 text-sm font-bold tabular-nums">{formatMoney(month.outstanding)} <span className="text-xs font-normal text-muted-foreground">left</span></p></div>
                 </li>)}</ul>
                 {category.optional && <p className="pending-optional-note">Washing is optional. If this bill is not paid, the washing machine cannot be used.</p>}
               </details>

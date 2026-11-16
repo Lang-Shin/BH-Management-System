@@ -25,6 +25,7 @@ export interface PendingPaymentMonth extends FinancialTotals {
   startDate: string
   timing: PendingPaymentPeriod['timing']
   chargeCount: number
+  dueDates: string[]
 }
 
 export interface PendingPaymentCategory {
@@ -82,6 +83,7 @@ export function pendingPaymentCategories(data: PrototypeAppState, charges: Charg
         startDate: period.startDate,
         timing: period.timing,
         chargeCount: items.length,
+        dueDates: [...new Set(items.map(charge => charge.dueDate))].sort(),
         ...financialTotals(data, items, asOf),
       }]
     })

@@ -117,7 +117,9 @@ describe('room pending-payment presentation', () => {
     const trigger = screen.getByRole('button', { name: 'View pending payments for Room 101' })
     expect(screen.queryByText('Alex Rivera')).not.toBeInTheDocument()
     await user.click(trigger)
-    const dialog = screen.getByRole('dialog', { name: 'Room 101 · Pending payments' })
+    const dialog = screen.getByRole('dialog', { name: 'Room 101 · Pending Payments' })
+    expect(dialog).toHaveTextContent('All unpaid billing periods — older unpaid months first.')
+    expect(dialog).toHaveTextContent('As of Nov 13, 2026 (sample)')
     expect(within(dialog).getAllByRole('region').map(section => section.getAttribute('aria-label'))).toEqual(['Rent pending payments', 'Electricity pending payments', 'Water pending payments'])
     expect(dialog).toHaveTextContent('₱2,950.00')
     expect(dialog).not.toHaveTextContent('Alex Rivera')
@@ -132,7 +134,7 @@ describe('room pending-payment presentation', () => {
     ])
     expect(within(rent).getAllByText('Not yet paid')).toHaveLength(1)
     expect(within(rent).getByText('Partly paid')).toBeInTheDocument()
-    expect(rent).toHaveTextContent('Paid so far ₱1,000.00')
+    expect(rent).toHaveTextContent('Due Nov 5, 2026 · Billed ₱1,750.00 · Paid ₱1,000.00')
     expect(rent).toHaveTextContent('₱750.00')
     expect(within(rent).queryByText('Alex Rivera')).not.toBeInTheDocument()
 
@@ -151,12 +153,20 @@ describe('room pending-payment presentation', () => {
     expect(JSON.stringify(data)).toBe(before)
   })
 
+  it('does not subtract unallocated advance credit from pending room balances', () => {
+    const data = createDemoData()
+    const room = selectRoomFinance(data, DEMO_DATE).find(item => item.id === 'room-3')!
+    const categories = pendingPaymentCategories(data, room.charges, DEMO_DATE)
+    expect(categories.map(category => [category.category, category.outstanding])).toEqual([['RENT', 350000]])
+    expect(data.tenantCredits.reduce((sum, credit) => sum + credit.amountCents, 0)).toBe(50000)
+  })
+
   it('shows only categories with pending months and keeps the washing note visible', async () => {
     const data = createDemoData()
     const user = userEvent.setup()
     render(<OutstandingBalances data={data} asOf={DEMO_DATE} />)
     await user.click(screen.getByRole('button', { name: 'View pending payments for Room 101' }))
-    const dialog = screen.getByRole('dialog', { name: 'Room 101 · Pending payments' })
+    const dialog = screen.getByRole('dialog', { name: 'Room 101 · Pending Payments' })
     expect(within(dialog).getAllByRole('region').map(section => section.getAttribute('aria-label'))).toEqual(['Rent pending payments'])
     expect(dialog).toHaveTextContent('₱7,000.00')
     expect(within(dialog).queryByRole('region', { name: 'Washing machine pending payments' })).not.toBeInTheDocument()

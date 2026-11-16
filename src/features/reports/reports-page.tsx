@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ReceiptText, Wallet, CircleAlert, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/shared/status-badge'
-import { ChargeDetails } from '@/components/shared/charge-details'
 import { selectRoomFinance } from '@/domain/calculations/room-finance'
 import { CHARGE_STATUS_LABELS } from '@/lib/labels'
 import { roomReportCsv } from './room-report'
+import { PendingPaymentsDialog } from '@/features/dashboard/pending-payments-dialog'
 import { PageHeader, PreviewNotice, StatCard } from '@/components/shared/page'
 import { AnimatedNumber } from '@/components/shared/animated-number'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -26,7 +26,11 @@ const changeLabels: Record<AuditEvent['action'], string> = {
 export default function Reports() {
   const { data, storageWarning } = usePrototype()
   const [roomPeriod, setRoomPeriod] = useState(DEMO_PERIOD)
+  const [pendingRoomId, setPendingRoomId] = useState<string | null>(null)
+  const pendingTrigger = useRef<HTMLButtonElement | null>(null)
   const roomRows = selectRoomFinance(data, DEMO_DATE, roomPeriod)
+  const allRoomRows = selectRoomFinance(data, DEMO_DATE)
+  const pendingRoom = pendingRoomId ? allRoomRows.find(room => room.id === pendingRoomId) : undefined
   const roomTotals = selectSummary(data, DEMO_DATE, roomPeriod)
   const summary = selectSummary(data, DEMO_DATE, DEMO_PERIOD)
   const periods = data.billingPeriods.map(period => ({ ...period, summary: selectSummary(data, DEMO_DATE, period.id) }))
@@ -59,17 +63,22 @@ export default function Reports() {
     ]} /></section>
     <section className="mt-8" aria-labelledby="room-report-title">
       <h2 id="room-report-title" className="text-xl font-semibold">Room financial summary</h2>
-      <p className="mt-2 text-sm text-muted-foreground">Individual charges grouped by historical room context, not joint liability. Applied money excludes unallocated advances. Room needs review means the original room cannot be identified safely.</p>
+      <p className="mt-2 text-sm text-muted-foreground">Individual charges grouped by historical room context, not joint liability. Total billed, total paid, and payment status describe the selected report month. Pending Payment checks every unpaid billing period for the room. Unallocated advances are not counted as bill payments.</p>
       <div className="my-5 flex flex-wrap items-end justify-between gap-4"><div><label htmlFor="room-report-period" className="mb-2 block text-sm font-semibold">Report month</label><select id="room-report-period" value={roomPeriod} onChange={event => setRoomPeriod(event.target.value)} className="min-h-12 max-w-full rounded-lg border bg-card px-3">{data.billingPeriods.map(period => <option key={period.id} value={period.id}>{period.label}</option>)}</select></div><Button variant="outline" onClick={downloadRoomReport}><Download aria-hidden="true" />Download room CSV</Button></div>
       <DataTable rows={roomRows} caption="Room financial summary" columns={[
         { key: 'room', label: 'Room', render: row => <span className="font-semibold">{row.context.label}</span> },
         { key: 'billed', label: 'Total billed', align: 'right', render: row => formatMoney(row.billed) },
-        { key: 'paid', label: 'Applied to bills', align: 'right', render: row => formatMoney(row.paid) },
-        { key: 'outstanding', label: 'Outstanding', align: 'right', render: row => formatMoney(row.outstanding) },
-        { key: 'status', label: 'Payment status', render: row => <StatusBadge status={CHARGE_STATUS_LABELS[row.status]} /> },
-        { key: 'details', label: 'Underlying charges', render: row => <ChargeDetails data={data} charges={row.charges} asOf={DEMO_DATE} /> },
+        { key: 'paid', label: 'Total paid', align: 'right', render: row => formatMoney(row.paid) },
+        { key: 'pending', label: 'Pending payment', render: row => {
+          const allPeriodRoom = allRoomRows.find(item => item.id === row.id)
+          return allPeriodRoom && allPeriodRoom.outstanding > 0
+            ? <Button variant="outline" aria-label={`View pending payments for ${row.context.label}`} onClick={event => { pendingTrigger.current = event.currentTarget; setPendingRoomId(row.id) }}>View Details</Button>
+            : <span className="text-sm text-muted-foreground">NONE</span>
+        } },
+        { key: 'status', label: 'Payment status', render: row => row.charges.length > 0 ? <StatusBadge status={CHARGE_STATUS_LABELS[row.status]} /> : <span className="text-sm text-muted-foreground">No bills</span> },
       ]} />
-      <p className="mt-4 text-sm" aria-label="Room report reconciliation">All room/context totals: billed {formatMoney(roomTotals.billed)} · applied {formatMoney(roomTotals.applied)} · outstanding {formatMoney(roomTotals.outstanding)}. Includes any room-needs-review rows. Cash received is reported separately in Monthly summary.</p>
+      <p className="mt-4 text-sm" aria-label="Room report reconciliation">All room/context totals: billed {formatMoney(roomTotals.billed)} · applied {formatMoney(roomTotals.applied)} · outstanding {formatMoney(roomTotals.outstanding)}. Includes any room-needs-review rows. Pending Payment uses all unpaid billing periods, while the other columns describe {data.billingPeriods.find(period => period.id === roomPeriod)?.label ?? 'the selected month'}. Cash received is reported separately in Monthly summary.</p>
+      {pendingRoom && <PendingPaymentsDialog key={pendingRoom.id} data={data} room={pendingRoom} asOf={DEMO_DATE} onClose={() => setPendingRoomId(null)} onReturnFocus={() => pendingTrigger.current?.focus()} />}
     </section>
     <Card className="mt-8 shadow-none"><CardHeader><CardTitle>House settings</CardTitle><CardDescription>You can view these settings. Changing them will be added later.</CardDescription></CardHeader><CardContent><dl className="grid gap-6 text-base sm:grid-cols-2">{([
       ['Currency', 'Philippine peso (₱)'],
