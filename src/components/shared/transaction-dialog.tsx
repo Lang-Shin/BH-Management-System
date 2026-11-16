@@ -61,7 +61,7 @@ export function TransactionDialog({ data, payment, asOf, onClose, onReturnFocus 
       </section>
 
       <p className="break-all text-xs text-muted-foreground">Payment ID: {payment.id}</p>
-      <DialogFooter><Button onClick={requestClose}>Done</Button></DialogFooter>
+      <DialogFooter><Button onFocus={event => event.currentTarget.scrollIntoView?.({ block: 'nearest' })} onClick={requestClose}>Done</Button></DialogFooter>
     </DialogContent>
   </Dialog>
 }

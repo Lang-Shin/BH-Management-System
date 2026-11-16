@@ -568,7 +568,8 @@
 .billing-filter-status-icon[data-status="unpaid"] { border-color: color-mix(in srgb, var(--tomato-red) 28%, var(--border)); background: color-mix(in srgb, var(--tomato-red) 13%, var(--card)); color: #a52d1e; }
 .billing-filter-status-icon[data-status="all"] { background: color-mix(in srgb, var(--forest-green) 5%, var(--card)); color: var(--forest-green); }
 
-.transaction-dialog[data-slot="dialog-content"] { gap: 18px; max-height: 90dvh; overflow-y: auto; border-radius: 24px; padding: 24px; }
+.transaction-dialog[data-slot="dialog-content"] { gap: 18px; max-height: 90dvh; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; -ms-overflow-style: none; border-radius: 24px; padding: 24px; }
+.transaction-dialog[data-slot="dialog-content"]::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .transaction-dialog-heading { align-items: flex-start; gap: 8px; text-align: left; }
 .transaction-dialog-icon { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid color-mix(in srgb, var(--forest-green) 12%, var(--border)); border-radius: 15px; background: color-mix(in srgb, var(--forest-green) 8%, var(--card)); color: var(--forest-green); }
 .transaction-dialog-icon > svg { width: 22px; height: 22px; }
