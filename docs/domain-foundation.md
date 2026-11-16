@@ -38,13 +38,17 @@ IDs are explicit strings with referential validation. The type alias `PrototypeD
 
 ### Room occupancy — landlord clarification
 
-Count **rooms, not beds**. Any current rental makes the room occupied, including one tenant renting a three-bed room. A room with unused beds is not automatically available to rent again. Empty rooms that are not under repair are available; rooms under repair are a separate count. `selectRoomSummary()` is shared by the Dashboard and Rooms. The current sample shows 4 occupied / 6 rooms, 1 available, and 1 under repair. Existing `Room.capacity` values are retained as bed information for storage compatibility, not used as a headcount restriction or a payment rule.
+Count **rooms, not beds**. Any current rental makes the room occupied, including one tenant renting a three-bed room. A room with unused beds is not automatically available to rent again. Empty rooms that are not under repair are available; rooms under repair are a separate count. `selectRoomSummary()` is shared by the Dashboard and Rooms. The current sample shows 4 occupied / 15 rooms, 10 available, and 1 under repair. Existing `Room.capacity` values are retained as bed information for storage compatibility, not used as a headcount restriction or a payment rule.
+
+### Rental-rate categories
+
+Rooms are categorized only by rental rate, using stable IDs `RATE_3500`, `RATE_4000`, and `RATE_5000`. The approved fixture has 8 rooms at PHP 3,500, 6 rooms at PHP 4,000, and 1 room at PHP 5,000, totaling 15 rooms. Room cards and filters display the rate itself. Bathroom type and air-conditioning descriptions are not category names or category data.
 
 ## Confirmed billing requirements preserved
 
 ### Rent and periods
 
-Room rent is PHP 3,500.00 once per occupied room per billing period and must be settled in full. The demonstration fixture stores that single issued rent charge against one designated occupant’s assignment, so two occupants do not create two rent debts or imply joint liability. No sample rent allocation is partial; the snapshot validator rejects a partial rent allocation, and the payment calculator rejects a typed partial rent amount. Explicit billing periods connect all categories. October/November calendar months and due dates are fixture examples only; there is no recurring-bill engine, fixed rent-cycle rule, proration rule, or bill-generation action. Room capacity in the demonstration records is capped at two active occupants.
+Room rent is charged once per occupied room per billing period from the room’s rental-rate category and must be settled in full. The fixture stores the issued rent charge against one designated occupant’s assignment, so two occupants do not create two rent debts or imply joint liability. Assignment agreements and issued charges preserve their historical rate snapshots, so later category-rate changes do not rewrite past bills. No sample rent allocation is partial; the snapshot validator rejects a partial rent allocation, and the payment calculator rejects a typed partial rent amount. Explicit billing periods connect all categories. October/November calendar months and due dates are fixture examples only; there is no recurring-bill engine, fixed rent-cycle rule, proration rule, or bill-generation action. Room capacity in the demonstration records is capped at two active occupants.
 
 ### Electricity and rate history
 
@@ -110,6 +114,6 @@ Unfinished tools are collapsed under clearly marked “Coming later” sections,
 
 ## Persistence compatibility
 
-The expanded schema uses envelope version **4**. The existing key `bhms:prototype:v1` is intentionally retained so older snapshots can be detected and preserved. Loading an older or invalid schema shows fresh fixtures in memory and a recovery notice; saving remains disabled until the user explicitly confirms Restore sample records in Reports & Settings. No silent migration discards old notes or rewrites financial samples.
+The expanded schema uses envelope version **5**. The existing key `bhms:prototype:v1` is intentionally retained so older snapshots can be detected and preserved. Loading an older or invalid schema shows fresh fixtures in memory and a recovery notice; saving remains disabled until the user explicitly confirms Restore sample records in Reports & Settings. No silent migration discards old notes or rewrites financial samples.
 
 Runtime validation checks collection shapes, IDs, relationships, assignment dates/overlaps, occupied-room repair restrictions, safe-integer money, category-specific fields, unique electricity intervals, current-obligation baselines, reading/rate snapshots, allocation limits, source-credit reservations/consumption, receipt links, and correction/audit references. Bed counts do not restrict the number of rental records. A pure parser safely handles malformed JSON and incompatible envelopes. The repository also validates before writes and refuses invalid snapshots without replacing previously saved data. This is a useful prototype integrity boundary, not a replacement for future server validation and authorized financial transactions. localStorage is editable by browser users and is not secure financial storage.

@@ -16,6 +16,7 @@ import { usePrototype } from '@/hooks/use-prototype'
 import { selectSummary } from '@/domain/calculations/summary'
 import { DEMO_DATE, DEMO_PERIOD, DEMO_RATES } from '@/data/fixtures/demo'
 import { formatDate, formatMoney } from '@/lib/format'
+import { ROOM_RATE_CATEGORIES } from '@/lib/room-rates'
 import type { AuditEvent } from '@/domain/types/models'
 
 const changeLabels: Record<AuditEvent['action'], string> = {
@@ -85,7 +86,7 @@ export default function Reports() {
     </section>
     <Card className="mt-8 shadow-none"><CardHeader><CardTitle>House settings</CardTitle><CardDescription>You can view these settings. Changing them will be added later.</CardDescription></CardHeader><CardContent><dl className="grid gap-6 text-base sm:grid-cols-2">{([
       ['Currency', 'Philippine peso (₱)'],
-      ['Monthly rent', <><AnimatedNumber value={formatMoney(DEMO_RATES.rentCentsPerRoom)} /> per occupied room</>],
+      ['Monthly rent', ROOM_RATE_CATEGORIES.map(category => `${category.label} (${category.roomCount} ${category.roomCount === 1 ? 'room' : 'rooms'})`).join(' · ')],
       ['When rent is due', 'To be confirmed'],
       ['Electricity price', currentRate ? <><AnimatedNumber value={formatMoney(currentRate.rateCentsPerKwh)} /> per kWh, starting {formatDate(currentRate.effectiveFrom)}</> : 'No price set'],
       ['Sharing the electricity bill', 'Who uses each meter and how to share the bill still need to be agreed'],

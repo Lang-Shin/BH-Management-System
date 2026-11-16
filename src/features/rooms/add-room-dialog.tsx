@@ -3,6 +3,7 @@ import { Check, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { ROOM_RATE_CATEGORIES } from '@/lib/room-rates'
 
 export function AddRoomDialog() {
   const [open, setOpen] = useState(false)
@@ -35,6 +36,12 @@ export function AddRoomDialog() {
                 </div>
               </div>
               <p id="add-room-beds-help" className="-mt-3 text-sm text-muted-foreground">Bed counts are for reference only and do not determine room availability.</p>
+              <div className="grid gap-2">
+                <label htmlFor="add-room-rate" className="text-sm font-semibold">Monthly rental rate</label>
+                <select id="add-room-rate" defaultValue="RATE_3500" className="h-12 w-full rounded-xl border border-input bg-card px-3 text-base outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50">
+                  {ROOM_RATE_CATEGORIES.map(category => <option key={category.id} value={category.id}>{category.label}/month</option>)}
+                </select>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2">
                   <label htmlFor="add-room-type" className="text-sm font-semibold">Room type</label>

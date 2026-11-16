@@ -45,7 +45,7 @@ Amounts have not changed. “Already paid” is money used to pay bills for the 
 - Past assignments are retained and stop affecting the current count after their end date.
 - Financial charge amounts, rent agreements, allocations, and billing rules are not recalculated by this change.
 
-The current sample reads **4 occupied / 6 rooms · 1 available · 1 under repair**. A test also covers the requested example of **6 occupied / 10 rooms · 4 available**. No assumed real Halili BH room inventory was added.
+The current sample reads **4 occupied / 15 rooms · 10 available · 1 under repair**. A test also covers the requested example of **6 occupied / 10 rooms · 4 available**. No assumed real Halili BH room inventory was added.
 
 ## Restoring sample records
 

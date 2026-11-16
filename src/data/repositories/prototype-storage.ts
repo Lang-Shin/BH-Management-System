@@ -1,7 +1,7 @@
 import type { PrototypeAppState } from '@/domain/types/models'
 import { isPrototypeData, isRecord } from '@/domain/validation/prototype-data'
 
-export const STORAGE_SCHEMA_VERSION = 4
+export const STORAGE_SCHEMA_VERSION = 5
 
 type ParseResult =
   | { ok: true; data: PrototypeAppState }

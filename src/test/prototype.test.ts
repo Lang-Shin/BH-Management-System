@@ -10,7 +10,7 @@ describe('shared fictional financial model', () => {
   it('starts with consistent references, allocations, credits, and November summaries', () => {
     const data = createDemoData()
     expect(isPrototypeData(data)).toBe(true)
-    expect(selectSummary(data, DEMO_DATE, DEMO_PERIOD)).toEqual({ tenants: 7, totalRooms: 6, occupiedRooms: 4, availableRooms: 1, maintenanceRooms: 1,
+    expect(selectSummary(data, DEMO_DATE, DEMO_PERIOD)).toEqual({ tenants: 7, totalRooms: 15, occupiedRooms: 4, availableRooms: 10, maintenanceRooms: 1,
       billed: 1_522_500, applied: 1_152_500, received: 2_011_100, outstanding: 370_000, unresolved: 2, credit: 50_000, overdue: 0, paid: 12, partial: 0, unpaid: 3 })
     const received = data.payments.reduce((sum, p) => sum + p.amountCents, 0)
     const allocated = data.paymentAllocations.reduce((sum, a) => sum + a.amountCents, 0)
@@ -70,6 +70,7 @@ describe('shared fictional financial model', () => {
   const invalidCases: { name: string; change: (data: PrototypeAppState) => void }[] = [
     { name: 'orphan assignment', change: d => { d.roomAssignments[0]!.roomId = 'missing' } },
     { name: 'duplicate IDs', change: d => { d.rooms[1]!.id = 'room-1' } },
+    { name: 'invalid room rate category', change: d => { d.rooms[0]!.categoryId = 'RATE_9999' as never } },
     { name: 'impossible date', change: d => { d.roomAssignments[0]!.startDate = '2026-02-30' } },
     { name: 'occupied room marked under repair', change: d => { d.rooms[0]!.status = 'maintenance' } },
     { name: 'fractional currency', change: d => { d.payments[0]!.amountCents = 1.5 } },
@@ -123,14 +124,14 @@ describe('prototype reducer and persistence', () => {
     expect(changed.tenants[0]?.notes).toBe('Sample reminder')
     expect(await localStorageRepository.save(changed)).toBeNull()
     expect((await localStorageRepository.load()).data).toEqual(changed)
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 4)
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 5)
   })
 
   it('protects occupied rooms and preserves historical assignments during maintenance toggles', () => {
     const data = createDemoData()
     expect(prototypeReducer(data, { type: 'room/statusToggled', roomId: 'room-1' })).toBe(data)
     const changed = prototypeReducer(data, { type: 'room/statusToggled', roomId: 'room-6' })
-    expect(selectSummary(changed, DEMO_DATE)).toMatchObject({ totalRooms: 6, occupiedRooms: 4, availableRooms: 2, maintenanceRooms: 0 })
+    expect(selectSummary(changed, DEMO_DATE)).toMatchObject({ totalRooms: 15, occupiedRooms: 4, availableRooms: 11, maintenanceRooms: 0 })
     expect(isPrototypeData(changed)).toBe(true)
     const historicalRoom = prototypeReducer(data, { type: 'room/statusToggled', roomId: 'room-5' })
     expect(isPrototypeData(historicalRoom)).toBe(true)
@@ -138,7 +139,7 @@ describe('prototype reducer and persistence', () => {
     expect(prototypeReducer(changed, { type: 'demo/reset' })).toEqual(createDemoData())
   })
 
-  it.each(['{broken', JSON.stringify({ version: 1, data: { tenants: [] } }), JSON.stringify({ version: 2, data: createDemoData() }), JSON.stringify({ version: 3, data: createDemoData() }), JSON.stringify({ version: 99, data: createDemoData() }), JSON.stringify({ version: 4, data: {} })])('preserves malformed or unsupported storage until an explicit reset: %s', async raw => {
+  it.each(['{broken', JSON.stringify({ version: 1, data: { tenants: [] } }), JSON.stringify({ version: 2, data: createDemoData() }), JSON.stringify({ version: 3, data: createDemoData() }), JSON.stringify({ version: 4, data: createDemoData() }), JSON.stringify({ version: 99, data: createDemoData() }), JSON.stringify({ version: 5, data: {} })])('preserves malformed or unsupported storage until an explicit reset: %s', async raw => {
     localStorage.setItem(STORAGE_KEY, raw)
     const loaded = await localStorageRepository.load()
     expect(loaded.data).toEqual(createDemoData())

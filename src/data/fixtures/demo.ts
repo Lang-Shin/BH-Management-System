@@ -1,4 +1,5 @@
-import type { Charge, MeterReading, Payment, PaymentAllocation, PrototypeAppState, RoomAssignment } from '@/domain/types/models'
+import type { Charge, MeterReading, Payment, PaymentAllocation, PrototypeAppState, RoomAssignment, RoomCategoryId } from '@/domain/types/models'
+import { ROOM_RATE_BY_ID } from '@/lib/room-rates'
 
 export const DEMO_DATE = '2026-11-13'
 export const DEMO_PERIOD = 'period-nov'
@@ -28,9 +29,15 @@ export function createDemoData(): PrototypeAppState {
       status: movedOutTenantNumbers.has(number) ? 'MOVED_OUT' as const : 'ACTIVE' as const, notes: '',
     }
   })
-  const rooms = [2, 2, 2, 2, 2, 1].map((capacity, index) => ({
-    id: `room-${index + 1}`, name: String(101 + index), floor: 1, capacity,
-    kind: index >= 4 ? 'PRIVATE' as const : 'SHARED' as const, status: index === 5 ? 'maintenance' as const : 'available' as const,
+  const roomSpecs: { capacity: number; kind: 'PRIVATE' | 'SHARED'; status: 'available' | 'maintenance'; categoryId: RoomCategoryId }[] = [
+    ...[1, 2, 3, 4, 5].map(() => ({ capacity: 2, kind: 'SHARED' as const, status: 'available' as const, categoryId: 'RATE_3500' as const })),
+    { capacity: 1, kind: 'PRIVATE', status: 'maintenance', categoryId: 'RATE_3500' },
+    ...[1, 2].map(() => ({ capacity: 2, kind: 'SHARED' as const, status: 'available' as const, categoryId: 'RATE_3500' as const })),
+    ...[1, 2, 3, 4, 5, 6].map(() => ({ capacity: 2, kind: 'SHARED' as const, status: 'available' as const, categoryId: 'RATE_4000' as const })),
+    { capacity: 1, kind: 'PRIVATE', status: 'available', categoryId: 'RATE_5000' },
+  ]
+  const rooms = roomSpecs.map((room, index) => ({
+    id: `room-${index + 1}`, name: String(101 + index), floor: 1, ...room,
   }))
   const assignmentSpecs: { tenant: number; room: number; endDate: string | null }[] = [
     { tenant: 1, room: 1, endDate: null },
@@ -44,10 +51,13 @@ export function createDemoData(): PrototypeAppState {
     { tenant: 9, room: 1, endDate: '2026-09-30' },
     { tenant: 10, room: 5, endDate: '2026-10-31' },
   ]
-  const roomAssignments: RoomAssignment[] = assignmentSpecs.map(({ tenant, room, endDate }) => ({
-    id: `assignment-${tenant}`, tenantId: `tenant-${tenant}`, roomId: `room-${room}`,
-    startDate: '2026-09-01', endDate, agreedRentCents: DEMO_RATES.rentCentsPerRoom,
-  }))
+  const roomAssignments: RoomAssignment[] = assignmentSpecs.map(({ tenant, room, endDate }) => {
+    const assignedRoom = rooms[room - 1]!
+    return {
+      id: `assignment-${tenant}`, tenantId: `tenant-${tenant}`, roomId: `room-${room}`,
+      startDate: '2026-09-01', endDate, agreedRentCents: ROOM_RATE_BY_ID[assignedRoom.categoryId].monthlyRentCents,
+    }
+  })
   const billingPeriods = [
     { id: 'period-oct', label: 'October 2026 (sample)', startDate: '2026-10-01', endDate: '2026-10-31', status: 'CLOSED' as const },
     { id: DEMO_PERIOD, label: 'November 2026 (sample)', startDate: '2026-11-01', endDate: '2026-11-30', status: 'OPEN' as const },
@@ -95,7 +105,7 @@ export function createDemoData(): PrototypeAppState {
       const rentTenant = `tenant-${rentPayer[roomId]}`
       const rentAssignment = roomAssignments.find(assignment => assignment.tenantId === rentTenant && assignment.roomId === roomId)!
       const base = { billingPeriodId: spec.periodId, issuedOn: spec.issuedOn, dueDate: spec.dueDate, state: 'ISSUED' as const, correction: null }
-      charges.push({ ...base, id: `rent-${spec.key}-${roomId}`, tenantId: rentTenant, category: 'RENT', description: 'Room rent — charged once per occupied room', amountCents: DEMO_RATES.rentCentsPerRoom, agreedRentCents: DEMO_RATES.rentCentsPerRoom, roomAssignmentId: rentAssignment.id })
+      charges.push({ ...base, id: `rent-${spec.key}-${roomId}`, tenantId: rentTenant, category: 'RENT', description: 'Room rent — charged once per occupied room', amountCents: rentAssignment.agreedRentCents, agreedRentCents: rentAssignment.agreedRentCents, roomAssignmentId: rentAssignment.id })
       for (const occupant of occupants) {
         charges.push({ ...base, id: `water-${spec.key}-${occupant.id}`, tenantId: occupant.id, category: 'WATER', description: 'Room water — charged per tenant', amountCents: DEMO_RATES.waterCentsPerTenant, entryMethod: 'MANUAL' })
       }

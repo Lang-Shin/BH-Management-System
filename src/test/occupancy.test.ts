@@ -23,7 +23,7 @@ describe('room-based occupancy', () => {
     expect(roomOccupants(data, 'room-1', DEMO_DATE)).toHaveLength(1)
     expect(roomOccupants(data, 'room-2', DEMO_DATE)).toHaveLength(2)
     expect(roomOccupants(data, 'room-3', DEMO_DATE)).toHaveLength(2)
-    expect(selectRoomSummary(data, DEMO_DATE)).toEqual({ totalRooms: 6, occupiedRooms: 4, availableRooms: 1, maintenanceRooms: 1 })
+    expect(selectRoomSummary(data, DEMO_DATE)).toEqual({ totalRooms: 15, occupiedRooms: 4, availableRooms: 10, maintenanceRooms: 1 })
   })
 
   it('treats one person renting a two-bed room as occupied, not available', () => {
@@ -32,7 +32,7 @@ describe('room-based occupancy', () => {
     expect(data.rooms[2]?.capacity).toBe(2)
     expect(roomOccupants(data, 'room-3', DEMO_DATE)).toHaveLength(1)
     expect(roomOccupancy(data, data.rooms[2]!, DEMO_DATE)).toBe('OCCUPIED')
-    expect(selectRoomSummary(data, DEMO_DATE).availableRooms).toBe(1)
+    expect(selectRoomSummary(data, DEMO_DATE).availableRooms).toBe(10)
   })
 
   it('does not change availability or reject rental records when bed counts change', () => {

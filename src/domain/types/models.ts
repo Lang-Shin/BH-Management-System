@@ -15,6 +15,8 @@ export interface Tenant {
   notes: string
 }
 
+export type RoomCategoryId = 'RATE_3500' | 'RATE_4000' | 'RATE_5000'
+
 export interface Room {
   id: string
   name: string
@@ -23,6 +25,7 @@ export interface Room {
   capacity: number
   kind: 'PRIVATE' | 'SHARED'
   status: 'available' | 'maintenance'
+  categoryId: RoomCategoryId
 }
 
 export interface RoomAssignment {

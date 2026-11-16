@@ -6,7 +6,7 @@ import { localStorageRepository, STORAGE_KEY } from './local-storage-repository'
 describe('safe prototype snapshot parsing', () => {
   it('returns validated typed data from a supported envelope', () => {
     const data = createDemoData()
-    expect(parsePrototypeSnapshot(JSON.stringify({ version: 4, data }))).toEqual({ ok: true, data })
+    expect(parsePrototypeSnapshot(JSON.stringify({ version: 5, data }))).toEqual({ ok: true, data })
   })
 
   it.each([
@@ -14,7 +14,8 @@ describe('safe prototype snapshot parsing', () => {
     [JSON.stringify({ version: 1, data: createDemoData() }), 'UNSUPPORTED_SCHEMA'],
     [JSON.stringify({ version: 2, data: createDemoData() }), 'UNSUPPORTED_SCHEMA'],
     [JSON.stringify({ version: 3, data: createDemoData() }), 'UNSUPPORTED_SCHEMA'],
-    [JSON.stringify({ version: 4, data: { tenants: [] } }), 'INVALID_DATA'],
+    [JSON.stringify({ version: 4, data: createDemoData() }), 'UNSUPPORTED_SCHEMA'],
+    [JSON.stringify({ version: 5, data: { tenants: [] } }), 'INVALID_DATA'],
   ])('handles invalid input without throwing: %s', (raw, reason) => {
     expect(parsePrototypeSnapshot(raw)).toEqual({ ok: false, reason })
   })
