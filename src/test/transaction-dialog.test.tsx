@@ -26,7 +26,7 @@ describe('Payment History transaction dialog', () => {
     expect(within(table).getByRole('columnheader', { name: 'Receipt number' })).toBeInTheDocument()
   })
 
-  it('shows Room, date, amount, status, receipt, payer, method, and separate allocations', async () => {
+  it('shows Room, date, amount, status, receipt, payer, and allocations without payment method', async () => {
     const user = userEvent.setup()
     const data = createDemoData()
     const payment = paymentFrom(data, 'payment-3')
@@ -38,10 +38,14 @@ describe('Payment History transaction dialog', () => {
     expect(within(dialog).getAllByText('Room 103').length).toBeGreaterThan(0)
     expect(dialog).toHaveTextContent(formatDate(payment.paidOn))
     expect(dialog).toHaveTextContent(formatMoney(payment.amountCents))
+    const amount = within(dialog).getByText('Amount paid').parentElement!
+    expect(amount).toHaveClass('transaction-amount-section')
+    expect(amount.parentElement).toHaveClass('transaction-metadata', 'grid-cols-2')
+    expect(amount.querySelector('dd')).toHaveTextContent(formatMoney(payment.amountCents))
     expect(dialog).toHaveTextContent('Recorded')
     expect(dialog).toHaveTextContent(receipt)
     expect(dialog).toHaveTextContent('Paid by: Jamie Santos')
-    expect(dialog).toHaveTextContent(payment.method === 'cash' ? 'Cash' : 'Bank transfer')
+    expect(dialog).not.toHaveTextContent(/Payment method|Cash|Bank transfer/)
     expect(dialog).toHaveTextContent('Rent')
     expect(dialog).toHaveTextContent('Water')
     expect(dialog).not.toHaveTextContent('Electricity')

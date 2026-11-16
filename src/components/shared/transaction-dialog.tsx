@@ -22,7 +22,7 @@ export function TransactionDialog({ data, payment, asOf, onClose, onReturnFocus 
   const { open, requestClose, onOpenChange, onAnimationEnd } = useAnimatedDialogClose(onClose)
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="transaction-dialog sm:max-w-lg" onAnimationEnd={onAnimationEnd} onCloseAutoFocus={event => { event.preventDefault(); onReturnFocus() }}>
+    <DialogContent className="transaction-dialog" onAnimationEnd={onAnimationEnd} onCloseAutoFocus={event => { event.preventDefault(); onReturnFocus() }}>
       <DialogHeader className="transaction-dialog-heading">
         <span className="transaction-dialog-icon"><ReceiptText aria-hidden="true" /></span>
         <DialogTitle>Transaction Details</DialogTitle>
@@ -34,11 +34,10 @@ export function TransactionDialog({ data, payment, asOf, onClose, onReturnFocus 
           <div><p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Room</p><p className="mt-1 text-xl font-bold">{context.label}</p></div>
           <StatusBadge status={payment.state === 'RECORDED' ? 'Recorded' : 'Voided'} />
         </div>
-        <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+        <dl className="transaction-metadata mt-4 grid grid-cols-2 gap-3 text-sm">
           <div><dt className="text-muted-foreground">Date paid</dt><dd className="mt-1 font-semibold">{formatDate(payment.paidOn)}</dd></div>
-          <div><dt className="text-muted-foreground">Payment method</dt><dd className="mt-1 font-semibold">{payment.method === 'cash' ? 'Cash' : 'Bank transfer'}</dd></div>
           <div><dt className="text-muted-foreground">Receipt number</dt><dd className="mt-1 break-all font-semibold">{receipt ?? 'No receipt yet'}</dd></div>
-          <div><dt className="text-muted-foreground">Amount paid</dt><dd className="transaction-dialog-amount">{formatMoney(payment.amountCents)}</dd></div>
+          <div className="transaction-amount-section"><dt className="text-muted-foreground">Amount paid</dt><dd className="transaction-dialog-amount">{formatMoney(payment.amountCents)}</dd></div>
         </dl>
       </section>
 

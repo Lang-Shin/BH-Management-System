@@ -29,7 +29,7 @@ export default function Billing() {
   const billingRooms = selectBillingRooms(data, periodId, DEMO_DATE, false)
 
   return <>
-    <PageHeader title="Billing" description="Check rent, electricity, water, and washing payments in one place." action={<PaymentCalculator key={periodId} periodId={periodId} periodLabel={data.billingPeriods.find(period => period.id === periodId)?.label ?? 'Sample billing period'} />} />
+    <PageHeader title="Billing" description="Check rent, electricity, water, and washing payments in one place." />
     <PreviewNotice>Electricity bills are created only when you confirm a payment-time meter reading. Calculate Payment settles existing rent, water, washing, and electricity bills; other bill-generation and correction workflows will be added later.</PreviewNotice>
     <div className="mb-6"><div className="max-w-full"><label htmlFor="billing-period" className="mb-2 block text-base font-semibold">Choose a month</label><select id="billing-period" value={periodId} onChange={e => { setPeriodId(e.target.value); setStatusFilter(null) }} className="min-h-14 max-w-full rounded-lg border bg-card px-4 py-3 text-base">{data.billingPeriods.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}</select></div></div>
     <section className="mb-7 grid gap-5 xl:grid-cols-3" aria-label="Bills overview">
@@ -38,7 +38,10 @@ export default function Billing() {
       <StatCard label={summary.unresolved > 0 ? 'Known outstanding' : 'Still to pay'} value={formatMoney(summary.outstanding)} detail={<><AnimatedNumber value={summary.overdue} /> bills are past their due date.{summary.unresolved > 0 && <> Plus <AnimatedNumber value={summary.unresolved} /> electricity {summary.unresolved === 1 ? 'bill' : 'bills'} awaiting a meter reading.</>}</>} icon={CircleAlert} />
     </section>
     <BillingStatusChart key={periodId} rooms={billingRooms} periodLabel={data.billingPeriods.find(period => period.id === periodId)?.label ?? 'Selected billing period'} outstandingOnly={false} />
-    <div className="mb-3 flex justify-end"><BillingFiltersMenu value={statusFilter} onChange={setStatusFilter} /></div>
+    <div className="billing-table-toolbar">
+      <BillingFiltersMenu value={statusFilter} onChange={setStatusFilter} />
+      <PaymentCalculator key={periodId} periodId={periodId} periodLabel={data.billingPeriods.find(period => period.id === periodId)?.label ?? 'Sample billing period'} />
+    </div>
     <div key={statusFilter ?? 'ALL'} className="billing-table-enter">
       <BillingStatusMatrix data={data} periodId={periodId} asOf={DEMO_DATE} outstandingOnly={false} statusFilter={statusFilter} />
     </div>
