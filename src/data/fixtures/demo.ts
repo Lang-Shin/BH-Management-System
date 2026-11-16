@@ -1,100 +1,135 @@
-import type { Charge, Payment, PaymentAllocation, PrototypeAppState, RoomAssignment } from '@/domain/types/models'
+import type { Charge, MeterReading, Payment, PaymentAllocation, PrototypeAppState, RoomAssignment } from '@/domain/types/models'
 
 export const DEMO_DATE = '2026-11-13'
 export const DEMO_PERIOD = 'period-nov'
 
+export const DEMO_RATES = {
+  rentCentsPerRoom: 350_000,
+  waterCentsPerTenant: 10_000,
+  electricityCentsPerKwh: 1_300,
+  washingCentsPerRoom: 10_000,
+} as const
+
 const names = ['Alex Rivera', 'Sam Navarro', 'Jamie Santos', 'Morgan Cruz', 'Taylor Reyes', 'Jordan Flores', 'Casey Ramos', 'Riley Garcia', 'Avery Lim', 'Quinn Mendoza']
+const movedOutTenantNumbers = new Set([7, 9, 10])
+
+function electricityCents(consumptionMilliKwh: number) {
+  return consumptionMilliKwh * DEMO_RATES.electricityCentsPerKwh / 1000
+}
 
 /** Fictional fixtures only. This is not bill-generation or allocation logic. */
 export function createDemoData(): PrototypeAppState {
-  const tenants = names.map((name, index) => ({
-    id: `tenant-${index + 1}`, name, email: `resident${index + 1}@example.com`,
-    phone: `DEMO +63 000 000 ${String(index + 1).padStart(4, '0')}`,
-    address: `${index + 1} Sample Lane, Barangay Halimbawa, Demo City (fictional)`,
-    status: index === 9 ? 'MOVED_OUT' as const : 'ACTIVE' as const, notes: '',
-  }))
-  // Room 101 is a two-bed room with a PHP 3,500 room rent shared by two tenants.
-  // Room 102 has one tenant paying the full PHP 3,500 room rent.
-  const rooms = [2, 2, 3, 3, 1, 2].map((capacity, index) => ({
+  const tenants = names.map((name, index) => {
+    const number = index + 1
+    return {
+      id: `tenant-${number}`, name, email: `resident${number}@example.com`,
+      phone: `DEMO +63 000 000 ${String(number).padStart(4, '0')}`,
+      address: `${number} Sample Lane, Barangay Halimbawa, Demo City (fictional)`,
+      status: movedOutTenantNumbers.has(number) ? 'MOVED_OUT' as const : 'ACTIVE' as const, notes: '',
+    }
+  })
+  const rooms = [2, 2, 2, 2, 2, 1].map((capacity, index) => ({
     id: `room-${index + 1}`, name: String(101 + index), floor: 1, capacity,
-    kind: index === 4 ? 'PRIVATE' as const : 'SHARED' as const, status: index === 5 ? 'maintenance' as const : 'available' as const,
+    kind: index >= 4 ? 'PRIVATE' as const : 'SHARED' as const, status: index === 5 ? 'maintenance' as const : 'available' as const,
   }))
-  const roomIds = [1, 1, 3, 2, 4, 3, 3, 4, 4, 5]
-  const roomAssignments: RoomAssignment[] = tenants.map((tenant, index) => ({
-    id: `assignment-${index + 1}`, tenantId: tenant.id, roomId: `room-${roomIds[index]}`,
-    startDate: '2026-09-01', endDate: index === 9 ? '2026-10-31' : null,
-    agreedRentCents: index === 9 ? 300_000 : index < 2 ? 175_000 : 350_000,
+  const assignmentSpecs: { tenant: number; room: number; endDate: string | null }[] = [
+    { tenant: 1, room: 1, endDate: null },
+    { tenant: 2, room: 2, endDate: null },
+    { tenant: 3, room: 3, endDate: null },
+    { tenant: 4, room: 2, endDate: null },
+    { tenant: 5, room: 4, endDate: null },
+    { tenant: 6, room: 3, endDate: null },
+    { tenant: 7, room: 5, endDate: '2026-10-31' },
+    { tenant: 8, room: 4, endDate: null },
+    { tenant: 9, room: 1, endDate: '2026-09-30' },
+    { tenant: 10, room: 5, endDate: '2026-10-31' },
+  ]
+  const roomAssignments: RoomAssignment[] = assignmentSpecs.map(({ tenant, room, endDate }) => ({
+    id: `assignment-${tenant}`, tenantId: `tenant-${tenant}`, roomId: `room-${room}`,
+    startDate: '2026-09-01', endDate, agreedRentCents: DEMO_RATES.rentCentsPerRoom,
   }))
   const billingPeriods = [
     { id: 'period-oct', label: 'October 2026 (sample)', startDate: '2026-10-01', endDate: '2026-10-31', status: 'CLOSED' as const },
     { id: DEMO_PERIOD, label: 'November 2026 (sample)', startDate: '2026-11-01', endDate: '2026-11-30', status: 'OPEN' as const },
   ]
-  const electricityMeters = [{ id: 'meter-demo-a', label: 'Demo meter A', serialNumber: 'FICTIONAL-MTR-001', ownership: 'UNCONFIRMED' as const }]
-  const meterReadings = [
-    { id: 'reading-sep', readOn: '2026-09-30', readingMilliKwh: 288_000 },
-    { id: 'reading-oct', readOn: '2026-10-31', readingMilliKwh: 300_000 },
-    { id: 'reading-nov', readOn: '2026-11-10', readingMilliKwh: 312_000 },
-  ].map(reading => ({ ...reading, meterId: 'meter-demo-a', status: 'CONFIRMED' as const, confirmedBy: 'demo-admin', correction: null }))
+  const meterSeries = [
+    { room: 1, values: [300_000, 312_000, 324_000] },
+    { room: 2, values: [120_000, 133_000, 144_000] },
+    { room: 3, values: [180_000, 192_000, 204_000] },
+    { room: 4, values: [220_000, 230_000, 242_000] },
+    { room: 5, values: [90_000, 100_000] },
+  ]
+  const electricityMeters = meterSeries.map(({ room }) => ({
+    id: `meter-room-${room}`, label: `Room ${100 + room} meter`, serialNumber: `FICTIONAL-MTR-${100 + room}`, ownership: 'UNCONFIRMED' as const,
+  }))
+  const meterReadings: MeterReading[] = meterSeries.flatMap(({ room, values }) => [
+    { id: `reading-room-${room}-sep`, meterId: `meter-room-${room}`, readOn: '2026-09-30', readingMilliKwh: values[0]! },
+    { id: `reading-room-${room}-oct`, meterId: `meter-room-${room}`, readOn: '2026-10-31', readingMilliKwh: values[1]! },
+    ...(values[2] === undefined ? [] : [{ id: `reading-room-${room}-nov`, meterId: `meter-room-${room}`, readOn: '2026-11-10', readingMilliKwh: values[2]! }]),
+  ].map(reading => ({ ...reading, status: 'CONFIRMED' as const, confirmedBy: 'demo-admin', correction: null })))
   const electricityRates = [
-    { id: 'rate-oct', label: 'Historical sample rate', rateCentsPerKwh: 1_200, effectiveFrom: '2026-10-01' },
-    { id: 'rate-nov', label: 'Current sample rate', rateCentsPerKwh: 1_300, effectiveFrom: '2026-11-01' },
-    { id: 'rate-dec', label: 'Future sample rate', rateCentsPerKwh: 1_450, effectiveFrom: '2026-12-01' },
+    { id: 'rate-oct', label: 'Historical sample rate', rateCentsPerKwh: DEMO_RATES.electricityCentsPerKwh, effectiveFrom: '2026-10-01' },
+    { id: 'rate-nov', label: 'Current sample rate', rateCentsPerKwh: DEMO_RATES.electricityCentsPerKwh, effectiveFrom: '2026-11-01' },
+    { id: 'rate-dec', label: 'Future sample rate', rateCentsPerKwh: DEMO_RATES.electricityCentsPerKwh, effectiveFrom: '2026-12-01' },
+  ]
+
+  const rentPayer: Record<string, number> = { 'room-1': 1, 'room-2': 4, 'room-3': 3, 'room-4': 5, 'room-5': 10 }
+  const utilityPayer: Record<string, number> = { 'room-1': 1, 'room-2': 2, 'room-3': 6, 'room-4': 5, 'room-5': 10 }
+  const washingRooms = new Set(['room-1', 'room-2', 'room-5'])
+  const periodSpecs = [
+    { key: 'oct', periodId: 'period-oct', startDate: '2026-10-01', endDate: '2026-10-31', issuedOn: '2026-10-31', electricityIssuedOn: '2026-10-31', dueDate: '2026-11-05', previous: 'sep', current: 'oct', rateId: 'rate-oct', rateEffectiveFrom: '2026-10-01' },
+    { key: 'nov', periodId: DEMO_PERIOD, startDate: '2026-11-01', endDate: '2026-11-30', issuedOn: '2026-11-01', electricityIssuedOn: '2026-11-10', dueDate: '2026-11-20', previous: 'oct', current: 'nov', rateId: 'rate-nov', rateEffectiveFrom: '2026-11-01' },
   ]
   const charges: Charge[] = []
-  for (let index = 0; index < 9; index++) {
-    const rentCents = index < 2 ? 175_000 : 350_000
-    const base = { tenantId: `tenant-${index + 1}`, billingPeriodId: DEMO_PERIOD, issuedOn: '2026-11-01', dueDate: index < 4 ? '2026-11-05' : '2026-11-20', state: 'ISSUED' as const, correction: null }
-    charges.push({ ...base, id: `rent-${index + 1}`, category: 'RENT', description: 'Sample agreed room rent share', amountCents: rentCents, agreedRentCents: rentCents, roomAssignmentId: `assignment-${index + 1}` })
-    charges.push({ ...base, id: `water-${index + 1}`, category: 'WATER', description: 'Manually entered sample water charge', amountCents: 15_000, entryMethod: 'MANUAL' })
-  }
-  charges.push({ id: 'washing-2', tenantId: 'tenant-2', billingPeriodId: DEMO_PERIOD, category: 'WASHING_MACHINE', description: 'Optional manually entered sample charge', amountCents: 8_000, issuedOn: '2026-11-01', dueDate: '2026-11-20', state: 'ISSUED', entryMethod: 'MANUAL', correction: null })
-  charges.push({ id: 'washing-7', tenantId: 'tenant-7', billingPeriodId: DEMO_PERIOD, category: 'WASHING_MACHINE', description: 'Optional washing charge paid while rent remains unpaid', amountCents: 8_000, issuedOn: '2026-11-01', dueDate: '2026-11-20', state: 'ISSUED', entryMethod: 'MANUAL', correction: null })
-  charges.push({ id: 'rent-old', tenantId: 'tenant-10', billingPeriodId: 'period-oct', category: 'RENT', description: 'Historical agreed rent', amountCents: 300_000, agreedRentCents: 300_000, roomAssignmentId: 'assignment-10', issuedOn: '2026-10-31', dueDate: '2026-11-05', state: 'ISSUED', correction: null })
-  charges.push({ id: 'water-old', tenantId: 'tenant-10', billingPeriodId: 'period-oct', category: 'WATER', description: 'Historical manual water charge', amountCents: 10_000, entryMethod: 'MANUAL', issuedOn: '2026-10-31', dueDate: '2026-11-05', state: 'ISSUED', correction: null })
-  charges.push(...[
-    { id: 'electricity-old', tenantId: 'tenant-10', billingPeriodId: 'period-oct', amountCents: 14_400, issuedOn: '2026-10-31', dueDate: '2026-11-05', previousReadingId: 'reading-sep', currentReadingId: 'reading-oct', previousReadingMilliKwh: 288_000, currentReadingMilliKwh: 300_000, rateId: 'rate-oct', appliedRateCentsPerKwh: 1_200, appliedRateEffectiveFrom: '2026-10-01' },
-    { id: 'electricity-1', tenantId: 'tenant-1', billingPeriodId: DEMO_PERIOD, amountCents: 15_600, issuedOn: '2026-11-10', dueDate: '2026-11-20', previousReadingId: 'reading-oct', currentReadingId: 'reading-nov', previousReadingMilliKwh: 300_000, currentReadingMilliKwh: 312_000, rateId: 'rate-nov', appliedRateCentsPerKwh: 1_300, appliedRateEffectiveFrom: '2026-11-01' },
-  ].map(({ previousReadingId, currentReadingId, previousReadingMilliKwh, currentReadingMilliKwh, rateId, appliedRateCentsPerKwh, appliedRateEffectiveFrom, ...base }): Charge => ({
-    ...base, category: 'ELECTRICITY', description: 'Illustrative charge only; meter ownership and shared allocation unconfirmed', state: 'ISSUED', correction: null,
-    electricity: { meterId: 'meter-demo-a', previousReadingId, currentReadingId, previousReadingMilliKwh, currentReadingMilliKwh, consumptionMilliKwh: currentReadingMilliKwh - previousReadingMilliKwh, rateId, appliedRateCentsPerKwh, appliedRateEffectiveFrom },
-  })))
-
-  const novemberElectricity = charges.find(charge => charge.id === 'electricity-1')
-  if (novemberElectricity?.category === 'ELECTRICITY') {
-    charges.push({ ...novemberElectricity, id: 'electricity-6', tenantId: 'tenant-6', description: 'November sample electricity paid while rent remains unpaid' })
-  }
-
-  const octoberBase = { billingPeriodId: 'period-oct', issuedOn: '2026-10-31', dueDate: '2026-11-05', state: 'ISSUED' as const, correction: null }
-  charges.push(
-    { ...octoberBase, id: 'rent-oct-1', tenantId: 'tenant-1', category: 'RENT', description: 'October sample room rent share', amountCents: 175_000, agreedRentCents: 175_000, roomAssignmentId: 'assignment-1' },
-    { ...octoberBase, id: 'rent-oct-2', tenantId: 'tenant-2', category: 'RENT', description: 'October sample room rent share', amountCents: 175_000, agreedRentCents: 175_000, roomAssignmentId: 'assignment-2' },
-    { ...octoberBase, id: 'rent-oct-4', tenantId: 'tenant-4', category: 'RENT', description: 'October sample room rent', amountCents: 350_000, agreedRentCents: 350_000, roomAssignmentId: 'assignment-4' },
-    { ...octoberBase, id: 'water-oct-1', tenantId: 'tenant-1', category: 'WATER', description: 'October sample water charge', amountCents: 15_000, entryMethod: 'MANUAL' },
-    { ...octoberBase, id: 'water-oct-2', tenantId: 'tenant-2', category: 'WATER', description: 'October sample water charge', amountCents: 15_000, entryMethod: 'MANUAL' },
-    { ...octoberBase, id: 'water-oct-4', tenantId: 'tenant-4', category: 'WATER', description: 'October sample water charge', amountCents: 15_000, entryMethod: 'MANUAL' },
-    { ...octoberBase, id: 'washing-oct-2', tenantId: 'tenant-2', category: 'WASHING_MACHINE', description: 'October optional washing charge', amountCents: 8_000, entryMethod: 'MANUAL' },
-  )
-  const octoberElectricity = charges.find(charge => charge.id === 'electricity-old')
-  if (octoberElectricity?.category === 'ELECTRICITY') {
-    charges.push({ ...octoberElectricity, id: 'electricity-oct-1', tenantId: 'tenant-1', description: 'October sample electricity for Room 101' })
+  for (const spec of periodSpecs) {
+    const roomIds = rooms.filter(room => roomAssignments.some(assignment => assignment.roomId === room.id
+      && assignment.startDate <= spec.endDate && (assignment.endDate === null || assignment.endDate >= spec.startDate))).map(room => room.id)
+    for (const roomId of roomIds) {
+      const occupants = tenants.filter(tenant => roomAssignments.some(assignment => assignment.tenantId === tenant.id && assignment.roomId === roomId
+        && assignment.startDate <= spec.endDate && (assignment.endDate === null || assignment.endDate >= spec.startDate)))
+      const rentTenant = `tenant-${rentPayer[roomId]}`
+      const rentAssignment = roomAssignments.find(assignment => assignment.tenantId === rentTenant && assignment.roomId === roomId)!
+      const base = { billingPeriodId: spec.periodId, issuedOn: spec.issuedOn, dueDate: spec.dueDate, state: 'ISSUED' as const, correction: null }
+      charges.push({ ...base, id: `rent-${spec.key}-${roomId}`, tenantId: rentTenant, category: 'RENT', description: 'Room rent — charged once per occupied room', amountCents: DEMO_RATES.rentCentsPerRoom, agreedRentCents: DEMO_RATES.rentCentsPerRoom, roomAssignmentId: rentAssignment.id })
+      for (const occupant of occupants) {
+        charges.push({ ...base, id: `water-${spec.key}-${occupant.id}`, tenantId: occupant.id, category: 'WATER', description: 'Room water — charged per tenant', amountCents: DEMO_RATES.waterCentsPerTenant, entryMethod: 'MANUAL' })
+      }
+      const utilityTenant = `tenant-${utilityPayer[roomId]}`
+      const previousReading = meterReadings.find(reading => reading.id === `reading-${roomId}-${spec.previous}`)!
+      const currentReading = meterReadings.find(reading => reading.id === `reading-${roomId}-${spec.current}`)!
+      const consumptionMilliKwh = currentReading.readingMilliKwh - previousReading.readingMilliKwh
+      charges.push({
+        ...base, id: `electricity-${spec.key}-${roomId}`, tenantId: utilityTenant, category: 'ELECTRICITY', description: 'Room electricity — consumed meter difference',
+        amountCents: electricityCents(consumptionMilliKwh), issuedOn: spec.electricityIssuedOn,
+        electricity: {
+          meterId: `meter-room-${roomId.slice(5)}`, previousReadingId: previousReading.id, currentReadingId: currentReading.id,
+          previousReadingMilliKwh: previousReading.readingMilliKwh, currentReadingMilliKwh: currentReading.readingMilliKwh,
+          consumptionMilliKwh, rateId: spec.rateId, appliedRateCentsPerKwh: DEMO_RATES.electricityCentsPerKwh,
+          appliedRateEffectiveFrom: spec.rateEffectiveFrom,
+        },
+      })
+      if (washingRooms.has(roomId)) {
+        charges.push({ ...base, id: `washing-${spec.key}-${roomId}`, tenantId: utilityTenant, category: 'WASHING_MACHINE', description: 'Optional washing machine — charged once per room', amountCents: DEMO_RATES.washingCentsPerRoom, entryMethod: 'MANUAL' })
+      }
+    }
   }
 
   const payments: Payment[] = []
   const paymentAllocations: PaymentAllocation[] = []
-  // Explicit fixture allocations; categories can be paid separately on different dates.
   const examples = [
-    { id: 'payment-old', tenantId: 'tenant-10', paidOn: '2026-11-02', items: [['rent-old', 300_000], ['water-old', 10_000], ['electricity-old', 14_400]] },
-    { id: 'payment-oct-1', tenantId: 'tenant-1', paidOn: '2026-11-02', items: [['water-oct-1', 15_000], ['electricity-oct-1', 14_400]] },
-    { id: 'payment-oct-2', tenantId: 'tenant-2', paidOn: '2026-11-02', items: [['water-oct-2', 15_000], ['washing-oct-2', 8_000]] },
-    { id: 'payment-oct-4-rent', tenantId: 'tenant-4', paidOn: '2026-11-02', items: [['rent-oct-4', 350_000]] },
-    { id: 'payment-1-water', tenantId: 'tenant-1', paidOn: '2026-11-08', items: [['water-1', 15_000]] },
-    { id: 'payment-1-electricity', tenantId: 'tenant-1', paidOn: '2026-11-11', items: [['electricity-1', 15_600]] },
-    { id: 'payment-2-water', tenantId: 'tenant-2', paidOn: '2026-11-06', items: [['water-2', 15_000]] },
-    { id: 'payment-2-washing', tenantId: 'tenant-2', paidOn: '2026-11-06', items: [['washing-2', 8_000]] },
-    { id: 'payment-3', tenantId: 'tenant-3', paidOn: '2026-11-05', items: [['rent-3', 350_000], ['water-3', 15_000]] },
-    { id: 'payment-7', tenantId: 'tenant-7', paidOn: '2026-11-07', items: [['rent-7', 350_000]] },
-    { id: 'payment-6-utilities', tenantId: 'tenant-6', paidOn: '2026-11-10', items: [['water-6', 15_000], ['electricity-6', 15_600]] },
-    { id: 'payment-7-utilities', tenantId: 'tenant-7', paidOn: '2026-11-12', items: [['water-7', 15_000], ['washing-7', 8_000]] },
+    { id: 'payment-old', tenantId: 'tenant-10', paidOn: '2026-11-02', items: [['rent-oct-room-5', 350_000], ['water-oct-tenant-10', 10_000], ['electricity-oct-room-5', 13_000], ['washing-oct-room-5', 10_000]] },
+    { id: 'payment-oct-1', tenantId: 'tenant-1', paidOn: '2026-11-02', items: [['rent-oct-room-1', 100_000], ['water-oct-tenant-1', 10_000], ['electricity-oct-room-1', 15_600]] },
+    { id: 'payment-oct-2', tenantId: 'tenant-2', paidOn: '2026-11-02', items: [['water-oct-tenant-2', 10_000], ['electricity-oct-room-2', 16_900], ['washing-oct-room-2', 10_000]] },
+    { id: 'payment-oct-4-rent', tenantId: 'tenant-4', paidOn: '2026-11-02', items: [['rent-oct-room-2', 350_000]] },
+    { id: 'payment-casey-oct', tenantId: 'tenant-7', paidOn: '2026-11-02', items: [['water-oct-tenant-7', 10_000]] },
+    { id: 'payment-1-water', tenantId: 'tenant-1', paidOn: '2026-11-08', items: [['water-nov-tenant-1', 10_000]] },
+    { id: 'payment-1-electricity', tenantId: 'tenant-1', paidOn: '2026-11-11', items: [['electricity-nov-room-1', 15_600]] },
+    { id: 'payment-2-water', tenantId: 'tenant-2', paidOn: '2026-11-06', items: [['water-nov-tenant-2', 10_000]] },
+    { id: 'payment-2-washing', tenantId: 'tenant-2', paidOn: '2026-11-06', items: [['washing-nov-room-2', 10_000]] },
+    { id: 'payment-3', tenantId: 'tenant-3', paidOn: '2026-11-05', items: [['rent-nov-room-3', 350_000], ['water-nov-tenant-3', 10_000]] },
+    { id: 'payment-6-utilities', tenantId: 'tenant-6', paidOn: '2026-11-10', items: [['water-nov-tenant-6', 10_000], ['electricity-nov-room-3', 15_600]] },
+    { id: 'payment-4-rent', tenantId: 'tenant-5', paidOn: '2026-11-07', items: [['rent-nov-room-4', 350_000]] },
+    { id: 'payment-8-water', tenantId: 'tenant-8', paidOn: '2026-11-12', items: [['water-nov-tenant-8', 10_000]] },
   ] satisfies { id: string; tenantId: string; paidOn: string; items: [string, number][] }[]
   examples.forEach((example, index) => {
     payments.push({ id: example.id, tenantId: example.tenantId, paidOn: example.paidOn, amountCents: example.items.reduce((sum, [, amount]) => sum + amount, 0), method: index % 2 ? 'cash' : 'bank-transfer', state: 'RECORDED', correction: null })

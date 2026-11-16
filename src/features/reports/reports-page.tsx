@@ -14,7 +14,7 @@ import { WorkflowPlaceholders } from '@/components/shared/workflow-placeholders'
 import { ResetDemoButton } from '@/components/shared/reset-demo-button'
 import { usePrototype } from '@/hooks/use-prototype'
 import { selectSummary } from '@/domain/calculations/summary'
-import { DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
+import { DEMO_DATE, DEMO_PERIOD, DEMO_RATES } from '@/data/fixtures/demo'
 import { formatDate, formatMoney } from '@/lib/format'
 import type { AuditEvent } from '@/domain/types/models'
 
@@ -82,11 +82,11 @@ export default function Reports() {
     </section>
     <Card className="mt-8 shadow-none"><CardHeader><CardTitle>House settings</CardTitle><CardDescription>You can view these settings. Changing them will be added later.</CardDescription></CardHeader><CardContent><dl className="grid gap-6 text-base sm:grid-cols-2">{([
       ['Currency', 'Philippine peso (₱)'],
-      ['Rent', 'Based on the agreed rent for each tenant'],
+      ['Monthly rent', <><AnimatedNumber value={formatMoney(DEMO_RATES.rentCentsPerRoom)} /> per occupied room</>],
       ['When rent is due', 'To be confirmed'],
       ['Electricity price', currentRate ? <><AnimatedNumber value={formatMoney(currentRate.rateCentsPerKwh)} /> per kWh, starting {formatDate(currentRate.effectiveFrom)}</> : 'No price set'],
       ['Sharing the electricity bill', 'Who uses each meter and how to share the bill still need to be agreed'],
-      ['Water and washing', 'Water amounts are entered by hand. Washing is an optional extra bill.'],
+      ['Water and washing', <><AnimatedNumber value={formatMoney(DEMO_RATES.waterCentsPerTenant)} /> per tenant for water. Washing is optional at <AnimatedNumber value={formatMoney(DEMO_RATES.washingCentsPerRoom)} /> per room.</>],
     ] as const).map(([label, value]) => <div key={label} className="rounded-lg border bg-muted/40 p-4"><dt className="text-xs font-semibold text-muted-foreground">{label}</dt><dd className="mt-2 text-sm leading-relaxed font-medium">{value}</dd></div>)}</dl></CardContent></Card>
     <details open={Boolean(storageWarning)} className="mt-7 rounded-xl border bg-card p-5 sm:p-6"><summary className="min-h-12 cursor-pointer py-2 text-lg font-semibold">More settings and sample records</summary>
       <section className="mt-5" aria-labelledby="sample-records"><h2 id="sample-records" className="mb-3 text-xl font-semibold">Start again with sample records</h2><p className="mb-5 max-w-2xl text-base text-muted-foreground">Restore the original sample records and remove your saved notes and room changes. This is only for trying the app.</p><ResetDemoButton /></section>

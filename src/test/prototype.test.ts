@@ -10,34 +10,44 @@ describe('shared fictional financial model', () => {
   it('starts with consistent references, allocations, credits, and November summaries', () => {
     const data = createDemoData()
     expect(isPrototypeData(data)).toBe(true)
-    expect(selectSummary(data, DEMO_DATE, DEMO_PERIOD)).toEqual({ tenants: 9, totalRooms: 6, occupiedRooms: 4, availableRooms: 1, maintenanceRooms: 1,
-      billed: 2_982_200, applied: 822_200, received: 1_599_000, outstanding: 2_160_000, credit: 50_000, overdue: 4, paid: 11, partial: 0, unpaid: 11 })
+    expect(selectSummary(data, DEMO_DATE, DEMO_PERIOD)).toEqual({ tenants: 7, totalRooms: 6, occupiedRooms: 4, availableRooms: 1, maintenanceRooms: 1,
+      billed: 1_551_100, applied: 791_200, received: 1_746_700, outstanding: 759_900, credit: 50_000, overdue: 0, paid: 10, partial: 0, unpaid: 7 })
     const received = data.payments.reduce((sum, p) => sum + p.amountCents, 0)
     const allocated = data.paymentAllocations.reduce((sum, a) => sum + a.amountCents, 0)
     expect(received - allocated).toBe(50_000)
     expect(data.tenants).toHaveLength(10)
-    expect(roomOccupants(data, 'room-1', DEMO_DATE)).toHaveLength(2)
+    expect(roomOccupants(data, 'room-1', DEMO_DATE)).toHaveLength(1)
     expect(roomOccupants(data, 'room-5', DEMO_DATE)).toHaveLength(0)
-    expect(roomOccupants(data, 'room-5', '2026-10-30')).toHaveLength(1)
+    expect(roomOccupants(data, 'room-5', '2026-10-30')).toHaveLength(2)
   })
 
   it('keeps categories independently payable and does not auto-apply advance credit', () => {
     const data = createDemoData()
-    const rent = data.charges.find(c => c.id === 'rent-1')!
-    const water = data.charges.find(c => c.id === 'water-1')!
-    const electricity = data.charges.find(c => c.id === 'electricity-1')!
-    expect(chargeStatus(data, rent, '2026-11-04')).toBe('UNPAID')
-    expect(chargeStatus(data, water, '2026-11-04')).toBe('UNPAID')
+    const rent = data.charges.find(c => c.id === 'rent-oct-room-1')!
+    const water = data.charges.find(c => c.id === 'water-oct-tenant-1')!
+    const electricity = data.charges.find(c => c.id === 'electricity-oct-room-1')!
+    expect(chargeStatus(data, rent, '2026-11-01')).toBe('UNPAID')
+    expect(chargeStatus(data, water, DEMO_DATE)).toBe('PAID')
     expect(chargeStatus(data, electricity, DEMO_DATE)).toBe('PAID')
+    expect(chargeBalance(data, rent, DEMO_DATE)).toBe(250_000)
     expect(chargeBalance(data, electricity, DEMO_DATE)).toBe(0)
     expect(creditRemaining(data, data.tenantCredits[0]!, DEMO_DATE)).toBe(50_000)
-    expect(tenantAccount(data, 'tenant-6', DEMO_DATE)).toMatchObject({ balance: 350_000, credit: 50_000 })
-    expect(data.charges.some(c => c.tenantId === 'tenant-1' && c.category === 'WASHING_MACHINE')).toBe(false)
+    expect(tenantAccount(data, 'tenant-6', DEMO_DATE)).toMatchObject({ balance: 25_600, credit: 50_000 })
+    expect(data.charges.some(c => c.tenantId === 'tenant-3' && c.category === 'WASHING_MACHINE')).toBe(false)
   })
 
-  it('preserves the 300 → 312 kWh × PHP 13 example and historical applied rates', () => {
+  it('uses the normalized mock rent, water, washing, and electricity rates', () => {
     const data = createDemoData()
-    const electricity = data.charges.find(c => c.id === 'electricity-1')!
+    expect(data.roomAssignments.every(assignment => assignment.agreedRentCents === 350_000)).toBe(true)
+    expect(data.charges.filter(charge => charge.category === 'RENT').every(charge => charge.amountCents === 350_000)).toBe(true)
+    expect(data.charges.filter(charge => charge.category === 'WATER').every(charge => charge.amountCents === 10_000)).toBe(true)
+    expect(data.charges.filter(charge => charge.category === 'WASHING_MACHINE').every(charge => charge.amountCents === 10_000)).toBe(true)
+    expect(data.electricityRates.every(rate => rate.rateCentsPerKwh === 1_300)).toBe(true)
+  })
+
+  it('preserves the 300 → 312 kWh × PHP 13 example and stored applied rates', () => {
+    const data = createDemoData()
+    const electricity = data.charges.find(c => c.id === 'electricity-oct-room-1')!
     expect(electricity.category).toBe('ELECTRICITY')
     if (electricity.category !== 'ELECTRICITY') throw new Error('Fixture missing electricity basis')
     expect(electricity.electricity).toMatchObject({ previousReadingMilliKwh: 300_000, currentReadingMilliKwh: 312_000, consumptionMilliKwh: 12_000, appliedRateCentsPerKwh: 1_300 })
@@ -46,15 +56,15 @@ describe('shared fictional financial model', () => {
     expect(isPrototypeData(data)).toBe(true)
     expect(electricity.amountCents).toBe(15_600)
     expect(electricity.electricity.appliedRateCentsPerKwh).toBe(1_300)
-    expect(data.charges.find(c => c.id === 'electricity-old')?.amountCents).toBe(14_400)
+    expect(data.charges.find(c => c.id === 'electricity-nov-room-1')?.amountCents).toBe(15_600)
   })
 
   it('distinguishes receipt-month collections from allocations against a prior billing period', () => {
     const data = createDemoData()
     const october = selectSummary(data, DEMO_DATE, 'period-oct')
-    expect(october).toMatchObject({ billed: 1_091_800, applied: 726_800, received: 0, outstanding: 365_000 })
+    expect(october).toMatchObject({ billed: 1_944_100, applied: 905_500, received: 0, outstanding: 1_038_600 })
     expect(selectSummary(data, '2026-11-01', DEMO_PERIOD).received).toBe(0)
-    expect(selectSummary(data, '2026-11-21', DEMO_PERIOD).overdue).toBe(11)
+    expect(selectSummary(data, '2026-11-21', DEMO_PERIOD).overdue).toBe(7)
   })
 
   const invalidCases: { name: string; change: (data: PrototypeAppState) => void }[] = [
@@ -66,13 +76,13 @@ describe('shared fictional financial model', () => {
     { name: 'negative currency', change: d => { d.charges[0]!.amountCents = -1 } },
     { name: 'charge over-allocation', change: d => { d.paymentAllocations[0]!.amountCents = 500_000 } },
     { name: 'payment over-allocation within a valid charge balance', change: d => { d.paymentAllocations.find(a => a.paymentId === 'payment-1-water')!.amountCents = 20_000 } },
-    { name: 'credit over-consumption', change: d => { d.paymentAllocations.push({ id: 'overspent-credit', paymentId: 'payment-advance', chargeId: 'rent-6', amountCents: 60_000, allocatedOn: DEMO_DATE, creditId: 'credit-6', state: 'ACTIVE', reversalAuditEventId: null }) } },
+    { name: 'credit over-consumption', change: d => { d.paymentAllocations.push({ id: 'overspent-credit', paymentId: 'payment-advance', chargeId: 'water-nov-tenant-6', amountCents: 60_000, allocatedOn: DEMO_DATE, creditId: 'credit-6', state: 'ACTIVE', reversalAuditEventId: null }) } },
     { name: 'aggregate overpayment from otherwise valid separate payments', change: d => {
-      d.payments.push({ id: 'extra-payment', tenantId: 'tenant-1', amountCents: 200_000, paidOn: DEMO_DATE, method: 'cash', state: 'RECORDED', correction: null })
-      d.paymentAllocations.push({ id: 'extra-allocation', paymentId: 'extra-payment', chargeId: 'rent-1', amountCents: 200_000, allocatedOn: DEMO_DATE, creditId: null, state: 'ACTIVE', reversalAuditEventId: null })
+      d.payments.push({ id: 'extra-payment', tenantId: 'tenant-1', amountCents: 400_000, paidOn: DEMO_DATE, method: 'cash', state: 'RECORDED', correction: null })
+      d.paymentAllocations.push({ id: 'extra-allocation', paymentId: 'extra-payment', chargeId: 'rent-nov-room-1', amountCents: 400_000, allocatedOn: DEMO_DATE, creditId: null, state: 'ACTIVE', reversalAuditEventId: null })
     } },
-    { name: 'cross-tenant allocation', change: d => { d.paymentAllocations[0]!.chargeId = 'rent-1' } },
-    { name: 'advance double spending', change: d => { d.tenantCredits[0]!.sourcePaymentId = 'payment-1-rent'; d.tenantCredits[0]!.tenantId = 'tenant-1' } },
+    { name: 'cross-tenant allocation', change: d => { d.paymentAllocations[0]!.chargeId = 'rent-oct-room-1' } },
+    { name: 'advance double spending', change: d => { d.tenantCredits[0]!.sourcePaymentId = 'payment-1-water'; d.tenantCredits[0]!.tenantId = 'tenant-1' } },
     { name: 'wrong receipt allocation', change: d => { d.receipts[0]!.allocationIds = ['allocation-payment-1-rent-rent-1'] } },
     { name: 'unauthorized reading correction', change: d => { d.meterReadings[2]!.correction = { supersedesId: 'reading-oct', auditEventId: 'missing', authorizedBy: 'unknown' } } },
     { name: 'inconsistent consumption', change: d => { const c = d.charges.find(c => c.category === 'ELECTRICITY'); if (c?.category === 'ELECTRICITY') c.electricity.consumptionMilliKwh = 99_000 } },
@@ -85,14 +95,14 @@ describe('shared fictional financial model', () => {
 
   it('can retain an authorized corrected reading without overwriting an issued charge', () => {
     const data = createDemoData()
-    const original = data.meterReadings[2]!
+    const original = data.meterReadings.find(reading => reading.id === 'reading-room-1-nov')!
     original.status = 'SUPERSEDED'
-    const corrected = { ...original, id: 'corrected-reading', readingMilliKwh: 313_000, status: 'CONFIRMED' as const,
+    const corrected = { ...original, id: 'corrected-reading', readingMilliKwh: 325_000, status: 'CONFIRMED' as const,
       correction: { supersedesId: original.id, auditEventId: 'audit-correction', authorizedBy: 'demo-admin' } }
     data.meterReadings.push(corrected)
     data.auditEvents.push({ id: 'audit-correction', actorId: 'demo-admin', occurredOn: DEMO_DATE, action: 'READING_CORRECTED', entityType: 'METER_READING', entityId: corrected.id, reason: 'Fictional authorized correction example', beforeSnapshot: JSON.stringify(original), afterSnapshot: JSON.stringify(corrected) })
     expect(isPrototypeData(data)).toBe(true)
-    expect(data.charges.find(c => c.id === 'electricity-1')?.amountCents).toBe(15_600)
+    expect(data.charges.find(c => c.id === 'electricity-nov-room-1')?.amountCents).toBe(15_600)
   })
 })
 

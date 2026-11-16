@@ -46,7 +46,7 @@ describe('Payment History transaction dialog', () => {
     expect(dialog).toHaveTextContent('Water')
     expect(dialog).not.toHaveTextContent('Electricity')
     expect(dialog).toHaveTextContent(`${formatMoney(350_000)}`)
-    expect(dialog).toHaveTextContent(`${formatMoney(15_000)}`)
+    expect(dialog).toHaveTextContent(`${formatMoney(10_000)}`)
   })
 
   it('shows electricity and washing-machine allocations accurately', async () => {
@@ -66,7 +66,7 @@ describe('Payment History transaction dialog', () => {
     await user.click(screen.getByRole('button', { name: /See Transaction/ }))
     dialog = screen.getByRole('dialog', { name: 'Transaction Details' })
     expect(dialog).toHaveTextContent('Washing machine')
-    expect(dialog).toHaveTextContent('₱80.00')
+    expect(dialog).toHaveTextContent('₱100.00')
   })
 
   it('shows the actual allocated amount for a partial payment', async () => {
@@ -75,7 +75,7 @@ describe('Payment History transaction dialog', () => {
     const original = paymentFrom(data, 'payment-3')
     const payment: Payment = { ...original, id: 'partial-test', amountCents: 5_000, paidOn: DEMO_DATE }
     data.payments = [payment]
-    data.paymentAllocations = [{ id: 'partial-rent', paymentId: payment.id, chargeId: 'rent-3', amountCents: 5_000, allocatedOn: DEMO_DATE, state: 'ACTIVE', creditId: null, reversalAuditEventId: null }]
+    data.paymentAllocations = [{ id: 'partial-rent', paymentId: payment.id, chargeId: 'rent-nov-room-3', amountCents: 5_000, allocatedOn: DEMO_DATE, state: 'ACTIVE', creditId: null, reversalAuditEventId: null }]
     data.receipts = []
     renderPayment(data, payment)
     await user.click(screen.getByRole('button', { name: /See Transaction/ }))

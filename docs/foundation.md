@@ -61,10 +61,10 @@ Tailwind 4 uses its Vite plugin and CSS-first theme. There is no Tailwind 3 conf
 - Six destinations are Dashboard (titled Overview), Tenants, Rooms, Billing, Payments & Receipts, and Reports & Settings. All route URLs remain stable. Receipt generation is future scope; a labeled sample preview uses existing receipt data. Settings show read-only defaults rather than introducing configuration workflows.
 - Property branding: Halili BH. The demonstration tenant and financial records remain fictional; display currency: PHP.
 - Fixed sample date: November 13, 2026, keeping overdue/upcoming examples deterministic.
-- There are 10 fictional tenants (9 active and 1 moved out), 6 rooms, 2 sample billing periods, 33 category charges, and 13 sample payments. Room totals initially show 4 occupied, 1 available, and 1 under repair. Bed counts do not affect these totals.
-- Rent agreements are PHP 1,750 for the two Room 101 tenants sharing a PHP 3,500 room rent, PHP 3,500 for the single Room 102 tenant, and PHP 3,500 for other active sample assignments. The moved-out historical assignment remains PHP 3,000.
-- November charges total PHP 29,822.00, with PHP 8,222.00 allocated and PHP 21,600.00 outstanding. November cash received is PHP 15,990.00, including prior-period collections and an unapplied PHP 500.00 advance.
-- Water charges and the optional washing machine charge are manual examples. Electricity readings and effective-dated rates are historical fixtures; no meter ownership or shared-room allocation policy has been implemented.
+- There are 10 fictional tenants (7 active and 3 moved out), 6 rooms, 2 sample billing periods, 39 category charges, and 14 sample payments. Room totals initially show 4 occupied, 1 available, and 1 under repair. Bed counts do not affect these totals.
+- Each occupied room has one PHP 3,500.00 monthly rent charge, independent of whether it has one or two occupants. Room capacity is capped at two active tenants in the demonstration records; vacant and moved-out histories remain visible.
+- November charges total PHP 15,511.00, with PHP 7,912.00 allocated and PHP 7,599.00 outstanding. November cash received is PHP 17,467.00, including prior-period collections and an unapplied PHP 500.00 advance.
+- Water is PHP 100.00 per tenant, washing is an optional PHP 100.00 per room, and electricity is PHP 13.00/kWh from a fictional meter per occupied room. Electricity readings and effective-dated rates remain historical fixtures; no meter ownership or shared-room allocation policy has been implemented.
 - No collection ratio or financial total is fabricated independently of the shared records.
 
 These assumptions should be confirmed with the landlord before designing complete workflows.

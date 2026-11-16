@@ -42,19 +42,19 @@ Count **rooms, not beds**. Any current rental makes the room occupied, including
 
 ### Rent and periods
 
-Agreed rent is recorded on the assignment and snapshotted onto issued rent charges. Explicit billing periods connect all categories. October/November calendar months and due dates are fixture examples only; there is no recurring-bill engine, fixed rent-cycle rule, proration rule, or bill-generation action.
+Room rent is PHP 3,500.00 once per occupied room per billing period. The demonstration fixture stores that single issued rent charge against one designated occupant’s assignment, so two occupants do not create two rent debts or imply joint liability. Explicit billing periods connect all categories. October/November calendar months and due dates are fixture examples only; there is no recurring-bill engine, fixed rent-cycle rule, proration rule, or bill-generation action. Room capacity in the demonstration records is capped at two active occupants.
 
 ### Electricity and rate history
 
-Readings store integer **milli-kWh** (1000 units = 1 kWh); money stores integer **centavos**. November’s charge retains:
+Readings store integer **milli-kWh** (1000 units = 1 kWh); money stores integer **centavos**. Each occupied room has its own fictional meter. Room 101’s November charge retains:
 
-- Meter `meter-demo-a` and previous/current confirmed reading IDs.
-- Previous 300,000 milli-kWh = 300 kWh; current 312,000 = 312 kWh.
+- Meter `meter-room-1` and previous/current confirmed reading IDs.
+- Previous 312,000 milli-kWh = 312 kWh; current 324,000 = 324 kWh, continuing from the October 300 → 312 example.
 - Consumption 12,000 milli-kWh = 12 kWh.
 - Applied rate 1,300 centavos/kWh, effective November 1, 2026.
 - Issued amount 15,600 centavos = **PHP 156.00**.
 
-The historical October example uses PHP 12.00/kWh; a future December rate of PHP 14.50 is a separate rate record. Summaries use stored issued amounts, never the latest configured rate. A rate change cannot silently reprice old charges through a selector.
+The historical October, current November, and future December rate records all use the mock PHP 13.00/kWh tariff. Summaries use stored issued amounts, never the latest configured rate. A later rate change cannot silently reprice old charges through a selector.
 
 The future meter-entry workflow must find the previous confirmed reading, accept the current reading, and retain history. Corrections reference an original record plus an authorizing audit event and actor reference. Superseded readings remain available to historical charges. No correction UI or real authorization is implemented.
 
@@ -62,9 +62,9 @@ Meter ownership, shared-room allocation, meter rollover/replacement rules, fract
 
 ### Manual charges and payments
 
-Water is entered manually per tenant; no water meter model or calculation is added. Washing machine charges are optional manual entries.
+Water is a sample PHP 100.00 manual charge per tenant, based on each billing period’s occupants; no water meter model or calculation is added. Washing machine charges are optional manual PHP 100.00-per-room entries, so two occupants share one room charge.
 
-Payments and allocations are separate. Alex’s rent, water, and partial electricity payments occur on different dates. Sam’s rent is partially paid independently of fully paid water. Jordan’s PHP 500.00 advance remains source-linked credit until explicitly allocated. Full, partial, advance, correction, reversal, and receipt issuance workflows are placeholders; there are no financial reducer actions.
+Payments and allocations are separate. Alex makes a partial PHP 1,000.00 October rent payment and separately pays water and electricity. Room 102’s one room-level rent charge remains unpaid while different occupant utilities have their own payment states. Jordan’s PHP 500.00 advance remains source-linked credit until explicitly allocated. Full, partial, advance, correction, reversal, and receipt issuance workflows are placeholders; there are no financial reducer actions.
 
 Receipt references are fictional, not official tax receipts or generated documents. Their stored allocation IDs describe issuance-time allocation history rather than a dynamically recomputed receipt.
 
@@ -74,18 +74,18 @@ All amounts below derive from fixture records, not dashboard-specific constants.
 
 | Measure, as of November 13, 2026 | Amount |
 | --- | ---: |
-| November rent charges (Room 101 two shares of PHP 1,750; Room 102 PHP 3,500; seven other tenant charges at PHP 3,500) | PHP 28,000.00 |
-| November manually entered water (9 × PHP 150) | PHP 1,350.00 |
-| November electricity examples (2 × PHP 156) | PHP 312.00 |
-| Optional November washing machine charges (2 × PHP 80) | PHP 160.00 |
-| **November issued charges** | **PHP 29,822.00** |
-| Explicitly allocated to November charges | PHP 8,222.00 |
-| **November outstanding** | **PHP 21,600.00** |
-| October charges paid during November | PHP 7,268.00 |
+| November rent charges (4 occupied rooms × PHP 3,500) | PHP 14,000.00 |
+| November manually entered water (7 occupants × PHP 100) | PHP 700.00 |
+| November electricity examples (4 rooms: PHP 156 + 143 + 156 + 156) | PHP 611.00 |
+| Optional November washing machine charges (2 rooms × PHP 100) | PHP 200.00 |
+| **November issued charges** | **PHP 15,511.00** |
+| Explicitly allocated to November charges | PHP 7,912.00 |
+| **November outstanding** | **PHP 7,599.00** |
+| October charges paid during November | PHP 9,055.00 |
 | Unapplied advance received in November | PHP 500.00 |
-| **Cash received during November** | **PHP 15,990.00** |
+| **Cash received during November** | **PHP 17,467.00** |
 
-Eleven November charges are paid and eleven are unpaid. Four are overdue at the fixed demo date; the remaining outstanding charges are due November 20. Room 101 has unpaid October/November rent but paid utilities. Room 102 has unpaid November rent and unpaid October/November water. Room 103 has water, electricity, and washing paid for the November 20 due-date group while rent remains unpaid. The moved-out tenant’s October account is fully settled while their assignment and charge history remain visible.
+Ten November charges are paid and seven are unpaid; the seven unpaid charges are due November 20. Historical October arrears remain overdue. Room 101 has one room-level rent charge in each period, with October partially paid and November unpaid. Room 102 has one room-level November rent charge, one unpaid occupant water charge, and unpaid electricity. Room 103 is fully paid for November. Room 105’s two moved-out occupants have a fully settled October bill while their assignments and charge history remain visible.
 
 The fixture factory generates fresh objects for reset/tests; it is not an executable bill-generation workflow. Contacts are invented, with reserved `example.com` email addresses and deliberately non-dialable `DEMO +63 000 ...` phone strings.
 
