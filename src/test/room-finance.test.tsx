@@ -191,6 +191,8 @@ describe('room financial presentation and reconciliation', () => {
     await user.click(within(region).getByRole('button', { name: /See Transaction/ }))
     const dialog = screen.getByRole('dialog', { name: 'Transaction Details' })
     expect(dialog).toHaveTextContent('Multiple rooms / contexts')
+    expect(within(dialog).getByText('Room 105')).toBeInTheDocument()
+    expect(within(dialog).getByText('Room 103')).toBeInTheDocument()
     expect(dialog).toHaveTextContent('Paid by: Quinn Mendoza')
     expect(dialog).toHaveTextContent('Payment ID: multi')
     expect(dialog).toHaveTextContent('Water')

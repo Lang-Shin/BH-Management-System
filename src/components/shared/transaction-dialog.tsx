@@ -19,6 +19,7 @@ export function TransactionDialog({ data, payment, asOf, onClose, onReturnFocus 
   const payer = data.tenants.find(tenant => tenant.id === payment.tenantId)?.name
   const receipt = data.receipts.find(item => item.paymentId === payment.id && item.state === 'ISSUED')?.receiptNumber
   const advance = data.tenantCredits.some(credit => credit.sourcePaymentId === payment.id)
+  const allocationsSpanMultipleRooms = new Set(context.allocations.map(allocation => allocation.context.id)).size > 1
   const { open, requestClose, onOpenChange, onAnimationEnd } = useAnimatedDialogClose(onClose)
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
@@ -48,7 +49,7 @@ export function TransactionDialog({ data, payment, asOf, onClose, onReturnFocus 
         {context.allocations.length > 0 && <ul className="transaction-lines">{context.allocations.map(allocation => {
           const charge = data.charges.find(item => item.id === allocation.chargeId)
           return <li key={allocation.id}>
-            <div className="min-w-0"><p className="font-semibold">{charge ? CATEGORY_LABELS[charge.category] : 'Bill'}</p><p className="mt-0.5 break-words text-xs text-muted-foreground">{allocation.context.label}</p>{charge?.category === 'ELECTRICITY' && <p className="mt-1 text-xs text-muted-foreground">{charge.electricity.previousReadingMilliKwh / 1000} → {charge.electricity.currentReadingMilliKwh / 1000} kWh · {charge.electricity.consumptionMilliKwh / 1000} kWh × {formatMoney(charge.electricity.appliedRateCentsPerKwh)}/kWh</p>}</div>
+            <div className="min-w-0"><p className="font-semibold">{charge ? CATEGORY_LABELS[charge.category] : 'Bill'}</p>{allocationsSpanMultipleRooms && <p className="mt-0.5 break-words text-xs text-muted-foreground">{allocation.context.label}</p>}{charge?.category === 'ELECTRICITY' && <p className="mt-1 text-xs text-muted-foreground">{charge.electricity.previousReadingMilliKwh / 1000} → {charge.electricity.currentReadingMilliKwh / 1000} kWh · {charge.electricity.consumptionMilliKwh / 1000} kWh × {formatMoney(charge.electricity.appliedRateCentsPerKwh)}/kWh</p>}</div>
             <span className="shrink-0 font-semibold tabular-nums">{formatMoney(allocation.amountCents)}</span>
           </li>
         })}</ul>}

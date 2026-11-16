@@ -18,6 +18,11 @@ export function ReceiptDialog({ data, receipt, onClose, onReturnFocus }: {
   const tenant = data.tenants.find(item => item.id === payment?.tenantId)
   // Use the receipt's issue-time allocation references, not the payment's live allocations.
   const allocations = data.paymentAllocations.filter(item => receipt.allocationIds.includes(item.id) && item.paymentId === receipt.paymentId)
+  const allocationRoomIds = new Set(allocations.map(allocation => {
+    const charge = data.charges.find(item => item.id === allocation.chargeId)
+    return charge ? chargeRoom(data, charge).id : `review:${allocation.chargeId}`
+  }))
+  const allocationsSpanMultipleRooms = allocationRoomIds.size > 1
   const advance = data.tenantCredits.some(item => item.sourcePaymentId === receipt.paymentId)
   const { open, requestClose, onOpenChange, onAnimationEnd } = useAnimatedDialogClose(onClose)
 
@@ -43,7 +48,7 @@ export function ReceiptDialog({ data, receipt, onClose, onReturnFocus }: {
             const charge = data.charges.find(item => item.id === allocation.chargeId)
             const period = data.billingPeriods.find(item => item.id === charge?.billingPeriodId)
             return <li key={allocation.id} className="flex flex-wrap justify-between gap-3 py-2 text-sm">
-              <div className="min-w-0"><p className="font-semibold">{charge ? CATEGORY_LABELS[charge.category] : 'Bill'} · {charge ? chargeRoom(data, charge).label : 'Room needs review'}</p>{charge?.category === 'ELECTRICITY' && <p className="mt-1 text-xs text-muted-foreground">Previous settled {charge.electricity.previousReadingMilliKwh / 1000} kWh → current {charge.electricity.currentReadingMilliKwh / 1000} kWh · {charge.electricity.consumptionMilliKwh / 1000} kWh × {formatMoney(charge.electricity.appliedRateCentsPerKwh)}/kWh</p>}{period && <p className="mt-1 text-xs text-muted-foreground">{period.label}</p>}<p className="mt-1 break-all text-xs text-muted-foreground">Charge: {allocation.chargeId} · Allocation: {allocation.id}</p>{allocation.state === 'REVERSED' && <p className="mt-1 text-xs text-muted-foreground">Allocation later reversed</p>}</div>
+              <div className="min-w-0"><p className="font-semibold">{charge ? CATEGORY_LABELS[charge.category] : 'Bill'}{allocationsSpanMultipleRooms ? ` · ${charge ? chargeRoom(data, charge).label : 'Room needs review'}` : ''}</p>{charge?.category === 'ELECTRICITY' && <p className="mt-1 text-xs text-muted-foreground">Previous settled {charge.electricity.previousReadingMilliKwh / 1000} kWh → current {charge.electricity.currentReadingMilliKwh / 1000} kWh · {charge.electricity.consumptionMilliKwh / 1000} kWh × {formatMoney(charge.electricity.appliedRateCentsPerKwh)}/kWh</p>}{period && <p className="mt-1 text-xs text-muted-foreground">{period.label}</p>}<p className="mt-1 break-all text-xs text-muted-foreground">Charge: {allocation.chargeId} · Allocation: {allocation.id}</p>{allocation.state === 'REVERSED' && <p className="mt-1 text-xs text-muted-foreground">Allocation later reversed</p>}</div>
               <span className="font-semibold tabular-nums">{formatMoney(allocation.amountCents)}</span>
             </li>
           })}

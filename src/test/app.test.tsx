@@ -525,6 +525,7 @@ describe('admin workspace integration', () => {
     expect(dialog).toHaveTextContent('Nov 2, 2026')
     expect(dialog).toHaveTextContent('₱3,830.00')
     expect(dialog).toHaveTextContent('Bank transfer')
+    expect(within(dialog).getAllByText('Room 105')).toHaveLength(1)
     expect(within(dialog).getByRole('list')).toHaveTextContent('Rent')
     expect(within(dialog).getByRole('list')).toHaveTextContent('Water')
     expect(within(dialog).getByRole('list')).toHaveTextContent('Washing machine')
