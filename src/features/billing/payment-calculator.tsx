@@ -3,6 +3,8 @@ import { ArrowUpRight, Calculator, Check, Droplets, House, WashingMachine, Zap }
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { usePrototype } from '@/hooks/use-prototype'
+import { DEMO_DATE } from '@/data/fixtures/demo'
+import { rentPaymentError } from '@/domain/calculations/payment-rules'
 import { formatMoney } from '@/lib/format'
 import { paymentAmountCents } from './payment-total'
 
@@ -14,7 +16,7 @@ const items = [
 ] as const
 const emptyAmounts = { rent: '', electricity: '', water: '', washing: '' }
 
-export function PaymentCalculator({ periodLabel }: { periodLabel: string }) {
+export function PaymentCalculator({ periodId, periodLabel }: { periodId: string; periodLabel: string }) {
   const { data } = usePrototype()
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState<'calculator' | 'success'>('calculator')
@@ -25,7 +27,9 @@ export function PaymentCalculator({ periodLabel }: { periodLabel: string }) {
   const sum = parsed.reduce<number>((total, value) => total + (value ?? 0), 0)
   const total = valid && Number.isSafeInteger(sum) ? sum : null
   const tenant = data.tenants.find(item => item.id === tenantId)
-  const canFinish = Boolean(tenant && total !== null && total > 0)
+  const rentAmount = paymentAmountCents(amounts.rent)
+  const rentError = tenantId && rentAmount !== null ? rentPaymentError(data, tenantId, periodId, rentAmount, DEMO_DATE) : null
+  const canFinish = Boolean(tenant && total !== null && total > 0 && !rentError)
 
   function changeOpen(next: boolean) {
     if (next) {
@@ -64,11 +68,12 @@ export function PaymentCalculator({ periodLabel }: { periodLabel: string }) {
               const invalid = paymentAmountCents(amounts[key]) === null
               return <div key={key} className="payment-input-row">
                 <label htmlFor={`payment-${key}`} className="flex min-w-0 items-center gap-3 text-sm font-semibold"><span className="payment-category-icon"><Icon className="size-[18px]" aria-hidden="true" /></span>{label}</label>
-                <div className="payment-amount-field"><span aria-hidden="true">₱</span><input id={`payment-${key}`} type="text" inputMode="decimal" maxLength={14} placeholder="0.00" aria-label={`${label} payment in pesos`} aria-invalid={invalid} aria-describedby={invalid ? 'payment-amount-error' : undefined} value={amounts[key]} onChange={event => setAmounts(current => ({ ...current, [key]: event.target.value }))} /></div>
+                <div className="payment-amount-field"><span aria-hidden="true">₱</span><input id={`payment-${key}`} type="text" inputMode="decimal" maxLength={14} placeholder="0.00" aria-label={`${label} payment in pesos`} aria-invalid={invalid || (key === 'rent' && Boolean(rentError))} aria-describedby={invalid ? 'payment-amount-error' : key === 'rent' && rentError ? 'payment-rent-error' : undefined} value={amounts[key]} onChange={event => setAmounts(current => ({ ...current, [key]: event.target.value }))} /></div>
               </div>
             })}
           </fieldset>
           {total === null && <p id="payment-amount-error" role="alert" className="mt-3 text-sm text-destructive">Enter positive amounts with up to two decimal places, for example 3500.50.</p>}
+          {rentError && <p id="payment-rent-error" role="alert" className="mt-3 text-sm text-destructive">{rentError} Leave Rent blank if rent is not part of this payment.</p>}
           <p className="mt-3 text-xs text-muted-foreground">Enter payment amounts, not meter readings. Changing the tenant clears these amounts.</p>
         </div>
         <div className="payment-total-panel">

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createDemoData, DEMO_DATE, DEMO_PERIOD, DEMO_RATES } from '@/data/fixtures/demo'
 import { roomOccupants } from '@/domain/calculations/summary'
 import { chargeRoom } from '@/domain/calculations/room-finance'
-import type { ChargeCategory, PrototypeAppState } from '@/domain/types/models'
+import type { Charge, ChargeCategory, PrototypeAppState } from '@/domain/types/models'
 
 function chargesFor(data: PrototypeAppState, periodId: string, roomId: string, category: ChargeCategory) {
   return data.charges.filter(charge => charge.billingPeriodId === periodId && charge.category === category && chargeRoom(data, charge).id === roomId)
@@ -40,7 +40,9 @@ describe('standardized demonstration billing', () => {
   it('calculates room electricity from reading differences at PHP 13 per kWh', () => {
     const data = createDemoData()
     expect(chargesFor(data, 'period-oct', 'room-1', 'ELECTRICITY')).toMatchObject([{ amountCents: 15_600 }])
-    expect(chargesFor(data, DEMO_PERIOD, 'room-2', 'ELECTRICITY')).toMatchObject([{ amountCents: 14_300 }])
+    expect(chargesFor(data, DEMO_PERIOD, 'room-1', 'ELECTRICITY')).toMatchObject([{ amountCents: 16_900 }])
+    expect(chargesFor(data, DEMO_PERIOD, 'room-2', 'ELECTRICITY')).toEqual([])
+    expect(chargesFor(data, DEMO_PERIOD, 'room-4', 'ELECTRICITY')).toEqual([])
     for (const charge of data.charges.filter(item => item.category === 'ELECTRICITY')) {
       expect(charge.electricity.consumptionMilliKwh).toBe(charge.electricity.currentReadingMilliKwh - charge.electricity.previousReadingMilliKwh)
       expect(charge.electricity.appliedRateCentsPerKwh).toBe(1_300)
@@ -48,11 +50,21 @@ describe('standardized demonstration billing', () => {
     }
   })
 
+  it('bills adjacent settled intervals without overlapping consumption', () => {
+    const data = createDemoData()
+    const charges = data.charges.filter((charge): charge is Extract<Charge, { category: 'ELECTRICITY' }> =>
+      charge.category === 'ELECTRICITY' && charge.electricity.meterId === 'meter-room-1')
+      .sort((a, b) => a.electricity.previousReadingMilliKwh - b.electricity.previousReadingMilliKwh)
+    expect(charges.map(charge => charge.electricity.consumptionMilliKwh)).toEqual([12_000, 13_000])
+    expect(charges.map(charge => charge.amountCents)).toEqual([15_600, 16_900])
+    expect(charges[0]?.electricity.currentReadingMilliKwh).toBe(charges[1]?.electricity.previousReadingMilliKwh)
+  })
+
   it('keeps meter readings chronological and continuous per room', () => {
     const data = createDemoData()
     for (const meter of data.electricityMeters) {
       const readings = data.meterReadings.filter(reading => reading.meterId === meter.id).sort((a, b) => a.readOn.localeCompare(b.readOn))
-      expect(readings.length).toBeGreaterThanOrEqual(2)
+      expect(readings.length).toBeGreaterThanOrEqual(['meter-room-2', 'meter-room-4'].includes(meter.id) ? 1 : 2)
       for (let index = 1; index < readings.length; index++) {
         expect(readings[index]!.readOn > readings[index - 1]!.readOn).toBe(true)
         expect(readings[index]!.readingMilliKwh).toBeGreaterThan(readings[index - 1]!.readingMilliKwh)

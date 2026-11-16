@@ -23,7 +23,7 @@ export function BillingStatusChart({ rooms, periodLabel, outstandingOnly }: { ro
   const segments = [
     { label: 'PAID', value: counts.paid, color: 'var(--forest-green)' },
     { label: 'PARTLY PAID', value: counts.partlyPaid, color: '#7c9770' },
-    { label: 'NOT PAID', value: counts.notPaid, color: 'var(--tomato-red)' },
+    { label: 'NOT YET PAID', value: counts.notPaid, color: 'var(--tomato-red)' },
   ]
 
   return <Card className="mb-7">

@@ -688,6 +688,24 @@
 .pending-bill-amount { font-size: 17px; font-weight: 750; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .pending-bill-amount + p,
 .pending-month-amount { white-space: nowrap; }
+.pending-electricity-action { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--forest-green) 14%, var(--border)); border-radius: 14px; background: color-mix(in srgb, var(--forest-green) 5%, var(--card)); font-size: 12px; }
+.pending-electricity-action > p { min-width: 12rem; flex: 1; }
+.electricity-payment-dialog[data-slot="dialog-content"] { max-height: 90dvh; overflow-y: auto; }
+.electricity-payment-icon { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 2px; border: 1px solid color-mix(in srgb, var(--forest-green) 16%, var(--border)); border-radius: 15px; background: color-mix(in srgb, var(--forest-green) 9%, var(--card)); color: var(--forest-green); }
+.electricity-payment-icon > svg { width: 22px; height: 22px; }
+.electricity-reading-summary { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: 16px; background: var(--oat-milk); font-size: 13px; }
+.electricity-reading-summary div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.electricity-reading-summary dt { color: var(--muted-foreground); }
+.electricity-reading-summary dd { font-weight: 700; text-align: right; }
+.electricity-reading-input { min-height: 48px; width: 100%; border: 1px solid var(--border); border-radius: 12px; background: var(--card); padding: 10px 12px; font-size: 18px; font-variant-numeric: tabular-nums; }
+.electricity-reading-input[aria-invalid="true"] { border-color: var(--destructive); }
+.electricity-calculation-preview { display: grid; gap: 12px; padding: 14px; border: 1px solid color-mix(in srgb, var(--forest-green) 20%, var(--border)); border-radius: 16px; background: color-mix(in srgb, var(--forest-green) 6%, var(--card)); }
+.electricity-calculation-preview dl { display: grid; gap: 8px; font-size: 14px; }
+.electricity-calculation-preview dl div { display: flex; justify-content: space-between; gap: 12px; }
+.electricity-calculation-preview dt { color: var(--muted-foreground); }
+.electricity-calculation-preview dd { font-weight: 650; }
+.electricity-calculation-preview > p { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; border-top: 1px solid color-mix(in srgb, var(--forest-green) 16%, var(--border)); padding-top: 12px; }
+.electricity-calculation-preview > p strong { font-size: 24px; font-variant-numeric: tabular-nums; }
 .pending-optional-badge { padding: 2px 8px; border: 1px solid color-mix(in srgb, var(--forest-green) 18%, var(--border)); border-radius: 999px; color: var(--forest-green); background: color-mix(in srgb, var(--forest-green) 8%, var(--card)); font-size: 11px; font-weight: 700; }
 .pending-month-details { margin-top: 12px; border-top: 1px solid color-mix(in srgb, var(--forest-green) 14%, var(--border)); padding-top: 2px; }
 .pending-month-details > summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; list-style: none; cursor: pointer; color: var(--forest-green); font-size: 14px; font-weight: 650; }
@@ -702,6 +720,9 @@
   .pending-dialog-heading { padding: 20px 16px 16px; }
   .pending-dialog-body { padding: 0 16px 16px; }
   .pending-payment-item { padding: 12px; }
+  .pending-category-heading { flex-direction: column; align-items: stretch; }
+  .pending-category-amount { text-align: left; }
+  .pending-bill-amount { white-space: normal; }
   .pending-month-row { padding: 10px; }
   .pending-dialog-footer { padding: 12px 16px; }
 }

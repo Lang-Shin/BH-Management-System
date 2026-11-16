@@ -60,6 +60,6 @@ export function BillPaymentChart({ summary }: { summary: ReturnType<typeof selec
       </div>
     </div>
     <AnalyticsLegend segments={segments} total={total} />
-    <figcaption className="mt-3 text-sm text-muted-foreground">{total > 0 ? <><AnimatedNumber value={total} /> issued bills this month · counts, not payment amounts</> : 'No issued bills for this month.'}</figcaption>
+    <figcaption className="mt-3 text-sm text-muted-foreground">{total > 0 ? <><AnimatedNumber value={total} /> issued bills this month · counts, not payment amounts{summary.unresolved > 0 ? ` · plus ${summary.unresolved} electricity ${summary.unresolved === 1 ? 'bill' : 'bills'} awaiting a reading` : ''}</> : summary.unresolved > 0 ? `${summary.unresolved} electricity ${summary.unresolved === 1 ? 'bill is' : 'bills are'} awaiting a meter reading.` : 'No issued bills for this month.'}</figcaption>
   </figure>
 }

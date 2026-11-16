@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import type { BillingRoomStatus } from './billing-room-status'
 
-const statuses: BillingRoomStatus[] = ['PAID', 'PARTLY PAID', 'NOT PAID']
+const statuses: BillingRoomStatus[] = ['PAID', 'PARTLY PAID', 'NOT YET PAID']
 
 function StatusIcon({ status }: { status: BillingRoomStatus }) {
   const Icon = status === 'PAID' ? Check : status === 'PARTLY PAID' ? CircleDashed : Clock3

@@ -1,4 +1,4 @@
-import { chargeBalance, creditRemaining, issuedCharges, roomOccupancy } from '@/domain/calculations/summary'
+import { chargeBalance, creditRemaining, issuedCharges, roomOccupancy, unresolvedElectricity } from '@/domain/calculations/summary'
 import type { PrototypeAppState } from '@/domain/types/models'
 import { formatMoney } from '@/lib/format'
 
@@ -43,16 +43,17 @@ export function selectNotifications(data: PrototypeAppState, asOf: string): AppN
   const credits = data.tenantCredits
     .map(credit => ({ credit, remaining: creditRemaining(data, credit, asOf) }))
     .filter(item => item.remaining > 0)
+  const awaitingElectricity = unresolvedElectricity(data, asOf).length
 
   const notifications: AppNotification[] = []
 
   if (overdue.length > 0) {
     const total = overdue.reduce((sum, item) => sum + item.balance, 0)
     notifications.push({
-      id: `overdue:${overdue.length}:${total}`,
+      id: `overdue:${overdue.length}:${total}:${awaitingElectricity}`,
       kind: 'overdue',
       title: `${bills(overdue.length)} ${isAre(overdue.length)} past due`,
-      description: `${formatMoney(total)} still to pay. Open Billing to see who owes what.`,
+      description: `${formatMoney(total)} known still to pay.${awaitingElectricity > 0 ? ` Plus ${awaitingElectricity} electricity ${awaitingElectricity === 1 ? 'bill' : 'bills'} awaiting a meter reading.` : ''} Open Billing to see who owes what.`,
       href: '/billing',
     })
   }

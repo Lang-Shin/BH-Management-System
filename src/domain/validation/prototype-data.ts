@@ -30,6 +30,8 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
   if (!rows(value, 'electricityMeters', r => id(r.label) && id(r.serialNumber) && r.ownership === 'UNCONFIRMED')) return false
   if (!rows(value, 'meterReadings', r => id(r.meterId) && date(r.readOn) && money(r.readingMilliKwh)
     && oneOf(r.status, ['DRAFT', 'CONFIRMED', 'SUPERSEDED']) && (r.confirmedBy === null || id(r.confirmedBy)) && correction(r.correction))) return false
+  if (!rows(value, 'electricityBillObligations', r => id(r.roomId) && id(r.tenantId) && id(r.billingPeriodId)
+    && id(r.meterId) && id(r.previousReadingId) && date(r.createdAt) && date(r.dueDate) && r.state === 'AWAITING_READING')) return false
   if (!rows(value, 'electricityRates', r => positive(r.rateCentsPerKwh) && date(r.effectiveFrom) && text(r.label))) return false
   if (!rows(value, 'billingPeriods', r => id(r.label) && date(r.startDate) && date(r.endDate) && oneOf(r.status, ['OPEN', 'CLOSED']))) return false
   if (!rows(value, 'charges', r => {
@@ -39,7 +41,7 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     if (r.category === 'WATER' || r.category === 'WASHING_MACHINE') return r.entryMethod === 'MANUAL'
     if (r.category !== 'ELECTRICITY' || !isRecord(r.electricity)) return false
     const e = r.electricity
-    return id(e.meterId) && id(e.previousReadingId) && id(e.currentReadingId) && money(e.previousReadingMilliKwh)
+    return id(e.intervalId) && id(e.meterId) && id(e.previousReadingId) && id(e.currentReadingId) && money(e.previousReadingMilliKwh)
       && money(e.currentReadingMilliKwh) && money(e.consumptionMilliKwh) && id(e.rateId)
       && positive(e.appliedRateCentsPerKwh) && date(e.appliedRateEffectiveFrom)
   })) return false
@@ -52,15 +54,15 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
   if (!rows(value, 'receipts', r => id(r.paymentId) && id(r.receiptNumber) && date(r.issuedOn) && positive(r.amountCents)
     && oneOf(r.state, ['ISSUED', 'VOIDED']) && Array.isArray(r.allocationIds) && r.allocationIds.length <= 1000 && r.allocationIds.every(id))) return false
   if (!rows(value, 'auditEvents', r => id(r.actorId) && date(r.occurredOn) && id(r.entityId) && text(r.reason)
-    && oneOf(r.action, ['DEMO_SEEDED', 'READING_CORRECTED', 'CHARGE_CORRECTED', 'PAYMENT_CORRECTED', 'ALLOCATION_REVERSED'])
+    && oneOf(r.action, ['DEMO_SEEDED', 'READING_CORRECTED', 'CHARGE_CORRECTED', 'PAYMENT_CORRECTED', 'ALLOCATION_REVERSED', 'ELECTRICITY_PAYMENT_RECORDED'])
     && oneOf(r.entityType, ['PROTOTYPE', 'METER_READING', 'CHARGE', 'PAYMENT', 'PAYMENT_ALLOCATION'])
     && nullableText(r.beforeSnapshot) && nullableText(r.afterSnapshot))) return false
 
   // Each collection and its discriminated field shapes have been checked above.
   const data = value as unknown as PrototypeAppState
   if ([data.tenants, data.rooms, data.roomAssignments, data.electricityMeters, data.meterReadings,
-    data.electricityRates, data.billingPeriods, data.charges, data.payments, data.paymentAllocations,
-    data.tenantCredits, data.receipts, data.auditEvents]
+    data.electricityBillObligations, data.electricityRates, data.billingPeriods, data.charges, data.payments,
+    data.paymentAllocations, data.tenantCredits, data.receipts, data.auditEvents]
     .some(items => new Set(items.map(item => item.id)).size !== items.length)) return false
   const tenant = (key: string) => data.tenants.find(t => t.id === key)
   const audit = (key: string) => data.auditEvents.find(a => a.id === key)
@@ -94,6 +96,26 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
       && (r.status !== 'CONFIRMED' || !data.meterReadings.some(previous => previous.meterId === r.meterId
         && previous.status === 'CONFIRMED' && previous.readOn < r.readOn && previous.readingMilliKwh > r.readingMilliKwh))
   })) return false
+  const electricityIntervals = data.charges.filter(c => c.category === 'ELECTRICITY').map(c => c.electricity.intervalId)
+  if (new Set(electricityIntervals).size !== electricityIntervals.length) return false
+  if (!data.electricityBillObligations.every(o => {
+    const period = data.billingPeriods.find(p => p.id === o.billingPeriodId)
+    const meter = data.electricityMeters.find(m => m.id === o.meterId)
+    const previous = data.meterReadings.find(r => r.id === o.previousReadingId)
+    const latest = [...data.meterReadings]
+      .filter(reading => reading.meterId === o.meterId && reading.status === 'CONFIRMED')
+      .sort((a, b) => b.readOn.localeCompare(a.readOn) || b.id.localeCompare(a.id))[0]
+    return tenant(o.tenantId) && data.rooms.some(r => r.id === o.roomId) && period && meter && previous
+      && previous.meterId === o.meterId && previous.status !== 'DRAFT' && previous.readOn <= o.createdAt
+      && latest?.id === previous.id
+      && o.dueDate >= o.createdAt
+      && data.roomAssignments.some(a => a.tenantId === o.tenantId && a.roomId === o.roomId
+        && a.startDate <= period.endDate && (a.endDate === null || a.endDate >= period.startDate))
+      && !data.charges.some(c => c.category === 'ELECTRICITY' && c.state === 'ISSUED'
+        && c.billingPeriodId === o.billingPeriodId && c.electricity.meterId === o.meterId)
+  })) return false
+  if (new Set(data.electricityBillObligations.map(o => JSON.stringify([o.meterId, o.billingPeriodId]))).size
+    !== data.electricityBillObligations.length) return false
   if (!data.charges.every(c => {
     const period = data.billingPeriods.find(p => p.id === c.billingPeriodId)
     const original = c.correction && data.charges.find(o => o.id === c.correction?.supersedesId)
@@ -137,7 +159,9 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
   })) return false
   if (!data.charges.every(c => {
     const applied = sum(activeAllocations.filter(a => a.chargeId === c.id).map(a => a.amountCents))
+    // Rent is all-or-nothing; a sample or user-entered partial rent allocation is invalid.
     return Number.isSafeInteger(applied) && applied <= c.amountCents
+      && (c.category !== 'RENT' || applied === 0 || applied === c.amountCents)
   })) return false
   if (!data.tenantCredits.every(c => {
     const payment = data.payments.find(p => p.id === c.sourcePaymentId)

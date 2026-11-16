@@ -19,21 +19,21 @@ describe('notification center', () => {
     await user.click(bell)
 
     const panel = await screen.findByRole('dialog', { name: 'Notifications' })
-    expect(within(panel).getByText('11 bills are past due')).toBeInTheDocument()
-    expect(within(panel).getByText(/₱10,386\.00 still to pay/)).toBeInTheDocument()
-    expect(within(panel).getByText('7 bills are due in the next 7 days')).toBeInTheDocument()
-    expect(within(panel).getByText(/₱7,599\.00 still to pay/)).toBeInTheDocument()
+    expect(within(panel).getByText('8 bills are past due')).toBeInTheDocument()
+    expect(within(panel).getByText(/₱11,056\.00 known still to pay/)).toBeInTheDocument()
+    expect(within(panel).getByText('3 bills are due in the next 7 days')).toBeInTheDocument()
+    expect(within(panel).getByText(/₱3,700\.00 still to pay/)).toBeInTheDocument()
     expect(within(panel).getByText('Room 106 is under repair')).toBeInTheDocument()
     expect(within(panel).getByText('₱500.00 advance payment is held')).toBeInTheDocument()
 
-    await user.click(within(panel).getByRole('link', { name: /11 bills are past due/ }))
+    await user.click(within(panel).getByRole('link', { name: /8 bills are past due/ }))
     expect(await screen.findByRole('heading', { level: 1, name: 'Billing' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Notifications, 3 unread' })).toBeInTheDocument()
 
     app.unmount()
     renderApp('/billing')
     expect(await screen.findByRole('button', { name: 'Notifications, 3 unread' })).toBeInTheDocument()
-    expect(loadReadIds()).toContain('overdue:11:1038600')
+    expect(loadReadIds()).toContain('overdue:8:1105600:2')
   })
 
   it('marks every item as read and closes with Escape', async () => {
@@ -59,7 +59,7 @@ describe('notification center', () => {
   })
 
   it('clears read state when the sample records are restored', async () => {
-    localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify({ version: 1, readIds: ['overdue:11:1038600'] }))
+    localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify({ version: 1, readIds: ['overdue:8:1105600:2'] }))
     const user = userEvent.setup()
     renderApp('/reports')
     expect(await screen.findByRole('button', { name: 'Notifications, 3 unread' })).toBeInTheDocument()

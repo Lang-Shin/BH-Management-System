@@ -2,6 +2,8 @@
 export type ChargeCategory = 'RENT' | 'ELECTRICITY' | 'WATER' | 'WASHING_MACHINE'
 /** Derived from active allocations; absence of a charge means not applicable. */
 export type ChargeStatus = 'UNPAID' | 'PARTIALLY_PAID' | 'PAID'
+/** Owner-defined room status; distinct from an individual bill's settlement status. */
+export type RoomPaymentStatus = 'NO_BILLS' | 'NOT_YET_PAID' | 'PARTLY_PAID' | 'PAID'
 
 export interface Tenant {
   id: string
@@ -75,6 +77,8 @@ export interface BillingPeriod {
 }
 
 export interface ElectricityChargeBasis {
+  /** Stable identifier for the settled meter interval, preventing duplicate consumption. */
+  intervalId: string
   meterId: string
   previousReadingId: string
   currentReadingId: string
@@ -84,6 +88,19 @@ export interface ElectricityChargeBasis {
   rateId: string
   appliedRateCentsPerKwh: number
   appliedRateEffectiveFrom: string
+}
+
+/** An expected bill that is not a Charge until a current meter reading is entered. */
+export interface ElectricityBillObligation {
+  id: string
+  roomId: string
+  tenantId: string
+  billingPeriodId: string
+  meterId: string
+  previousReadingId: string
+  createdAt: string
+  dueDate: string
+  state: 'AWAITING_READING'
 }
 
 interface ChargeRecord {
@@ -150,7 +167,7 @@ export interface AuditEvent {
   id: string
   actorId: string
   occurredOn: string
-  action: 'DEMO_SEEDED' | 'READING_CORRECTED' | 'CHARGE_CORRECTED' | 'PAYMENT_CORRECTED' | 'ALLOCATION_REVERSED'
+  action: 'DEMO_SEEDED' | 'READING_CORRECTED' | 'CHARGE_CORRECTED' | 'PAYMENT_CORRECTED' | 'ALLOCATION_REVERSED' | 'ELECTRICITY_PAYMENT_RECORDED'
   entityType: 'PROTOTYPE' | 'METER_READING' | 'CHARGE' | 'PAYMENT' | 'PAYMENT_ALLOCATION'
   entityId: string
   reason: string
@@ -165,6 +182,7 @@ export interface PrototypeAppState {
   roomAssignments: RoomAssignment[]
   electricityMeters: ElectricityMeter[]
   meterReadings: MeterReading[]
+  electricityBillObligations: ElectricityBillObligation[]
   electricityRates: ElectricityRate[]
   billingPeriods: BillingPeriod[]
   charges: Charge[]

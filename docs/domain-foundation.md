@@ -28,9 +28,11 @@ IDs are explicit strings with referential validation. The type alias `PrototypeD
 ### Status semantics
 
 - Charge categories: `RENT`, `ELECTRICITY`, `WATER`, `WASHING_MACHINE`.
-- Payment statuses are derived from active allocations: `UNPAID`, `PARTIALLY_PAID`, `PAID`.
-- Issuance state (`ISSUED` / `VOIDED`) is distinct from payment status.
+- Individual bill payment statuses are derived from active allocations: `UNPAID`, `PARTIALLY_PAID`, `PAID`.
+- Room payment statuses follow the owner’s category-based definitions: `NO_BILLS`, `NOT_YET_PAID`, `PARTLY_PAID`, `PAID`. They are not calculated from total money divided by total billed.
+- Room `Paid` requires every applicable bill to be fully settled and no required electricity obligation left unresolved. At least one fully settled applicable bill makes the room `Partly paid` while anything remains. `Not yet paid` means nothing applicable is fully settled. `No bills` means no bills or pending obligations exist.
 - No charge in a category means **not applicable** in the sample matrix. No zero-value unpaid placeholder charge is manufactured.
+- A missing current electricity reading is stored as an `ElectricityBillObligation` with `AWAITING_READING`, not as a Charge and not as a PHP 0 balance.
 - Overdue is a date/balance condition, separate from partial/unpaid status.
 - An active tenant may have outstanding debt and advance credit simultaneously. Credit does not automatically offset charges.
 
@@ -42,31 +44,34 @@ Count **rooms, not beds**. Any current rental makes the room occupied, including
 
 ### Rent and periods
 
-Room rent is PHP 3,500.00 once per occupied room per billing period. The demonstration fixture stores that single issued rent charge against one designated occupant’s assignment, so two occupants do not create two rent debts or imply joint liability. Explicit billing periods connect all categories. October/November calendar months and due dates are fixture examples only; there is no recurring-bill engine, fixed rent-cycle rule, proration rule, or bill-generation action. Room capacity in the demonstration records is capped at two active occupants.
+Room rent is PHP 3,500.00 once per occupied room per billing period and must be settled in full. The demonstration fixture stores that single issued rent charge against one designated occupant’s assignment, so two occupants do not create two rent debts or imply joint liability. No sample rent allocation is partial; the snapshot validator rejects a partial rent allocation, and the payment calculator rejects a typed partial rent amount. Explicit billing periods connect all categories. October/November calendar months and due dates are fixture examples only; there is no recurring-bill engine, fixed rent-cycle rule, proration rule, or bill-generation action. Room capacity in the demonstration records is capped at two active occupants.
 
 ### Electricity and rate history
 
-Readings store integer **milli-kWh** (1000 units = 1 kWh); money stores integer **centavos**. Each occupied room has its own fictional meter. Room 101’s November charge retains:
+Readings store integer **milli-kWh** (1000 units = 1 kWh); money stores integer **centavos**. Each occupied room has its own fictional meter. Electricity is cumulative: each confirmed charge covers the interval from the latest settled reading to the current payment-time reading.
 
-- Meter `meter-room-1` and previous/current confirmed reading IDs.
-- Previous 312,000 milli-kWh = 312 kWh; current 324,000 = 324 kWh, continuing from the October 300 → 312 example.
-- Consumption 12,000 milli-kWh = 12 kWh.
-- Applied rate 1,300 centavos/kWh, effective November 1, 2026.
-- Issued amount 15,600 centavos = **PHP 156.00**.
+Room 101 demonstrates normal monthly settlement:
 
-The historical October, current November, and future December rate records all use the mock PHP 13.00/kWh tariff. Summaries use stored issued amounts, never the latest configured rate. A later rate change cannot silently reprice old charges through a selector.
+- October: previous 300,000 milli-kWh (300 kWh) → current 312,000 (312 kWh), consumption 12,000 (12 kWh), applied 1,300 centavos/kWh, amount 15,600 centavos = **PHP 156.00**.
+- November: previous 312,000 → current 325,000 (325 kWh), consumption 13,000 (13 kWh), applied 1,300 centavos/kWh, amount 16,900 centavos = **PHP 169.00**.
 
-The future meter-entry workflow must find the previous confirmed reading, accept the current reading, and retain history. Corrections reference an original record plus an authorizing audit event and actor reference. Superseded readings remain available to historical charges. No correction UI or real authorization is implemented.
+Room 104 skipped October. Its latest settled reading remains 300 kWh. No October electricity charge exists. If the tenant pays in November with a 325 kWh reading, the single November charge is **25 kWh × PHP 13.00 = PHP 325.00** and the next baseline becomes 325 kWh.
 
-Meter ownership, shared-room allocation, meter rollover/replacement rules, fractional-consumption rounding, and the precise rate-selection policy are still unconfirmed. No ownership or tenant split is inferred. The fixtures’ electricity charges are illustrative tenant records, not evidence of a decided meter-allocation rule. The current snapshot validator checks exact-cent sample calculations; it is not a general-purpose bill-issuance calculator or a confirmed rounding policy.
+The historical October, current November, and future December rate records all use the mock PHP 13.00/kWh tariff. Summaries use stored issued amounts, never the latest configured rate. A later rate change cannot silently reprice old charges. If consumption crosses a rate-change boundary, the prototype uses the rate effective on the payment-calculation date and does not invent a split between rates; this policy is provisional.
+
+The payment-time workflow retrieves the latest confirmed reading and applicable rate, accepts a current reading with up to three decimal places, shows consumption and amount, and persists nothing until confirmation. Confirmation adds one confirmed reading, one finalized charge, one payment, one allocation, and one receipt in a single reducer snapshot, then removes the unresolved obligation. A stable meter-interval ID prevents duplicate billing. A calculated-but-unconfirmed preview is UI-only; it is discarded on cancel.
+
+Rooms 102 and 104 have `AWAITING_READING` obligations with no electricity Charge, no `₱0` payable amount, and a status that prevents the room from being marked Paid. Pending Payments and the Billing matrix show **Amount pending calculation** / **AWAITING READING** instead of a peso figure. Pending electricity is counted once, not as a separate bill for each skipped month.
+
+Meter ownership, shared-room allocation, meter rollover/replacement rules, fractional-consumption rounding, and production concurrency guarantees are still unconfirmed. Browser localStorage cannot provide production-grade atomicity across tabs or devices. No ownership or tenant split is inferred. The fixtures’ electricity charges are illustrative tenant records, not evidence of a decided meter-allocation rule. The current snapshot validator checks exact-cent sample calculations; it is not a general-purpose bill-issuance calculator or a confirmed rounding policy.
 
 ### Manual charges and payments
 
 Water is a sample PHP 100.00 manual charge per tenant, based on each billing period’s occupants; no water meter model or calculation is added. Washing machine charges are optional manual PHP 100.00-per-room entries, so two occupants share one room charge.
 
-Payments and allocations are separate. Alex makes a partial PHP 1,000.00 October rent payment and separately pays water and electricity. Room 102’s one room-level rent charge remains unpaid while different occupant utilities have their own payment states. Jordan’s PHP 500.00 advance remains source-linked credit until explicitly allocated. Full, partial, advance, correction, reversal, and receipt issuance workflows are placeholders; there are no financial reducer actions.
+Payments and allocations are separate. Room 101 is fully settled in the sample. Room 102’s historical rent remains fully unpaid while its known November rent, water, and washing are paid; its electricity remains unresolved until a payment-time reading is entered. Room 104 has no current payments and two skipped electricity months represented by one cumulative obligation. Jordan’s PHP 500.00 advance remains source-linked credit until explicitly allocated. The only saving workflow is electricity payment confirmation. Rent/water/washing entry, advance use, corrections, reversals, and general receipt issuance remain placeholders; the standalone payment calculator does not save or allocate money.
 
-Receipt references are fictional, not official tax receipts or generated documents. Their stored allocation IDs describe issuance-time allocation history rather than a dynamically recomputed receipt.
+Confirmed electricity payments generate a receipt and retain the meter interval. Receipt references are fictional, not official tax receipts or generated documents. Their stored allocation IDs describe issuance-time allocation history rather than a dynamically recomputed receipt.
 
 ## Consistent sample ledger
 
@@ -76,16 +81,19 @@ All amounts below derive from fixture records, not dashboard-specific constants.
 | --- | ---: |
 | November rent charges (4 occupied rooms × PHP 3,500) | PHP 14,000.00 |
 | November manually entered water (7 occupants × PHP 100) | PHP 700.00 |
-| November electricity examples (4 rooms: PHP 156 + 143 + 156 + 156) | PHP 611.00 |
+| November electricity examples (Room 101 PHP 169 + Room 103 PHP 156) | PHP 325.00 |
 | Optional November washing machine charges (2 rooms × PHP 100) | PHP 200.00 |
-| **November issued charges** | **PHP 15,511.00** |
-| Explicitly allocated to November charges | PHP 7,912.00 |
-| **November outstanding** | **PHP 7,599.00** |
-| October charges paid during November | PHP 9,055.00 |
+| **November issued charges** | **PHP 15,225.00** |
+| Explicitly allocated to November charges | PHP 11,525.00 |
+| **November known outstanding** | **PHP 3,700.00** |
+| November electricity awaiting readings | 2 obligations, no amounts |
+| October finalized charges | PHP 19,142.00 |
+| Explicitly allocated to October charges | PHP 8,086.00 |
+| **October known outstanding** | **PHP 11,056.00** |
 | Unapplied advance received in November | PHP 500.00 |
-| **Cash received during November** | **PHP 17,467.00** |
+| **Cash received during November** | **PHP 20,111.00** |
 
-Ten November charges are paid and seven are unpaid; the seven unpaid charges are due November 20. Historical October arrears remain overdue. Room 101 has one room-level rent charge in each period, with October partially paid and November unpaid. Room 102 has one room-level November rent charge, one unpaid occupant water charge, and unpaid electricity. Room 103 is fully paid for November. Room 105’s two moved-out occupants have a fully settled October bill while their assignments and charge history remain visible.
+Twelve November charges are paid and three are unpaid. Historical October arrears remain overdue. Room 101 is fully paid across both sample periods. Room 102’s historical rent is exactly PHP 3,500.00 and unpaid; its November rent, water, and washing are paid, while cumulative electricity awaits a reading. Room 103 is fully paid for November but has historical October arrears. Room 104 has no payments and has skipped electricity since its 300 kWh September baseline; its rent and water remain known outstanding. Room 105’s two moved-out occupants have fully settled October bills while their assignments and charge history remain visible.
 
 The fixture factory generates fresh objects for reset/tests; it is not an executable bill-generation workflow. Contacts are invented, with reserved `example.com` email addresses and deliberately non-dialable `DEMO +63 000 ...` phone strings.
 
@@ -94,14 +102,14 @@ The fixture factory generates fresh objects for reset/tests; it is not an execut
 - **Dashboard:** financial overview, independent category payment status, five recent payments, upcoming charge due dates, and assignment-based occupancy.
 - **Tenants:** searchable directory, profiles, dated assignments/agreed amounts, tenant status, derived account balance/credit, and fictional contacts.
 - **Rooms:** private/shared configuration, full/partial/empty/maintenance states, dated occupants, and preserved history.
-- **Billing:** period selector, category matrix, detailed balances/status/due dates, effective-dated rates, confirmed readings, and charge snapshots.
-- **Payments & Receipts:** payment/allocation history, partial-payment examples, advance credit, and fictional receipt snapshots.
+- **Billing:** period selector, category matrix, detailed balances/status/due dates, effective-dated rates, payment-time meter entry, calculated cumulative preview, confirmed readings, and charge snapshots.
+- **Payments & Receipts:** payment/allocation history, confirmed electricity interval details, partial-payment examples, advance credit, and fictional receipt snapshots.
 - **Reports & Settings:** derived collection rows by sample period, confirmed/unconfirmed billing settings, seeded admin event, and explicit export/backup/recovery placeholders.
 
 Unfinished tools are collapsed under clearly marked “Coming later” sections, not decorative action buttons. localStorage is demo persistence, not production backup. Restore sample records is under Reports & Settings and replaces only the prototype snapshot with fresh fixtures after confirmation.
 
 ## Persistence compatibility
 
-The expanded schema uses envelope version **2**. The existing key `bhms:prototype:v1` is intentionally retained so version 1 snapshots can be detected and preserved. Loading an old schema shows fresh fixtures in memory and a recovery notice; saving remains disabled until the user explicitly confirms Restore sample records in Reports & Settings. No silent migration discards old notes or rewrites financial samples. The room-based UI revision does not change the stored shape or schema version; saved notes and rental records are preserved.
+The expanded schema uses envelope version **4**. The existing key `bhms:prototype:v1` is intentionally retained so older snapshots can be detected and preserved. Loading an older or invalid schema shows fresh fixtures in memory and a recovery notice; saving remains disabled until the user explicitly confirms Restore sample records in Reports & Settings. No silent migration discards old notes or rewrites financial samples.
 
-Runtime validation checks collection shapes, IDs, relationships, assignment dates/overlaps, occupied-room repair restrictions, safe-integer money, category-specific fields, reading/rate snapshots, allocation limits, source-credit reservations/consumption, receipt links, and correction/audit references. Bed counts do not restrict the number of rental records. A pure parser safely handles malformed JSON and incompatible envelopes. The repository also validates before writes and refuses invalid snapshots without replacing previously saved data. This is a useful prototype integrity boundary, not a replacement for future server validation and authorized financial transactions. localStorage is editable by browser users and is not secure financial storage.
+Runtime validation checks collection shapes, IDs, relationships, assignment dates/overlaps, occupied-room repair restrictions, safe-integer money, category-specific fields, unique electricity intervals, current-obligation baselines, reading/rate snapshots, allocation limits, source-credit reservations/consumption, receipt links, and correction/audit references. Bed counts do not restrict the number of rental records. A pure parser safely handles malformed JSON and incompatible envelopes. The repository also validates before writes and refuses invalid snapshots without replacing previously saved data. This is a useful prototype integrity boundary, not a replacement for future server validation and authorized financial transactions. localStorage is editable by browser users and is not secure financial storage.

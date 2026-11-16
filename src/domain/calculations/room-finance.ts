@@ -1,5 +1,5 @@
-import type { Charge, ChargeStatus, Payment, PrototypeAppState } from '@/domain/types/models'
-import { chargeBalance, chargePaid, chargeStatus, issuedCharges } from './summary'
+import type { Charge, ChargeStatus, Payment, PrototypeAppState, RoomPaymentStatus } from '@/domain/types/models'
+import { chargeBalance, chargePaid, chargeStatus, issuedCharges, unresolvedElectricity } from './summary'
 
 const categoryOrder: Charge['category'][] = ['RENT', 'ELECTRICITY', 'WATER', 'WASHING_MACHINE']
 
@@ -35,43 +35,68 @@ export interface FinancialTotals {
   billed: number
   paid: number
   outstanding: number
+  unresolved: number
   unpaid: number
   partial: number
   overdue: number
   status: ChargeStatus
 }
 
-export function financialTotals(data: PrototypeAppState, charges: Charge[], asOf: string): FinancialTotals {
+export function financialTotals(data: PrototypeAppState, charges: Charge[], asOf: string, unresolved = 0): FinancialTotals {
   const items = [...new Map(charges.filter(charge => charge.state === 'ISSUED' && charge.issuedOn <= asOf).map(charge => [charge.id, charge])).values()]
   const billed = items.reduce((sum, charge) => sum + charge.amountCents, 0)
   const paid = items.reduce((sum, charge) => sum + chargePaid(data, charge.id, asOf), 0)
   const outstanding = items.reduce((sum, charge) => sum + chargeBalance(data, charge, asOf), 0)
   return {
-    billed, paid, outstanding,
+    billed, paid, outstanding, unresolved,
     unpaid: items.filter(charge => chargeStatus(data, charge, asOf) === 'UNPAID').length,
     partial: items.filter(charge => chargeStatus(data, charge, asOf) === 'PARTIALLY_PAID').length,
     overdue: items.filter(charge => charge.dueDate < asOf && chargeBalance(data, charge, asOf) > 0).length,
-    status: outstanding === 0 ? 'PAID' : paid > 0 ? 'PARTIALLY_PAID' : 'UNPAID',
+    status: outstanding === 0 && unresolved === 0 ? 'PAID' : paid > 0 ? 'PARTIALLY_PAID' : 'UNPAID',
   }
+}
+
+/** Room status uses settled categories plus unresolved obligations, never money ratios alone. */
+export function roomPaymentStatus(data: PrototypeAppState, charges: Charge[], unresolved: number, asOf: string): RoomPaymentStatus {
+  if (charges.length === 0 && unresolved === 0) return 'NO_BILLS'
+  const settled = charges.filter(charge => chargeStatus(data, charge, asOf) === 'PAID').length
+  const unsettled = charges.length - settled + unresolved
+  if (unsettled === 0) return 'PAID'
+  return settled > 0 ? 'PARTLY_PAID' : 'NOT_YET_PAID'
 }
 
 export interface RoomFinance extends FinancialTotals {
   id: string
   context: FinancialRoom
   charges: Charge[]
+  paymentStatus: RoomPaymentStatus
+}
+
+/** Known money or an uncalculated electricity obligation both keep Pending Payment actionable. */
+export function roomHasPending(room: Pick<RoomFinance, 'outstanding' | 'unresolved'>): boolean {
+  return room.outstanding > 0 || room.unresolved > 0
 }
 
 /** A presentation grouping of distinct obligations, never a replacement room charge. */
 export function selectRoomFinance(data: PrototypeAppState, asOf: string, periodId?: string): RoomFinance[] {
-  const groups = new Map<string, { context: FinancialRoom; charges: Charge[] }>()
+  const groups = new Map<string, { context: FinancialRoom; charges: Charge[]; unresolved: number }>()
   for (const charge of issuedCharges(data, asOf, periodId)) {
     const context = chargeRoom(data, charge)
-    const group = groups.get(context.id) ?? { context, charges: [] }
+    const group = groups.get(context.id) ?? { context, charges: [], unresolved: 0 }
     group.charges.push(charge)
     groups.set(context.id, group)
   }
-  return [...groups].map(([id, group]) => ({ id, ...group, ...financialTotals(data, group.charges, asOf) }))
-    .sort((a, b) => a.context.label.localeCompare(b.context.label, 'en', { numeric: true }) || a.id.localeCompare(b.id))
+  for (const obligation of unresolvedElectricity(data, asOf, periodId)) {
+    const context = roomContext(data, obligation.roomId, 'period-assignment', 'Expected electricity bill; amount pending meter reading.')
+    if (!context) continue
+    const group = groups.get(context.id) ?? { context, charges: [], unresolved: 0 }
+    group.unresolved += 1
+    groups.set(context.id, group)
+  }
+  return [...groups].map(([id, group]) => ({
+    id, ...group, ...financialTotals(data, group.charges, asOf, group.unresolved),
+    paymentStatus: roomPaymentStatus(data, group.charges, group.unresolved, asOf),
+  })).sort((a, b) => a.context.label.localeCompare(b.context.label, 'en', { numeric: true }) || a.id.localeCompare(b.id))
 }
 
 export interface RoomDueGroup extends RoomFinance {
@@ -81,19 +106,32 @@ export interface RoomDueGroup extends RoomFinance {
 }
 
 export function selectRoomDues(data: PrototypeAppState, asOf: string): RoomDueGroup[] {
-  const groups = new Map<string, { context: FinancialRoom; charges: Charge[]; dueDate: string; periodId: string }>()
+  const groups = new Map<string, { context: FinancialRoom; charges: Charge[]; unresolved: number; dueDate: string; periodId: string }>()
   for (const charge of issuedCharges(data, asOf)) {
     if (charge.dueDate < asOf || chargeBalance(data, charge, asOf) <= 0) continue
     const context = chargeRoom(data, charge)
     // Combine categories sharing a room and due date; keep periods and dates separate.
     const id = JSON.stringify([context.id, charge.billingPeriodId, charge.dueDate])
-    const group = groups.get(id) ?? { context, charges: [], dueDate: charge.dueDate, periodId: charge.billingPeriodId }
+    const group = groups.get(id) ?? { context, charges: [], unresolved: 0, dueDate: charge.dueDate, periodId: charge.billingPeriodId }
     group.charges.push(charge)
     groups.set(id, group)
   }
+  for (const obligation of unresolvedElectricity(data, asOf)) {
+    if (obligation.dueDate < asOf) continue
+    const context = roomContext(data, obligation.roomId, 'period-assignment', 'Expected electricity bill; amount pending meter reading.')
+    if (!context) continue
+    const id = JSON.stringify([context.id, obligation.billingPeriodId, obligation.dueDate])
+    const group = groups.get(id) ?? { context, charges: [], unresolved: 0, dueDate: obligation.dueDate, periodId: obligation.billingPeriodId }
+    group.unresolved += 1
+    groups.set(id, group)
+  }
   return [...groups].map(([id, group]) => {
-    const categories = categoryOrder.filter(category => group.charges.some(charge => charge.category === category))
-    return { id, ...group, categories, ...financialTotals(data, group.charges, asOf) }
+    const categories = categoryOrder.filter(category => (category === 'ELECTRICITY' && group.unresolved > 0)
+      || group.charges.some(charge => charge.category === category))
+    return {
+      id, ...group, categories, ...financialTotals(data, group.charges, asOf, group.unresolved),
+      paymentStatus: roomPaymentStatus(data, group.charges, group.unresolved, asOf),
+    }
   }).sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.context.label.localeCompare(b.context.label, 'en', { numeric: true }) || a.id.localeCompare(b.id))
 }
 

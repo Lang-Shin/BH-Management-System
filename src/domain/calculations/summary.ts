@@ -1,5 +1,10 @@
 import type { Charge, ChargeStatus, PrototypeAppState, Room, RoomAssignment, TenantCredit } from '@/domain/types/models'
 
+export function unresolvedElectricity(data: PrototypeAppState, asOf: string, periodId?: string, roomId?: string) {
+  return data.electricityBillObligations.filter(item => item.state === 'AWAITING_READING' && item.createdAt <= asOf
+    && (!periodId || item.billingPeriodId === periodId) && (!roomId || item.roomId === roomId))
+}
+
 export function activeAssignments(data: PrototypeAppState, asOf: string): RoomAssignment[] {
   return data.roomAssignments.filter(a => a.startDate <= asOf && (a.endDate === null || a.endDate >= asOf))
 }
@@ -65,13 +70,14 @@ export function selectSummary(data: PrototypeAppState, asOf: string, periodId?: 
   const charges = issuedCharges(data, asOf, periodId)
   const billed = charges.reduce((sum, c) => sum + c.amountCents, 0)
   const applied = charges.reduce((sum, c) => sum + chargePaid(data, c.id, asOf), 0)
+  const unresolved = unresolvedElectricity(data, asOf, periodId).length
   const period = data.billingPeriods.find(p => p.id === periodId)
   const received = data.payments.filter(p => p.state === 'RECORDED' && p.paidOn <= asOf
     && (!period || (p.paidOn >= period.startDate && p.paidOn <= period.endDate))).reduce((sum, p) => sum + p.amountCents, 0)
   return {
     tenants: data.tenants.filter(t => t.status === 'ACTIVE').length,
     ...selectRoomSummary(data, asOf),
-    billed, applied, received, outstanding: billed - applied,
+    billed, applied, received, outstanding: billed - applied, unresolved,
     credit: data.tenantCredits.reduce((sum, c) => sum + creditRemaining(data, c, asOf), 0),
     overdue: charges.filter(c => c.dueDate < asOf && chargeBalance(data, c, asOf) > 0).length,
     paid: charges.filter(c => chargeStatus(data, c, asOf) === 'PAID').length,

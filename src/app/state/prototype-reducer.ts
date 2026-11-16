@@ -2,6 +2,7 @@ import { createDemoData, DEMO_DATE } from '@/data/fixtures/demo'
 import type { PrototypeData } from '@/domain/types/models'
 import type { StateAction } from './actions'
 import { activeAssignments } from '@/domain/calculations/summary'
+import { prepareElectricityPayment } from '@/domain/calculations/electricity-payment'
 
 export function prototypeReducer(state: PrototypeData, action: StateAction): PrototypeData {
   switch (action.type) {
@@ -23,6 +24,10 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
           ? { ...room, status: room.status === 'available' ? 'maintenance' : 'available' }
           : room),
       }
+    }
+    case 'electricity/paymentConfirmed': {
+      const result = prepareElectricityPayment(state, action.obligationId, action.currentReadingMilliKwh, action.paidOn)
+      return result.ok ? result.data : state
     }
     case 'demo/reset':
       return createDemoData()

@@ -19,7 +19,7 @@ function dataWithSingleCharge(dueDate: string, amountCents = 1_000, state: Charg
     entryMethod: 'MANUAL',
     correction: null,
   }
-  return { ...data, charges: [charge], payments: [], paymentAllocations: [], tenantCredits: [], rooms: [] }
+  return { ...data, charges: [charge], electricityBillObligations: [], payments: [], paymentAllocations: [], tenantCredits: [], rooms: [] }
 }
 
 describe('notification selector', () => {
@@ -29,17 +29,17 @@ describe('notification selector', () => {
 
     expect(notifications).toEqual([
       {
-        id: 'overdue:11:1038600',
+        id: 'overdue:8:1105600:2',
         kind: 'overdue',
-        title: '11 bills are past due',
-        description: `${formatMoney(1_038_600)} still to pay. Open Billing to see who owes what.`,
+        title: '8 bills are past due',
+        description: `${formatMoney(1_105_600)} known still to pay. Plus 2 electricity bills awaiting a meter reading. Open Billing to see who owes what.`,
         href: '/billing',
       },
       {
-        id: 'due-soon:2026-11-20:7:759900',
+        id: 'due-soon:2026-11-20:3:370000',
         kind: 'due-soon',
-        title: '7 bills are due in the next 7 days',
-        description: `${formatMoney(759_900)} still to pay.`,
+        title: '3 bills are due in the next 7 days',
+        description: `${formatMoney(370_000)} still to pay.`,
         href: '/billing',
       },
       {
@@ -76,10 +76,10 @@ describe('notification selector', () => {
     const data = createDemoData()
     const notifications = selectNotifications(data, DEMO_DATE)
     expect(notifications.find(item => item.kind === 'overdue')).toMatchObject({
-      title: '11 bills are past due',
-      description: `${formatMoney(1_038_600)} still to pay. Open Billing to see who owes what.`,
+      title: '8 bills are past due',
+      description: `${formatMoney(1_105_600)} known still to pay. Plus 2 electricity bills awaiting a meter reading. Open Billing to see who owes what.`,
     })
-    expect(notifications.find(item => item.kind === 'overdue')?.description).not.toContain(formatMoney(759_900))
+    expect(notifications.find(item => item.kind === 'overdue')?.description).not.toContain(formatMoney(370_000))
 
     expect(selectNotifications(dataWithSingleCharge('2026-11-12', 1_000, 'VOIDED'), DEMO_DATE)).toEqual([])
   })

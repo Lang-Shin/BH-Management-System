@@ -2,8 +2,8 @@ import { useRef, useState } from 'react'
 import { ReceiptText, Wallet, CircleAlert, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/shared/status-badge'
-import { selectRoomFinance } from '@/domain/calculations/room-finance'
-import { CHARGE_STATUS_LABELS } from '@/lib/labels'
+import { roomHasPending, selectRoomFinance } from '@/domain/calculations/room-finance'
+import { ROOM_PAYMENT_STATUS_LABELS } from '@/lib/labels'
 import { roomReportCsv } from './room-report'
 import { PendingPaymentsDialog } from '@/features/dashboard/pending-payments-dialog'
 import { PageHeader, PreviewNotice, StatCard } from '@/components/shared/page'
@@ -21,6 +21,7 @@ import type { AuditEvent } from '@/domain/types/models'
 const changeLabels: Record<AuditEvent['action'], string> = {
   DEMO_SEEDED: 'Sample records added', READING_CORRECTED: 'Meter reading corrected', CHARGE_CORRECTED: 'Bill corrected',
   PAYMENT_CORRECTED: 'Payment corrected', ALLOCATION_REVERSED: 'Payment removed from a bill',
+  ELECTRICITY_PAYMENT_RECORDED: 'Electricity payment recorded',
 }
 
 export default function Reports() {
@@ -52,18 +53,19 @@ export default function Reports() {
     <section className="grid gap-5 xl:grid-cols-3" aria-label="Monthly money overview">
       <StatCard label="Money received" value={formatMoney(summary.received)} detail="All payments received in November." icon={Wallet} />
       <StatCard label="Already paid" value={formatMoney(summary.applied)} detail="Paid toward November’s bills." icon={ReceiptText} />
-      <StatCard label="Still to pay" value={formatMoney(summary.outstanding)} detail="What tenants still owe for November." icon={CircleAlert} />
+      <StatCard label={summary.unresolved > 0 ? 'Known outstanding' : 'Still to pay'} value={formatMoney(summary.outstanding)} detail={summary.unresolved > 0 ? `Known November amounts only; ${summary.unresolved} electricity ${summary.unresolved === 1 ? 'bill' : 'bills'} awaiting a meter reading.` : 'What tenants still owe for November.'} icon={CircleAlert} />
     </section>
     <section className="mt-8" aria-labelledby="monthly-reports"><h2 id="monthly-reports" className="mb-2 text-xl font-semibold">Monthly summary</h2><p className="mb-5 text-base text-muted-foreground">Money received may include payments for older bills or money paid in advance.</p><DataTable rows={periods} caption="Monthly summary" columns={[
       { key: 'period', label: 'Month', render: p => p.label },
       { key: 'billed', label: 'Total bills', align: 'right', render: p => formatMoney(p.summary.billed) },
       { key: 'applied', label: 'Paid for these bills', align: 'right', render: p => formatMoney(p.summary.applied) },
-      { key: 'balance', label: 'Still to pay', align: 'right', render: p => formatMoney(p.summary.outstanding) },
+      { key: 'balance', label: 'Known still to pay', align: 'right', render: p => formatMoney(p.summary.outstanding) },
+      { key: 'unresolved', label: 'Electricity awaiting reading', align: 'right', render: p => p.summary.unresolved > 0 ? `${p.summary.unresolved} bill${p.summary.unresolved === 1 ? '' : 's'}` : 'NONE' },
       { key: 'received', label: 'Money received', align: 'right', render: p => formatMoney(p.summary.received) },
     ]} /></section>
     <section className="mt-8" aria-labelledby="room-report-title">
       <h2 id="room-report-title" className="text-xl font-semibold">Room financial summary</h2>
-      <p className="mt-2 text-sm text-muted-foreground">Individual charges grouped by historical room context, not joint liability. Total billed, total paid, and payment status describe the selected report month. Pending Payment checks every unpaid billing period for the room. Unallocated advances are not counted as bill payments.</p>
+      <p className="mt-2 text-sm text-muted-foreground">Individual charges grouped by historical room context, not joint liability. Total billed, total paid, and payment status describe the selected report month. Electricity without a current reading is unresolved and has no peso amount. Pending Payment checks every unpaid or unresolved billing period for the room. Unallocated advances are not counted as bill payments.</p>
       <div className="my-5 flex flex-wrap items-end justify-between gap-4"><div><label htmlFor="room-report-period" className="mb-2 block text-sm font-semibold">Report month</label><select id="room-report-period" value={roomPeriod} onChange={event => setRoomPeriod(event.target.value)} className="min-h-12 max-w-full rounded-lg border bg-card px-3">{data.billingPeriods.map(period => <option key={period.id} value={period.id}>{period.label}</option>)}</select></div><Button variant="outline" onClick={downloadRoomReport}><Download aria-hidden="true" />Download room CSV</Button></div>
       <DataTable rows={roomRows} caption="Room financial summary" columns={[
         { key: 'room', label: 'Room', render: row => <span className="font-semibold">{row.context.label}</span> },
@@ -71,13 +73,13 @@ export default function Reports() {
         { key: 'paid', label: 'Total paid', align: 'right', render: row => formatMoney(row.paid) },
         { key: 'pending', label: 'Pending payment', render: row => {
           const allPeriodRoom = allRoomRows.find(item => item.id === row.id)
-          return allPeriodRoom && allPeriodRoom.outstanding > 0
+          return allPeriodRoom && roomHasPending(allPeriodRoom)
             ? <Button variant="outline" aria-label={`View pending payments for ${row.context.label}`} onClick={event => { pendingTrigger.current = event.currentTarget; setPendingRoomId(row.id) }}>View Details</Button>
             : <span className="text-sm text-muted-foreground">NONE</span>
         } },
-        { key: 'status', label: 'Payment status', render: row => row.charges.length > 0 ? <StatusBadge status={CHARGE_STATUS_LABELS[row.status]} /> : <span className="text-sm text-muted-foreground">No bills</span> },
+        { key: 'status', label: 'Payment status', render: row => <StatusBadge status={ROOM_PAYMENT_STATUS_LABELS[row.paymentStatus]} /> },
       ]} />
-      <p className="mt-4 text-sm" aria-label="Room report reconciliation">All room/context totals: billed {formatMoney(roomTotals.billed)} · applied {formatMoney(roomTotals.applied)} · outstanding {formatMoney(roomTotals.outstanding)}. Includes any room-needs-review rows. Pending Payment uses all unpaid billing periods, while the other columns describe {data.billingPeriods.find(period => period.id === roomPeriod)?.label ?? 'the selected month'}. Cash received is reported separately in Monthly summary.</p>
+      <p className="mt-4 text-sm" aria-label="Room report reconciliation">All room/context totals: billed {formatMoney(roomTotals.billed)} · applied {formatMoney(roomTotals.applied)} · known outstanding {formatMoney(roomTotals.outstanding)}{roomTotals.unresolved > 0 ? ` · ${roomTotals.unresolved} electricity ${roomTotals.unresolved === 1 ? 'bill' : 'bills'} awaiting a meter reading (amount not included)` : ''}. Includes any room-needs-review rows. Total billed excludes uncalculated electricity. Pending Payment uses all unpaid or unresolved billing periods, while the other columns describe {data.billingPeriods.find(period => period.id === roomPeriod)?.label ?? 'the selected month'}. Cash received is reported separately in Monthly summary.</p>
       {pendingRoom && <PendingPaymentsDialog key={pendingRoom.id} data={data} room={pendingRoom} asOf={DEMO_DATE} onClose={() => setPendingRoomId(null)} onReturnFocus={() => pendingTrigger.current?.focus()} />}
     </section>
     <Card className="mt-8 shadow-none"><CardHeader><CardTitle>House settings</CardTitle><CardDescription>You can view these settings. Changing them will be added later.</CardDescription></CardHeader><CardContent><dl className="grid gap-6 text-base sm:grid-cols-2">{([

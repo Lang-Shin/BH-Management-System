@@ -27,7 +27,7 @@ export default function Payments() {
 
   return <>
     <PageHeader title="Payments & Receipts" description="See who paid, when they paid, and what the payment was for." />
-    <PreviewNotice>These payments and receipts are examples. Recording new payments will be added later.</PreviewNotice>
+    <PreviewNotice>These are sample records. Electricity payments are recorded from Billing or a room’s Pending Payments; other payment workflows will be added later.</PreviewNotice>
     <section className="mb-7 grid gap-5 xl:grid-cols-3" aria-label="Payments overview">
       <StatCard label="Money received" value={formatMoney(summary.received)} detail="All payments received in November." icon={Wallet} />
       <StatCard label="Advance payments" value={formatMoney(summary.credit)} detail="Money kept for a future bill." icon={CircleDollarSign} />
@@ -51,7 +51,7 @@ export default function Payments() {
       { key: 'actions', label: 'Actions', render: r => <Button variant="outline" aria-label={`View receipt ${r.receiptNumber}`} onClick={event => { receiptTrigger.current = event.currentTarget; setSelectedReceiptId(r.id) }}>View receipt</Button> },
     ]} /></details>
     <WorkflowPlaceholders title="More payment tools" items={[
-      { title: 'Record a payment', description: 'Saving a new full or part payment will be available later.' },
+      { title: 'Record other payments', description: 'Electricity payment is available from Billing or Pending Payments. Rent, water, washing, and advance entry will be available later.' },
       { title: 'Use an advance payment', description: 'You will be able to choose which bill an advance payment pays for.' },
       { title: 'Print or send a receipt', description: 'Making a receipt for a tenant will be added later.' },
       { title: 'Correct a payment', description: 'Corrections will keep the original record and a note explaining the change.' },

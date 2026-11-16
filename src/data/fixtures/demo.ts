@@ -53,20 +53,25 @@ export function createDemoData(): PrototypeAppState {
     { id: DEMO_PERIOD, label: 'November 2026 (sample)', startDate: '2026-11-01', endDate: '2026-11-30', status: 'OPEN' as const },
   ]
   const meterSeries = [
-    { room: 1, values: [300_000, 312_000, 324_000] },
-    { room: 2, values: [120_000, 133_000, 144_000] },
+    { room: 1, values: [300_000, 312_000, 325_000] },
+    { room: 2, values: [120_000] },
     { room: 3, values: [180_000, 192_000, 204_000] },
-    { room: 4, values: [220_000, 230_000, 242_000] },
+    { room: 4, values: [300_000] },
     { room: 5, values: [90_000, 100_000] },
   ]
   const electricityMeters = meterSeries.map(({ room }) => ({
     id: `meter-room-${room}`, label: `Room ${100 + room} meter`, serialNumber: `FICTIONAL-MTR-${100 + room}`, ownership: 'UNCONFIRMED' as const,
   }))
-  const meterReadings: MeterReading[] = meterSeries.flatMap(({ room, values }) => [
-    { id: `reading-room-${room}-sep`, meterId: `meter-room-${room}`, readOn: '2026-09-30', readingMilliKwh: values[0]! },
-    { id: `reading-room-${room}-oct`, meterId: `meter-room-${room}`, readOn: '2026-10-31', readingMilliKwh: values[1]! },
-    ...(values[2] === undefined ? [] : [{ id: `reading-room-${room}-nov`, meterId: `meter-room-${room}`, readOn: '2026-11-10', readingMilliKwh: values[2]! }]),
-  ].map(reading => ({ ...reading, status: 'CONFIRMED' as const, confirmedBy: 'demo-admin', correction: null })))
+  const readingDates = [
+    ['sep', '2026-09-30'],
+    ['oct', '2026-10-31'],
+    ['nov', '2026-11-10'],
+  ] as const
+  const meterReadings: MeterReading[] = meterSeries.flatMap(({ room, values }) => values.map((readingMilliKwh, index) => {
+    const [suffix, readOn] = readingDates[index]!
+    return { id: `reading-room-${room}-${suffix}`, meterId: `meter-room-${room}`, readOn, readingMilliKwh,
+      status: 'CONFIRMED' as const, confirmedBy: 'demo-admin', correction: null }
+  }))
   const electricityRates = [
     { id: 'rate-oct', label: 'Historical sample rate', rateCentsPerKwh: DEMO_RATES.electricityCentsPerKwh, effectiveFrom: '2026-10-01' },
     { id: 'rate-nov', label: 'Current sample rate', rateCentsPerKwh: DEMO_RATES.electricityCentsPerKwh, effectiveFrom: '2026-11-01' },
@@ -95,41 +100,56 @@ export function createDemoData(): PrototypeAppState {
         charges.push({ ...base, id: `water-${spec.key}-${occupant.id}`, tenantId: occupant.id, category: 'WATER', description: 'Room water — charged per tenant', amountCents: DEMO_RATES.waterCentsPerTenant, entryMethod: 'MANUAL' })
       }
       const utilityTenant = `tenant-${utilityPayer[roomId]}`
-      const previousReading = meterReadings.find(reading => reading.id === `reading-${roomId}-${spec.previous}`)!
-      const currentReading = meterReadings.find(reading => reading.id === `reading-${roomId}-${spec.current}`)!
-      const consumptionMilliKwh = currentReading.readingMilliKwh - previousReading.readingMilliKwh
-      charges.push({
-        ...base, id: `electricity-${spec.key}-${roomId}`, tenantId: utilityTenant, category: 'ELECTRICITY', description: 'Room electricity — consumed meter difference',
-        amountCents: electricityCents(consumptionMilliKwh), issuedOn: spec.electricityIssuedOn,
-        electricity: {
-          meterId: `meter-room-${roomId.slice(5)}`, previousReadingId: previousReading.id, currentReadingId: currentReading.id,
-          previousReadingMilliKwh: previousReading.readingMilliKwh, currentReadingMilliKwh: currentReading.readingMilliKwh,
-          consumptionMilliKwh, rateId: spec.rateId, appliedRateCentsPerKwh: DEMO_RATES.electricityCentsPerKwh,
-          appliedRateEffectiveFrom: spec.rateEffectiveFrom,
-        },
-      })
+      // Electricity is collected cumulatively when payment is made, so these rooms
+      // intentionally have no monthly electricity charge or fabricated placeholder.
+      const awaitingReading = roomId === 'room-2' || roomId === 'room-4'
+      if (!awaitingReading) {
+        const previousReading = meterReadings.find(reading => reading.id === `reading-${roomId}-${spec.previous}`)!
+        const currentReading = meterReadings.find(reading => reading.id === `reading-${roomId}-${spec.current}`)!
+        const consumptionMilliKwh = currentReading.readingMilliKwh - previousReading.readingMilliKwh
+        charges.push({
+          ...base, id: `electricity-${spec.key}-${roomId}`, tenantId: utilityTenant, category: 'ELECTRICITY', description: 'Room electricity — consumed meter difference',
+          amountCents: electricityCents(consumptionMilliKwh), issuedOn: spec.electricityIssuedOn,
+          electricity: {
+            intervalId: `meter-room-${roomId.slice(5)}:${previousReading.id}>${currentReading.id}`,
+            meterId: `meter-room-${roomId.slice(5)}`, previousReadingId: previousReading.id, currentReadingId: currentReading.id,
+            previousReadingMilliKwh: previousReading.readingMilliKwh, currentReadingMilliKwh: currentReading.readingMilliKwh,
+            consumptionMilliKwh, rateId: spec.rateId, appliedRateCentsPerKwh: DEMO_RATES.electricityCentsPerKwh,
+            appliedRateEffectiveFrom: spec.rateEffectiveFrom,
+          },
+        })
+      }
       if (washingRooms.has(roomId)) {
         charges.push({ ...base, id: `washing-${spec.key}-${roomId}`, tenantId: utilityTenant, category: 'WASHING_MACHINE', description: 'Optional washing machine — charged once per room', amountCents: DEMO_RATES.washingCentsPerRoom, entryMethod: 'MANUAL' })
       }
     }
   }
 
+  const electricityBillObligations = [
+    { id: 'electricity-nov-room-2-awaiting', roomId: 'room-2', tenantId: 'tenant-2', billingPeriodId: 'period-nov',
+      meterId: 'meter-room-2', previousReadingId: 'reading-room-2-sep', createdAt: '2026-10-01', dueDate: '2026-11-20',
+      state: 'AWAITING_READING' as const },
+    { id: 'electricity-nov-room-4-awaiting', roomId: 'room-4', tenantId: 'tenant-5', billingPeriodId: 'period-nov',
+      meterId: 'meter-room-4', previousReadingId: 'reading-room-4-sep', createdAt: '2026-10-01', dueDate: '2026-11-20',
+      state: 'AWAITING_READING' as const },
+  ]
+
   const payments: Payment[] = []
   const paymentAllocations: PaymentAllocation[] = []
   const examples = [
     { id: 'payment-old', tenantId: 'tenant-10', paidOn: '2026-11-02', items: [['rent-oct-room-5', 350_000], ['water-oct-tenant-10', 10_000], ['electricity-oct-room-5', 13_000], ['washing-oct-room-5', 10_000]] },
-    { id: 'payment-oct-1', tenantId: 'tenant-1', paidOn: '2026-11-02', items: [['rent-oct-room-1', 100_000], ['water-oct-tenant-1', 10_000], ['electricity-oct-room-1', 15_600]] },
-    { id: 'payment-oct-2', tenantId: 'tenant-2', paidOn: '2026-11-02', items: [['water-oct-tenant-2', 10_000], ['electricity-oct-room-2', 16_900], ['washing-oct-room-2', 10_000]] },
-    { id: 'payment-oct-4-rent', tenantId: 'tenant-4', paidOn: '2026-11-02', items: [['rent-oct-room-2', 350_000]] },
+    { id: 'payment-oct-1', tenantId: 'tenant-1', paidOn: '2026-11-02', items: [['rent-oct-room-1', 350_000], ['water-oct-tenant-1', 10_000], ['electricity-oct-room-1', 15_600], ['washing-oct-room-1', 10_000]] },
+    { id: 'payment-oct-2', tenantId: 'tenant-2', paidOn: '2026-11-02', items: [['water-oct-tenant-2', 10_000], ['washing-oct-room-2', 10_000]] },
+    { id: 'payment-oct-4-water', tenantId: 'tenant-4', paidOn: '2026-11-02', items: [['water-oct-tenant-4', 10_000]] },
     { id: 'payment-casey-oct', tenantId: 'tenant-7', paidOn: '2026-11-02', items: [['water-oct-tenant-7', 10_000]] },
-    { id: 'payment-1-water', tenantId: 'tenant-1', paidOn: '2026-11-08', items: [['water-nov-tenant-1', 10_000]] },
-    { id: 'payment-1-electricity', tenantId: 'tenant-1', paidOn: '2026-11-11', items: [['electricity-nov-room-1', 15_600]] },
+    { id: 'payment-1-rent-water-washing', tenantId: 'tenant-1', paidOn: '2026-11-08', items: [['rent-nov-room-1', 350_000], ['water-nov-tenant-1', 10_000], ['washing-nov-room-1', 10_000]] },
+    { id: 'payment-1-electricity', tenantId: 'tenant-1', paidOn: '2026-11-11', items: [['electricity-nov-room-1', 16_900]] },
     { id: 'payment-2-water', tenantId: 'tenant-2', paidOn: '2026-11-06', items: [['water-nov-tenant-2', 10_000]] },
     { id: 'payment-2-washing', tenantId: 'tenant-2', paidOn: '2026-11-06', items: [['washing-nov-room-2', 10_000]] },
     { id: 'payment-3', tenantId: 'tenant-3', paidOn: '2026-11-05', items: [['rent-nov-room-3', 350_000], ['water-nov-tenant-3', 10_000]] },
     { id: 'payment-6-utilities', tenantId: 'tenant-6', paidOn: '2026-11-10', items: [['water-nov-tenant-6', 10_000], ['electricity-nov-room-3', 15_600]] },
-    { id: 'payment-4-rent', tenantId: 'tenant-5', paidOn: '2026-11-07', items: [['rent-nov-room-4', 350_000]] },
-    { id: 'payment-8-water', tenantId: 'tenant-8', paidOn: '2026-11-12', items: [['water-nov-tenant-8', 10_000]] },
+    { id: 'payment-2-rent', tenantId: 'tenant-4', paidOn: '2026-11-07', items: [['rent-nov-room-2', 350_000]] },
+    { id: 'payment-2-water-2', tenantId: 'tenant-4', paidOn: '2026-11-12', items: [['water-nov-tenant-4', 10_000]] },
   ] satisfies { id: string; tenantId: string; paidOn: string; items: [string, number][] }[]
   examples.forEach((example, index) => {
     payments.push({ id: example.id, tenantId: example.tenantId, paidOn: example.paidOn, amountCents: example.items.reduce((sum, [, amount]) => sum + amount, 0), method: index % 2 ? 'cash' : 'bank-transfer', state: 'RECORDED', correction: null })
@@ -139,5 +159,5 @@ export function createDemoData(): PrototypeAppState {
   const tenantCredits = [{ id: 'credit-6', tenantId: 'tenant-6', sourcePaymentId: 'payment-advance', amountCents: 50_000, createdOn: '2026-11-12' }]
   const receipts = payments.map((payment, index) => ({ id: `receipt-${index + 1}`, paymentId: payment.id, receiptNumber: `DEMO-RCT-${String(index + 1).padStart(3, '0')}`, issuedOn: payment.paidOn, amountCents: payment.amountCents, allocationIds: paymentAllocations.filter(a => a.paymentId === payment.id).map(a => a.id), state: 'ISSUED' as const }))
   const auditEvents = [{ id: 'audit-seed', actorId: 'demo-admin', occurredOn: DEMO_DATE, action: 'DEMO_SEEDED' as const, entityType: 'PROTOTYPE' as const, entityId: 'demo-workspace', reason: 'Fictional fixture snapshot prepared; no real transaction or authenticated actor.', beforeSnapshot: null, afterSnapshot: 'Sample records loaded' }]
-  return { tenants, rooms, roomAssignments, electricityMeters, meterReadings, electricityRates, billingPeriods, charges, payments, paymentAllocations, tenantCredits, receipts, auditEvents }
+  return { tenants, rooms, roomAssignments, electricityMeters, meterReadings, electricityBillObligations, electricityRates, billingPeriods, charges, payments, paymentAllocations, tenantCredits, receipts, auditEvents }
 }

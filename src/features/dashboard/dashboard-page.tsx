@@ -35,7 +35,7 @@ export default function Dashboard() {
     <section aria-label="Money overview" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <StatCard label="Total billed" value={formatMoney(summary.billed)} detail="November’s issued bills." icon={ReceiptText} />
       <StatCard label="Total collected" value={formatMoney(summary.applied)} detail="Already paid toward November’s bills." icon={Banknote} />
-      <StatCard label="Total outstanding" value={formatMoney(summary.outstanding)} detail="Still to pay for November." icon={CircleAlert} />
+      <StatCard label={summary.unresolved > 0 ? 'Known outstanding' : 'Total outstanding'} value={formatMoney(summary.outstanding)} detail={summary.unresolved > 0 ? `Known amounts only; ${summary.unresolved} electricity ${summary.unresolved === 1 ? 'bill' : 'bills'} awaiting a meter reading.` : 'Still to pay for November.'} icon={CircleAlert} />
       <StatCard label="Collection rate" value={`${collectionRate.toFixed(1)}%`} detail="Collected ÷ billed for November." icon={TrendingUp} />
     </section>
     <div className="my-6 grid items-start gap-6 xl:grid-cols-2">
@@ -53,7 +53,9 @@ export default function Dashboard() {
       { key: 'room', label: 'Room', render: c => <span className="font-semibold">{c.context.label}</span> },
       { key: 'bill', label: 'Bill for', render: c => <button type="button" className="upcoming-bill-button" aria-label={`Show Bill for ${c.context.label}`} onClick={event => { billTrigger.current = event.currentTarget; setSelectedRoomId(c.context.id) }}><span className="animated-forest-underline">Show Bill</span><ChevronRight aria-hidden="true" /></button> },
       { key: 'period', label: 'Month', render: c => data.billingPeriods.find(period => period.id === c.periodId)?.label },
-      { key: 'balance', label: 'Outstanding', align: 'right', render: c => formatMoney(c.outstanding) },
+      { key: 'balance', label: 'Outstanding', align: 'right', render: c => c.unresolved > 0 && c.outstanding === 0
+        ? <span className="text-sm font-semibold">Amount pending calculation</span>
+        : <div><span>{formatMoney(c.outstanding)}</span>{c.unresolved > 0 && <p className="mt-1 text-xs text-muted-foreground">plus electricity awaiting reading</p>}</div> },
       { key: 'status', label: 'Status', render: c => <StatusBadge status={CHARGE_STATUS_LABELS[c.status]} /> },
     ]} /></section>
     {selectedRoom && <PendingPaymentsDialog key={selectedRoom.id} data={data} room={selectedRoom} asOf={DEMO_DATE} onClose={() => setSelectedRoomId(null)} onReturnFocus={() => billTrigger.current?.focus()} />}

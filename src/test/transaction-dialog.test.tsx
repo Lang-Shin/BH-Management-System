@@ -57,7 +57,9 @@ describe('Payment History transaction dialog', () => {
     await user.click(screen.getByRole('button', { name: /See Transaction/ }))
     let dialog = screen.getByRole('dialog', { name: 'Transaction Details' })
     expect(dialog).toHaveTextContent('Electricity')
-    expect(dialog).toHaveTextContent('₱156.00')
+    expect(dialog).toHaveTextContent('₱169.00')
+    expect(dialog).toHaveTextContent('312 → 325 kWh')
+    expect(dialog).toHaveTextContent('13 kWh × ₱13.00/kWh')
     expect(dialog).not.toHaveTextContent('Rent')
     electricityRender.unmount()
 
@@ -72,16 +74,16 @@ describe('Payment History transaction dialog', () => {
   it('shows the actual allocated amount for a partial payment', async () => {
     const user = userEvent.setup()
     const data = createDemoData()
-    const original = paymentFrom(data, 'payment-3')
+    const original = paymentFrom(data, 'payment-2-water')
     const payment: Payment = { ...original, id: 'partial-test', amountCents: 5_000, paidOn: DEMO_DATE }
     data.payments = [payment]
-    data.paymentAllocations = [{ id: 'partial-rent', paymentId: payment.id, chargeId: 'rent-nov-room-3', amountCents: 5_000, allocatedOn: DEMO_DATE, state: 'ACTIVE', creditId: null, reversalAuditEventId: null }]
+    data.paymentAllocations = [{ id: 'partial-water', paymentId: payment.id, chargeId: 'water-nov-tenant-2', amountCents: 5_000, allocatedOn: DEMO_DATE, state: 'ACTIVE', creditId: null, reversalAuditEventId: null }]
     data.receipts = []
     renderPayment(data, payment)
     await user.click(screen.getByRole('button', { name: /See Transaction/ }))
     const dialog = screen.getByRole('dialog', { name: 'Transaction Details' })
     expect(dialog).toHaveTextContent(formatMoney(5_000))
-    expect(dialog).toHaveTextContent('Rent')
+    expect(dialog).toHaveTextContent('Water')
     expect(dialog).toHaveTextContent('No receipt yet')
     expect(dialog).not.toHaveTextContent('Unallocated')
   })
@@ -118,7 +120,7 @@ describe('Payment History transaction dialog', () => {
   it('closes with X, Done, and Escape, restores focus, and leaves records unchanged', async () => {
     const user = userEvent.setup()
     const data = createDemoData()
-    const payment = paymentFrom(data, 'payment-1-water')
+    const payment = paymentFrom(data, 'payment-2-water')
     const before = JSON.stringify(data)
     renderPayment(data, payment)
     const trigger = screen.getByRole('button', { name: /See Transaction/ })
