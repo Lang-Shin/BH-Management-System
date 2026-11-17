@@ -26,6 +26,8 @@ export interface Room {
   kind: 'PRIVATE' | 'SHARED'
   status: 'available' | 'maintenance'
   categoryId: RoomCategoryId
+  /** Current/future subscription; issued washing charges remain historical snapshots. */
+  washingMachineEnabled: boolean
 }
 
 export interface RoomAssignment {

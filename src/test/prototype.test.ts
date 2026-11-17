@@ -124,7 +124,7 @@ describe('prototype reducer and persistence', () => {
     expect(changed.tenants[0]?.notes).toBe('Sample reminder')
     expect(await localStorageRepository.save(changed)).toBeNull()
     expect((await localStorageRepository.load()).data).toEqual(changed)
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 5)
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 6)
   })
 
   it('protects occupied rooms and preserves historical assignments during maintenance toggles', () => {
@@ -139,7 +139,7 @@ describe('prototype reducer and persistence', () => {
     expect(prototypeReducer(changed, { type: 'demo/reset' })).toEqual(createDemoData())
   })
 
-  it.each(['{broken', JSON.stringify({ version: 1, data: { tenants: [] } }), JSON.stringify({ version: 2, data: createDemoData() }), JSON.stringify({ version: 3, data: createDemoData() }), JSON.stringify({ version: 4, data: createDemoData() }), JSON.stringify({ version: 99, data: createDemoData() }), JSON.stringify({ version: 5, data: {} })])('preserves malformed or unsupported storage until an explicit reset: %s', async raw => {
+  it.each(['{broken', JSON.stringify({ version: 1, data: { tenants: [] } }), JSON.stringify({ version: 2, data: createDemoData() }), JSON.stringify({ version: 3, data: createDemoData() }), JSON.stringify({ version: 4, data: createDemoData() }), JSON.stringify({ version: 99, data: createDemoData() }), JSON.stringify({ version: 5, data: createDemoData() }), JSON.stringify({ version: 6, data: {} })])('preserves malformed or unsupported storage until an explicit reset: %s', async raw => {
     localStorage.setItem(STORAGE_KEY, raw)
     const loaded = await localStorageRepository.load()
     expect(loaded.data).toEqual(createDemoData())

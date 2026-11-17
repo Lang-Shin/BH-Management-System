@@ -26,6 +26,13 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
           : room),
       }
     }
+    case 'room/washingMachineUpdated':
+      return {
+        ...state,
+        rooms: state.rooms.map(room => room.id === action.roomId
+          ? { ...room, washingMachineEnabled: action.enabled }
+          : room),
+      }
     case 'electricity/paymentConfirmed': {
       const result = prepareElectricityPayment(state, action.obligationId, action.currentReadingMilliKwh, action.paidOn)
       return result.ok ? result.data : state

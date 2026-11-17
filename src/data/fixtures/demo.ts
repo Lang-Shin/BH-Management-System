@@ -29,12 +29,12 @@ export function createDemoData(): PrototypeAppState {
       status: movedOutTenantNumbers.has(number) ? 'MOVED_OUT' as const : 'ACTIVE' as const, notes: '',
     }
   })
-  const roomSpecs: { capacity: number; kind: 'PRIVATE' | 'SHARED'; status: 'available' | 'maintenance'; categoryId: RoomCategoryId }[] = [
-    ...[1, 2, 3, 4, 5].map(() => ({ capacity: 2, kind: 'SHARED' as const, status: 'available' as const, categoryId: 'RATE_3500' as const })),
-    { capacity: 1, kind: 'PRIVATE', status: 'maintenance', categoryId: 'RATE_3500' },
-    ...[1, 2].map(() => ({ capacity: 2, kind: 'SHARED' as const, status: 'available' as const, categoryId: 'RATE_3500' as const })),
-    ...[1, 2, 3, 4, 5, 6].map(() => ({ capacity: 2, kind: 'SHARED' as const, status: 'available' as const, categoryId: 'RATE_4000' as const })),
-    { capacity: 1, kind: 'PRIVATE', status: 'available', categoryId: 'RATE_5000' },
+  const roomSpecs: { capacity: number; kind: 'PRIVATE' | 'SHARED'; status: 'available' | 'maintenance'; categoryId: RoomCategoryId; washingMachineEnabled: boolean }[] = [
+    ...Array.from({ length: 5 }, (_, index) => ({ capacity: 2, kind: 'SHARED' as const, status: 'available' as const, categoryId: 'RATE_3500' as const, washingMachineEnabled: index < 2 })),
+    { capacity: 1, kind: 'PRIVATE', status: 'maintenance', categoryId: 'RATE_3500', washingMachineEnabled: false },
+    ...[1, 2].map(() => ({ capacity: 2, kind: 'SHARED' as const, status: 'available' as const, categoryId: 'RATE_3500' as const, washingMachineEnabled: false })),
+    ...[1, 2, 3, 4, 5, 6].map(() => ({ capacity: 2, kind: 'SHARED' as const, status: 'available' as const, categoryId: 'RATE_4000' as const, washingMachineEnabled: false })),
+    { capacity: 1, kind: 'PRIVATE', status: 'available', categoryId: 'RATE_5000', washingMachineEnabled: false },
   ]
   const rooms = roomSpecs.map((room, index) => ({
     id: `room-${index + 1}`, name: String(101 + index), floor: 1, ...room,

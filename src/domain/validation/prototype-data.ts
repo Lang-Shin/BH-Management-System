@@ -25,7 +25,7 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     && oneOf(r.status, ['ACTIVE', 'MOVED_OUT']) && text(r.notes) && r.notes.length <= 500)) return false
   if (!rows(value, 'rooms', r => id(r.name) && positive(r.floor) && positive(r.capacity)
     && oneOf(r.kind, ['PRIVATE', 'SHARED']) && oneOf(r.status, ['available', 'maintenance'])
-    && oneOf(r.categoryId, ['RATE_3500', 'RATE_4000', 'RATE_5000']))) return false
+    && oneOf(r.categoryId, ['RATE_3500', 'RATE_4000', 'RATE_5000']) && typeof r.washingMachineEnabled === 'boolean')) return false
   if (!rows(value, 'roomAssignments', r => id(r.tenantId) && id(r.roomId) && date(r.startDate)
     && (r.endDate === null || date(r.endDate)) && positive(r.agreedRentCents))) return false
   if (!rows(value, 'electricityMeters', r => id(r.label) && id(r.serialNumber) && r.ownership === 'UNCONFIRMED')) return false
