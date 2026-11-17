@@ -1,12 +1,10 @@
-import { ReceiptText } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { useAnimatedDialogClose } from '@/components/ui/use-animated-dialog-close'
+import { Button, Dialog, Flex, Heading, Text } from '@radix-ui/themes'
 import { StatusBadge } from '@/components/shared/status-badge'
 import type { PrototypeAppState, Receipt } from '@/domain/types/models'
 import { formatDate, formatMoney } from '@/lib/format'
 import { CATEGORY_LABELS } from '@/lib/labels'
 import { chargeRoom, paymentRooms } from '@/domain/calculations/room-finance'
+import './payments.css'
 
 export function ReceiptDialog({ data, receipt, onClose, onReturnFocus }: {
   data: PrototypeAppState
@@ -24,38 +22,42 @@ export function ReceiptDialog({ data, receipt, onClose, onReturnFocus }: {
   }))
   const allocationsSpanMultipleRooms = allocationRoomIds.size > 1
   const advance = data.tenantCredits.some(item => item.sourcePaymentId === receipt.paymentId)
-  const { open, requestClose, onOpenChange, onAnimationEnd } = useAnimatedDialogClose(onClose)
 
-  return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="gap-4 sm:max-w-lg" onAnimationEnd={onAnimationEnd} onCloseAutoFocus={event => { event.preventDefault(); onReturnFocus() }}>
-      <DialogHeader className="pr-6">
-        <span className="mb-1 flex size-12 items-center justify-center rounded-2xl bg-accent text-primary"><ReceiptText className="size-6" aria-hidden="true" /></span>
-        <DialogTitle>Sample receipt · {receipt.receiptNumber}</DialogTitle>
-        <DialogDescription>Halili BH · Receipt details from the sample records.</DialogDescription>
-      </DialogHeader>
-      <div><StatusBadge status={receipt.state === 'ISSUED' ? 'Recorded' : 'Voided'} /></div>
-      <dl className="grid min-w-0 grid-cols-2 gap-3 rounded-2xl border bg-muted/40 p-4 text-sm">
-        <div className="col-span-2"><dt className="text-muted-foreground">Room context</dt><dd className="mt-1 font-semibold">{payment ? paymentRooms(data, payment, receipt.issuedOn, receipt.allocationIds).label : 'Room needs review'}</dd></div>
-        <div className="min-w-0"><dt className="text-muted-foreground">Received from</dt><dd className="mt-1 break-words font-semibold">{tenant?.name ?? 'Unknown tenant'}</dd></div>
-        <div><dt className="text-muted-foreground">Receipt date</dt><dd className="mt-1">{formatDate(receipt.issuedOn)}</dd></div>
-        <div><dt className="text-muted-foreground">Payment method</dt><dd className="mt-1">{payment ? payment.method === 'cash' ? 'Cash' : 'Bank transfer' : 'Not available'}</dd></div>
-        <div className="col-span-2 min-w-0 border-t pt-4"><dt className="text-muted-foreground">Amount paid</dt><dd className="mt-1 break-words text-3xl font-bold tabular-nums">{formatMoney(receipt.amountCents)}</dd></div>
+  function close() { onClose(); setTimeout(onReturnFocus, 0) }
+
+  return <Dialog.Root open onOpenChange={next => { if (!next) close() }}>
+    <Dialog.Content maxWidth="34rem" onCloseAutoFocus={event => { event.preventDefault(); onReturnFocus() }}>
+      <Dialog.Title size="5" mb="1">Sample receipt · {receipt.receiptNumber}</Dialog.Title>
+      <Dialog.Description size="2" color="gray">Halili BH · Receipt details from the sample records.</Dialog.Description>
+      <Flex mt="3"><StatusBadge status={receipt.state === 'ISSUED' ? 'Recorded' : 'Voided'} /></Flex>
+      <dl className="receipt-facts">
+        <div className="receipt-facts-wide"><Text asChild size="2" color="gray"><dt>Room context</dt></Text><dd><Text size="2" weight="bold">{payment ? paymentRooms(data, payment, receipt.issuedOn, receipt.allocationIds).label : 'Room needs review'}</Text></dd></div>
+        <div style={{ minWidth: 0 }}><Text asChild size="2" color="gray"><dt>Received from</dt></Text><dd><Text size="2" weight="bold">{tenant?.name ?? 'Unknown tenant'}</Text></dd></div>
+        <div><Text asChild size="2" color="gray"><dt>Receipt date</dt></Text><dd><Text size="2">{formatDate(receipt.issuedOn)}</Text></dd></div>
+        <div><Text asChild size="2" color="gray"><dt>Payment method</dt></Text><dd><Text size="2">{payment ? payment.method === 'cash' ? 'Cash' : 'Bank transfer' : 'Not available'}</Text></dd></div>
+        <div className="receipt-facts-wide receipt-facts-total"><Text asChild size="2" color="gray"><dt>Amount paid</dt></Text><dd><Text size="7" weight="bold" className="num">{formatMoney(receipt.amountCents)}</Text></dd></div>
       </dl>
-      <section aria-labelledby="receipt-coverage-title">
-        <h2 id="receipt-coverage-title" className="mb-3 font-semibold">What the payment covered</h2>
-        {allocations.length > 0 ? <ul className="divide-y rounded-xl border px-4">
+      <section aria-labelledby="receipt-coverage-title" style={{ marginTop: 20 }}>
+        <Heading as="h2" id="receipt-coverage-title" size="3">What the payment covered</Heading>
+        {allocations.length > 0 ? <ul className="receipt-coverage">
           {allocations.map(allocation => {
             const charge = data.charges.find(item => item.id === allocation.chargeId)
             const period = data.billingPeriods.find(item => item.id === charge?.billingPeriodId)
-            return <li key={allocation.id} className="flex flex-wrap justify-between gap-3 py-2 text-sm">
-              <div className="min-w-0"><p className="font-semibold">{charge ? CATEGORY_LABELS[charge.category] : 'Bill'}{allocationsSpanMultipleRooms ? ` · ${charge ? chargeRoom(data, charge).label : 'Room needs review'}` : ''}</p>{charge?.category === 'ELECTRICITY' && <p className="mt-1 text-xs text-muted-foreground">Previous settled {charge.electricity.previousReadingMilliKwh / 1000} kWh → current {charge.electricity.currentReadingMilliKwh / 1000} kWh · {charge.electricity.consumptionMilliKwh / 1000} kWh × {formatMoney(charge.electricity.appliedRateCentsPerKwh)}/kWh</p>}{period && <p className="mt-1 text-xs text-muted-foreground">{period.label}</p>}<p className="mt-1 break-all text-xs text-muted-foreground">Charge: {allocation.chargeId} · Allocation: {allocation.id}</p>{allocation.state === 'REVERSED' && <p className="mt-1 text-xs text-muted-foreground">Allocation later reversed</p>}</div>
-              <span className="font-semibold tabular-nums">{formatMoney(allocation.amountCents)}</span>
+            return <li key={allocation.id}>
+              <div className="receipt-coverage-main">
+                <Text as="p" size="2" weight="bold">{charge ? CATEGORY_LABELS[charge.category] : 'Bill'}{allocationsSpanMultipleRooms ? ` · ${charge ? chargeRoom(data, charge).label : 'Room needs review'}` : ''}</Text>
+                {charge?.category === 'ELECTRICITY' && <Text as="p" size="1" color="gray">Previous settled {charge.electricity.previousReadingMilliKwh / 1000} kWh → current {charge.electricity.currentReadingMilliKwh / 1000} kWh · {charge.electricity.consumptionMilliKwh / 1000} kWh × {formatMoney(charge.electricity.appliedRateCentsPerKwh)}/kWh</Text>}
+                {period && <Text as="p" size="1" color="gray">{period.label}</Text>}
+                <Text as="p" size="1" color="gray" className="receipt-coverage-id">Charge: {allocation.chargeId} · Allocation: {allocation.id}</Text>
+                {allocation.state === 'REVERSED' && <Text as="p" size="1" color="gray">Allocation later reversed</Text>}
+              </div>
+              <Text size="2" weight="bold" className="num">{formatMoney(allocation.amountCents)}</Text>
             </li>
           })}
-        </ul> : <p className="rounded-xl border bg-muted/40 p-4 text-sm text-muted-foreground">{advance ? 'Advance payment — kept for a future bill' : 'No bill allocations were included when this receipt was issued.'}</p>}
+        </ul> : <Text as="p" size="2" color="gray" mt="2">{advance ? 'Advance payment — kept for a future bill' : 'No bill allocations were included when this receipt was issued.'}</Text>}
       </section>
-      <p className="text-xs text-muted-foreground">Demonstration preview · Not an official receipt</p>
-      <DialogFooter><Button aria-label="Close receipt" onClick={requestClose}>Close</Button></DialogFooter>
-    </DialogContent>
-  </Dialog>
+      <Text as="p" size="1" color="gray" mt="4">Demonstration preview · Not an official receipt</Text>
+      <Flex mt="4" justify="end"><Button aria-label="Close receipt" onClick={close}>Close</Button></Flex>
+    </Dialog.Content>
+  </Dialog.Root>
 }

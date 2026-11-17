@@ -1,0 +1,13 @@
+/* A strip of exactly three figures fills the row instead of leaving an empty fourth column. */
+@media (min-width: 64rem) {
+  .stat-strip:has(> .stat:nth-child(3):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* Quiet disclosure for secondary content. */
+.disclosure { margin-top: 40px; border-top: 1px solid var(--gray-5); }
+.disclosure > summary {
+  display: flex; align-items: center; min-height: 48px; cursor: pointer;
+  font-size: var(--font-size-3); font-weight: 600; color: var(--gray-12);
+}
+.disclosure > summary:focus-visible { outline: 2px solid var(--focus-8); outline-offset: 2px; border-radius: var(--radius-2); }
+.disclosure-body { padding: 4px 0 8px; }

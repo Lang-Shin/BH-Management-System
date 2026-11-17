@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Button } from '@/components/ui/button'
+import { Button } from '@radix-ui/themes'
 import { EmptyState } from '@/components/shared/states'
 
 export function NotFound() {

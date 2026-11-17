@@ -1,12 +1,11 @@
-import { ReceiptText } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { useAnimatedDialogClose } from '@/components/ui/use-animated-dialog-close'
+import { Button, Dialog, Flex, Heading, IconButton, Text } from '@radix-ui/themes'
+import { X } from 'lucide-react'
 import { StatusBadge } from './status-badge'
 import type { Payment, PrototypeAppState } from '@/domain/types/models'
 import { paymentRooms } from '@/domain/calculations/room-finance'
 import { formatDate, formatMoney } from '@/lib/format'
 import { CATEGORY_LABELS } from '@/lib/labels'
+import './shared-parts.css'
 
 export function TransactionDialog({ data, payment, asOf, onClose, onReturnFocus }: {
   data: PrototypeAppState
@@ -20,48 +19,61 @@ export function TransactionDialog({ data, payment, asOf, onClose, onReturnFocus 
   const receipt = data.receipts.find(item => item.paymentId === payment.id && item.state === 'ISSUED')?.receiptNumber
   const advance = data.tenantCredits.some(credit => credit.sourcePaymentId === payment.id)
   const allocationsSpanMultipleRooms = new Set(context.allocations.map(allocation => allocation.context.id)).size > 1
-  const { open, requestClose, onOpenChange, onAnimationEnd } = useAnimatedDialogClose(onClose)
 
-  return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="transaction-dialog" onAnimationEnd={onAnimationEnd} onCloseAutoFocus={event => { event.preventDefault(); onReturnFocus() }}>
-      <DialogHeader className="transaction-dialog-heading">
-        <span className="transaction-dialog-icon"><ReceiptText aria-hidden="true" /></span>
-        <DialogTitle>Transaction Details</DialogTitle>
-        <DialogDescription>Payment information for the selected room.</DialogDescription>
-      </DialogHeader>
-
-      <section className="transaction-summary" aria-label="Payment summary">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div><p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Room</p><p className="mt-1 text-xl font-bold">{context.label}</p></div>
-          <StatusBadge status={payment.state === 'RECORDED' ? 'Recorded' : 'Voided'} />
+  return <Dialog.Root open onOpenChange={next => { if (!next) onClose() }}>
+    <Dialog.Content maxWidth="34rem" onCloseAutoFocus={event => { event.preventDefault(); onReturnFocus() }}>
+      <Flex justify="between" align="start" gap="3" mb="4">
+        <div>
+          <Dialog.Title size="5" mb="1">Transaction Details</Dialog.Title>
+          <Dialog.Description size="2" color="gray">Payment information for the selected room.</Dialog.Description>
         </div>
-        <dl className="transaction-metadata mt-4 grid grid-cols-2 gap-3 text-sm">
-          <div><dt className="text-muted-foreground">Date paid</dt><dd className="mt-1 font-semibold">{formatDate(payment.paidOn)}</dd></div>
-          <div><dt className="text-muted-foreground">Receipt number</dt><dd className="mt-1 break-all font-semibold">{receipt ?? 'No receipt yet'}</dd></div>
-          <div className="transaction-amount-section"><dt className="text-muted-foreground">Amount paid</dt><dd className="transaction-dialog-amount">{formatMoney(payment.amountCents)}</dd></div>
+        <Dialog.Close><IconButton variant="ghost" color="gray" aria-label="Close"><X size={18} aria-hidden="true" /></IconButton></Dialog.Close>
+      </Flex>
+
+      <section aria-label="Payment summary" className="panel panel-pad">
+        <Flex justify="between" align="start" gap="3" wrap="wrap">
+          <div>
+            <Text as="p" size="2" color="gray">Room</Text>
+            <Text as="p" size="5" weight="bold">{context.label}</Text>
+          </div>
+          <StatusBadge status={payment.state === 'RECORDED' ? 'Recorded' : 'Voided'} />
+        </Flex>
+        <dl className="kv" style={{ marginTop: 12 }}>
+          <div><dt>Date paid</dt><dd>{formatDate(payment.paidOn)}</dd></div>
+          <div><dt>Receipt number</dt><dd>{receipt ?? 'No receipt yet'}</dd></div>
+          <div className="kv-total"><dt>Amount paid</dt><dd className="num">{formatMoney(payment.amountCents)}</dd></div>
         </dl>
       </section>
 
-      <p className="text-sm"><span className="text-muted-foreground">Paid by:</span> <strong className="font-semibold">{payer ?? 'Not recorded'}</strong></p>
+      <Text as="p" size="2" mt="4"><Text color="gray">Paid by:</Text> <Text weight="medium">{payer ?? 'Not recorded'}</Text></Text>
 
-      <section aria-labelledby="transaction-paid-title">
-        <h2 id="transaction-paid-title" className="mb-3 font-semibold">What Was Paid</h2>
-        {context.allocations.length > 0 && <ul className="transaction-lines">{context.allocations.map(allocation => {
+      <section aria-labelledby="transaction-paid-title" style={{ marginTop: 20 }}>
+        <Heading as="h3" id="transaction-paid-title" size="3" mb="2">What Was Paid</Heading>
+        {context.allocations.length > 0 && <ul className="row-list">{context.allocations.map(allocation => {
           const charge = data.charges.find(item => item.id === allocation.chargeId)
-          return <li key={allocation.id}>
-            <div className="min-w-0"><p className="font-semibold">{charge ? CATEGORY_LABELS[charge.category] : 'Bill'}</p>{allocationsSpanMultipleRooms && <p className="mt-0.5 break-words text-xs text-muted-foreground">{allocation.context.label}</p>}{charge?.category === 'ELECTRICITY' && <p className="mt-1 text-xs text-muted-foreground">{charge.electricity.previousReadingMilliKwh / 1000} → {charge.electricity.currentReadingMilliKwh / 1000} kWh · {charge.electricity.consumptionMilliKwh / 1000} kWh × {formatMoney(charge.electricity.appliedRateCentsPerKwh)}/kWh</p>}</div>
-            <span className="shrink-0 font-semibold tabular-nums">{formatMoney(allocation.amountCents)}</span>
+          return <li key={allocation.id} className="row" style={{ alignItems: 'flex-start' }}>
+            <div style={{ minWidth: 0 }}>
+              <Text as="p" size="2" weight="medium">{charge ? CATEGORY_LABELS[charge.category] : 'Bill'}</Text>
+              {allocationsSpanMultipleRooms && <Text as="p" size="1" color="gray">{allocation.context.label}</Text>}
+              {charge?.category === 'ELECTRICITY' && <Text as="p" size="1" color="gray">{charge.electricity.previousReadingMilliKwh / 1000} → {charge.electricity.currentReadingMilliKwh / 1000} kWh · {charge.electricity.consumptionMilliKwh / 1000} kWh × {formatMoney(charge.electricity.appliedRateCentsPerKwh)}/kWh</Text>}
+            </div>
+            <Text size="2" weight="medium" className="num" style={{ flex: 'none' }}>{formatMoney(allocation.amountCents)}</Text>
           </li>
         })}</ul>}
-        {context.unallocated > 0 && <div className="transaction-unallocated">
-          <div className="min-w-0"><p className="font-semibold">{context.allocations.length === 0 && advance ? 'Advance payment — Unallocated' : 'Unallocated amount'}</p><p className="mt-1 text-sm text-muted-foreground">This money is being held for future billing and is not yet applied to an issued bill.</p></div>
-          <span className="shrink-0 font-semibold tabular-nums">{formatMoney(context.unallocated)}</span>
+        {context.unallocated > 0 && <div className="row" style={{ alignItems: 'flex-start', borderTop: context.allocations.length > 0 ? '1px solid var(--gray-5)' : undefined }}>
+          <div style={{ minWidth: 0 }}>
+            <Text as="p" size="2" weight="medium">{context.allocations.length === 0 && advance ? 'Advance payment — Unallocated' : 'Unallocated amount'}</Text>
+            <Text as="p" size="1" color="gray">This money is being held for future billing and is not yet applied to an issued bill.</Text>
+          </div>
+          <Text size="2" weight="medium" className="num" style={{ flex: 'none' }}>{formatMoney(context.unallocated)}</Text>
         </div>}
-        {context.allocations.length === 0 && context.unallocated === 0 && <p className="rounded-xl border bg-muted/40 p-4 text-sm text-muted-foreground">No bill categories were allocated to this payment.</p>}
+        {context.allocations.length === 0 && context.unallocated === 0 && <Text as="p" size="2" color="gray">No bill categories were allocated to this payment.</Text>}
       </section>
 
-      <p className="break-all text-xs text-muted-foreground">Payment ID: {payment.id}</p>
-      <DialogFooter><Button onFocus={event => event.currentTarget.scrollIntoView?.({ block: 'nearest' })} onClick={requestClose}>Done</Button></DialogFooter>
-    </DialogContent>
-  </Dialog>
+      <Text as="p" size="1" color="gray" mt="4" style={{ overflowWrap: 'anywhere' }}>Payment ID: {payment.id}</Text>
+      <Flex justify="end" mt="4">
+        <Dialog.Close><Button onFocus={event => event.currentTarget.scrollIntoView?.({ block: 'nearest' })}>Done</Button></Dialog.Close>
+      </Flex>
+    </Dialog.Content>
+  </Dialog.Root>
 }

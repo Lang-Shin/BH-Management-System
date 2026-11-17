@@ -76,12 +76,11 @@ Use fictional information only. This is a single-browser, single-workspace proto
 ### Technology and organization
 
 - React 19, TypeScript 6 (strict mode), Vite 8.
-- Tailwind CSS 4 through `@tailwindcss/vite`; CSS-first theme in `src/styles/globals.css`.
-- shadcn/ui New York components, using Radix primitives, committed as local source.
+- Radix Themes (component kit built on Radix primitives) with plain CSS; brand tokens, app shell and shared patterns in `src/styles/globals.css`. No Tailwind.
 - React Router 7, Lucide React, Context + reducer.
 - Vitest 5, React Testing Library, ESLint.
 
-Exact resolved versions are recorded in `package-lock.json`. Use `npm ci` for reproducible installs. Tailwind 4 does not require a legacy Tailwind configuration or PostCSS setup. shadcn aliases and style are recorded in `components.json`.
+Exact resolved versions are recorded in `package-lock.json`. Use `npm ci` for reproducible installs.
 
 ```text
 src/
@@ -92,8 +91,7 @@ src/
     state/              # Context, action union, reducer
   components/
     layout/             # Responsive admin shell, sidebar, header
-    shared/             # Page headers, stats, tables, badges, UI states
-    ui/                 # Local shadcn/ui components
+    shared/             # Page headers, stat strip, tables, status, UI states
   features/
     dashboard/          # Dashboard module
     tenants/            # Tenant directory and demo profile dialog
@@ -109,8 +107,8 @@ src/
     fixtures/           # Fictional fixture factory and fixed demo date
     repositories/       # Async repository contract and localStorage adapter
   hooks/                # Typed application-state access hook
-  lib/                  # Formatting and class-name utilities
-  styles/               # Tailwind imports, theme tokens, base styles
+  lib/                  # Formatting and small utilities
+  styles/               # Theme tokens, app shell and shared patterns
   test/                 # Test setup and cross-layer integration tests
   main.tsx              # React root and Strict Mode
 ```

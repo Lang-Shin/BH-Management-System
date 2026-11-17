@@ -1,0 +1,42 @@
+/* Billing-only layout and form controls. */
+
+.billing-period { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 20px; }
+
+/* Native select, styled to match Radix Themes text fields. */
+.field-select {
+  min-height: var(--space-6); max-width: 100%; padding: 0 var(--space-3);
+  border: 1px solid var(--gray-7); border-radius: var(--radius-3);
+  background: var(--color-surface); color: var(--gray-12);
+  font: inherit; font-size: var(--font-size-2);
+}
+.field-select:focus-visible { outline: 2px solid var(--focus-8); outline-offset: -1px; }
+#payment-room.field-select { width: 100%; }
+
+.billing-table-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.billing-table-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+@keyframes billing-table-enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.billing-table-enter { animation: billing-table-enter 260ms var(--route-ease) backwards; }
+
+/* Chart draws only once it scrolls into view. */
+.billing-room-status-chart[data-revealed="false"] .analytics-doughnut-segment { animation-play-state: paused; }
+
+.billing-two-col { display: grid; gap: 24px 40px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 64rem) { .billing-two-col { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.billing-awaiting { margin-top: 24px; }
+
+/* Payment calculator */
+.pay-options { margin: 16px 0 0; padding: 0; border: 0; min-width: 0; }
+.pay-option { border-top: 1px solid var(--gray-5); }
+.pay-option:last-child { border-bottom: 1px solid var(--gray-5); }
+.pay-option-label { display: flex; align-items: center; gap: 12px; padding: 12px 0; cursor: pointer; }
+.pay-option[data-state="PAID"] .pay-option-label, .pay-option[data-state="UNAVAILABLE"] .pay-option-label { cursor: default; }
+.pay-option-text { flex: 1; min-width: 0; }
+.pay-option-amount { flex: none; text-align: right; }
+.pay-electricity { display: grid; gap: 6px; padding: 0 0 16px 28px; }
+.pay-total { margin-top: 20px; padding-top: 16px; }
+.pay-total-value { display: block; font-size: var(--font-size-7); font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+
+@media (prefers-reduced-motion: reduce) {
+  .billing-table-enter { animation: none; }
+}

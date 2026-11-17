@@ -1,13 +1,11 @@
 import { useState } from 'react'
-import { Zap } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { useAnimatedDialogClose } from '@/components/ui/use-animated-dialog-close'
+import { Button, Dialog, Flex, Text, TextField } from '@radix-ui/themes'
 import { usePrototype } from '@/hooks/use-prototype'
 import { calculateElectricityCharge, latestSettledReading, parseMeterReadingMilliKwh } from '@/domain/calculations/electricity-calculation'
 import { prepareElectricityPayment } from '@/domain/calculations/electricity-payment'
 import { DEMO_DATE } from '@/data/fixtures/demo'
 import { formatDate, formatMoney } from '@/lib/format'
+import '@/components/shared/shared-parts.css'
 
 function formatKwh(milliKwh: number) {
   return `${milliKwh / 1000} kWh`
@@ -37,7 +35,6 @@ export function ElectricityPaymentDialog({ obligationId, onClose, onReturnFocus,
   const { data, dispatch } = usePrototype()
   const [reading, setReading] = useState('')
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const { open, requestClose, onOpenChange, onAnimationEnd } = useAnimatedDialogClose(onClose)
   const obligation = data.electricityBillObligations.find(item => item.id === obligationId)
   const room = data.rooms.find(item => item.id === obligation?.roomId)
   const previous = obligation ? latestSettledReading(data, obligation.meterId) : null
@@ -64,37 +61,37 @@ export function ElectricityPaymentDialog({ obligationId, onClose, onReturnFocus,
     }
     dispatch({ type: 'electricity/paymentConfirmed', obligationId: obligation.id, currentReadingMilliKwh: parsed, paidOn: DEMO_DATE })
     onConfirmed(result.receipt.receiptNumber)
-    requestClose()
+    onClose()
   }
 
-  return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="electricity-payment-dialog sm:max-w-lg" onAnimationEnd={onAnimationEnd} onCloseAutoFocus={event => { event.preventDefault(); onReturnFocus() }}>
-      <DialogHeader className="pr-6">
-        <span className="electricity-payment-icon"><Zap aria-hidden="true" /></span>
-        <DialogTitle>Electricity payment · {room ? `Room ${room.name}` : 'Room needs review'}</DialogTitle>
-        <DialogDescription>Enter the current meter reading when the tenant is ready to pay electricity.</DialogDescription>
-      </DialogHeader>
-      {!obligation || !previous ? <p role="alert" className="rounded-xl border bg-muted/40 p-4 text-sm">This electricity obligation is no longer pending. Close this form to refresh the room.</p> : <>
-        <dl className="electricity-reading-summary" aria-label="Previous settled electricity reading">
-          <div><dt>Last settled reading</dt><dd>{formatKwh(previous.readingMilliKwh)}</dd></div>
+  return <Dialog.Root open onOpenChange={next => { if (!next) onClose() }}>
+    <Dialog.Content maxWidth="32rem" onCloseAutoFocus={event => { event.preventDefault(); onReturnFocus() }}>
+      <Dialog.Title size="5" mb="1">Electricity payment · {room ? `Room ${room.name}` : 'Room needs review'}</Dialog.Title>
+      <Dialog.Description size="2" color="gray" mb="4">Enter the current meter reading when the tenant is ready to pay electricity.</Dialog.Description>
+      {!obligation || !previous ? <Text as="p" role="alert" size="2">This electricity obligation is no longer pending. Close this form to refresh the room.</Text> : <>
+        <dl className="kv panel panel-pad" aria-label="Previous settled electricity reading">
+          <div><dt>Last settled reading</dt><dd className="num">{formatKwh(previous.readingMilliKwh)}</dd></div>
           <div><dt>Last settled date</dt><dd>{formatDate(previous.readOn)}</dd></div>
-          <div><dt>Electricity rate</dt><dd>{rate ? `${formatMoney(rate.rateCentsPerKwh)} per kWh` : 'No rate available'}</dd></div>
+          <div><dt>Electricity rate</dt><dd className="num">{rate ? `${formatMoney(rate.rateCentsPerKwh)} per kWh` : 'No rate available'}</dd></div>
         </dl>
-        <label htmlFor="electricity-current-reading" className="block text-sm font-semibold">Current meter reading (kWh)</label>
-        <input id="electricity-current-reading" type="text" inputMode="decimal" maxLength={14} value={reading} onChange={event => { setReading(event.target.value); setSubmitError(null) }} aria-invalid={Boolean(error)} aria-describedby={error ? 'electricity-reading-error' : 'electricity-reading-help'} className="electricity-reading-input" autoFocus />
-        <p id="electricity-reading-help" className="text-xs text-muted-foreground">The calculation covers all consumption since the last settled reading. Nothing is saved until you confirm.</p>
-        {error && <p id="electricity-reading-error" role="alert" className="text-sm text-destructive">{error}</p>}
-        {calculation?.ok && <section className="electricity-calculation-preview" aria-label="Calculated electricity charge" aria-live="polite">
-          <dl>
-            <div><dt>Current reading</dt><dd>{formatKwh(calculation.currentReading.readingMilliKwh)}</dd></div>
-            <div><dt>Consumption</dt><dd>{formatKwh(calculation.charge.electricity.consumptionMilliKwh)}</dd></div>
-            <div><dt>Rate</dt><dd>{formatMoney(calculation.charge.electricity.appliedRateCentsPerKwh)} per kWh</dd></div>
+        <Text as="label" htmlFor="electricity-current-reading" size="2" weight="medium" style={{ display: 'block', margin: '16px 0 6px' }}>Current meter reading (kWh)</Text>
+        <TextField.Root id="electricity-current-reading" type="text" inputMode="decimal" maxLength={14} value={reading} onChange={event => { setReading(event.target.value); setSubmitError(null) }} aria-invalid={Boolean(error)} aria-describedby={error ? 'electricity-reading-error' : 'electricity-reading-help'} autoFocus />
+        <Text as="p" id="electricity-reading-help" size="1" color="gray" mt="1">The calculation covers all consumption since the last settled reading. Nothing is saved until you confirm.</Text>
+        {error && <Text as="p" id="electricity-reading-error" role="alert" size="2" color="red" mt="2">{error}</Text>}
+        {calculation?.ok && <section aria-label="Calculated electricity charge" aria-live="polite" style={{ marginTop: 16 }}>
+          <dl className="kv">
+            <div><dt>Current reading</dt><dd className="num">{formatKwh(calculation.currentReading.readingMilliKwh)}</dd></div>
+            <div><dt>Consumption</dt><dd className="num">{formatKwh(calculation.charge.electricity.consumptionMilliKwh)}</dd></div>
+            <div><dt>Rate</dt><dd className="num">{formatMoney(calculation.charge.electricity.appliedRateCentsPerKwh)} per kWh</dd></div>
+            <div className="kv-total"><dt>Amount to collect</dt><dd className="num">{formatMoney(calculation.charge.amountCents)}</dd></div>
           </dl>
-          <p><span>Amount to collect</span><strong>{formatMoney(calculation.charge.amountCents)}</strong></p>
         </section>}
-        {submitError && <p role="alert" className="text-sm text-destructive">{submitError}</p>}
+        {submitError && <Text as="p" role="alert" size="2" color="red" mt="2">{submitError}</Text>}
       </>}
-      <DialogFooter className="flex-col-reverse gap-2 sm:flex-row"><Button variant="outline" onClick={requestClose}>Cancel</Button><Button disabled={!canConfirm} onClick={confirm}>Confirm payment received</Button></DialogFooter>
-    </DialogContent>
-  </Dialog>
+      <Flex gap="3" justify="end" mt="4">
+        <Dialog.Close><Button variant="soft" color="gray">Cancel</Button></Dialog.Close>
+        <Button disabled={!canConfirm} onClick={confirm}>Confirm payment received</Button>
+      </Flex>
+    </Dialog.Content>
+  </Dialog.Root>
 }

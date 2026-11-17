@@ -1,18 +1,32 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { Button, Heading, Skeleton, Text } from '@radix-ui/themes'
 import { CircleAlert, SearchX } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
 
 export function EmptyState({ title = 'No results found', description = 'Try another search or clear your filters.', action }: { title?: string; description?: string; action?: ReactNode }) {
-  return <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed bg-muted/40 px-6 py-14 text-center" role="status"><span className="rounded-xl border bg-card p-3"><SearchX className="size-6 text-muted-foreground" aria-hidden="true" /></span><h2 className="font-semibold">{title}</h2><p className="max-w-sm text-sm text-muted-foreground">{description}</p>{action}</div>
+  return <div role="status" className="panel" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '48px 24px', textAlign: 'center', borderStyle: 'dashed' }}>
+    <SearchX size={22} color="var(--gray-10)" aria-hidden="true" />
+    <Heading as="h2" size="3">{title}</Heading>
+    <Text as="p" size="2" color="gray" style={{ maxWidth: '24rem' }}>{description}</Text>
+    {action}
+  </div>
 }
 
 export function LoadingState() {
-  return <div role="status" aria-label="Opening records" className="space-y-6"><p className="text-base font-medium">Please wait, opening your records…</p><Skeleton className="h-5 w-3/4" /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-36" />)}</div><Skeleton className="h-72 w-full" /></div>
+  return <div role="status" aria-label="Opening records" style={{ display: 'grid', gap: 16 }}>
+    <Text as="p" size="2" color="gray">Please wait, opening your records…</Text>
+    <Skeleton height="20px" width="40%" />
+    <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(12rem, 1fr))' }}>{[1, 2, 3, 4].map(i => <Skeleton key={i} height="88px" />)}</div>
+    <Skeleton height="288px" />
+  </div>
 }
 
 export function ErrorState({ title = 'This page could not be opened', description = 'Please try opening the page again. Your saved records have not been changed.', onRetry }: { title?: string; description?: string; onRetry: () => void }) {
-  return <div role="alert" className="rounded-xl border bg-card px-6 py-14 text-center"><CircleAlert className="mx-auto mb-4 size-9 text-destructive" aria-hidden="true" /><h1 className="text-2xl font-semibold">{title}</h1><p className="mx-auto my-5 max-w-md text-base text-muted-foreground">{description}</p><Button onClick={onRetry}>Try again</Button></div>
+  return <div role="alert" className="panel" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '56px 24px', textAlign: 'center' }}>
+    <CircleAlert size={28} color="var(--red-10)" aria-hidden="true" />
+    <Heading as="h1" size="5">{title}</Heading>
+    <Text as="p" size="2" color="gray" style={{ maxWidth: '28rem' }}>{description}</Text>
+    <Button onClick={onRetry}>Try again</Button>
+  </div>
 }
 
 export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {

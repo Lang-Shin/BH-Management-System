@@ -1,4 +1,5 @@
-import { render, screen, within } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
+import { renderWithTheme as render } from './test-utils'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { createDemoData, DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'

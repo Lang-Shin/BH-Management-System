@@ -1,7 +1,4 @@
-import { ReceiptText } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { useAnimatedDialogClose } from '@/components/ui/use-animated-dialog-close'
+import { Button, Dialog, Flex } from '@radix-ui/themes'
 import type { Payment, PrototypeAppState } from '@/domain/types/models'
 import { PaymentHistoryTable } from './payment-history-table'
 
@@ -12,17 +9,14 @@ export function TransactionHistoryDialog({ data, payments, asOf, onClose, onRetu
   onClose: () => void
   onReturnFocus: () => void
 }) {
-  const { open, requestClose, onOpenChange, onAnimationEnd } = useAnimatedDialogClose(onClose)
-
-  return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="transaction-history-dialog sm:max-w-5xl" onAnimationEnd={onAnimationEnd} onCloseAutoFocus={event => { event.preventDefault(); onReturnFocus() }}>
-      <DialogHeader className="pr-6">
-        <span className="transaction-history-icon"><ReceiptText aria-hidden="true" /></span>
-        <DialogTitle>Transaction History</DialogTitle>
-        <DialogDescription>All recorded payments. Choose See Transaction to inspect one; this list is read-only.</DialogDescription>
-      </DialogHeader>
+  return <Dialog.Root open onOpenChange={next => { if (!next) onClose() }}>
+    <Dialog.Content maxWidth="64rem" onCloseAutoFocus={event => { event.preventDefault(); onReturnFocus() }}>
+      <Dialog.Title size="5" mb="1">Transaction History</Dialog.Title>
+      <Dialog.Description size="2" color="gray" mb="4">All recorded payments. Choose See Transaction to inspect one; this list is read-only.</Dialog.Description>
       <PaymentHistoryTable data={data} payments={payments} asOf={asOf} caption="All transactions" />
-      <DialogFooter><Button aria-label="Close transaction history" onClick={requestClose}>Close</Button></DialogFooter>
-    </DialogContent>
-  </Dialog>
+      <Flex justify="end" mt="4">
+        <Dialog.Close><Button aria-label="Close transaction history">Close</Button></Dialog.Close>
+      </Flex>
+    </Dialog.Content>
+  </Dialog.Root>
 }

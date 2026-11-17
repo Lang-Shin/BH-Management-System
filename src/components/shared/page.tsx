@@ -1,23 +1,45 @@
 import type { ReactNode } from 'react'
-import type { LucideIcon } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
+import { Heading, Text } from '@radix-ui/themes'
 import { AnimatedNumber } from './animated-number'
 
-export function PageHeader({ title, description, action }: { title: string; description: string; action?: ReactNode }) {
-  return <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-    <div><h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1><p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">{description}</p></div>
-    {action && <div className="shrink-0">{action}</div>}
+/** The single h1 of a page, with an optional description and primary actions. */
+export function PageHeader({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
+  return <div className="page-header">
+    <div className="page-header-text">
+      <Heading as="h1" size="7" weight="bold" trim="start">{title}</Heading>
+      {description && <Text as="p" size="2" color="gray" mt="1">{description}</Text>}
+    </div>
+    {action && <div className="page-header-actions">{action}</div>}
   </div>
 }
 
-export function StatCard({ label, value, detail, icon: Icon }: { label: string; value: string | number; detail: ReactNode; icon: LucideIcon }) {
-  return <Card className="min-w-0 gap-0 py-5"><CardContent>
-    <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-semibold text-muted-foreground">{label}</h2><span className="stat-glass-icon shrink-0 text-primary"><Icon className="size-[18px]" aria-hidden="true" /></span></div>
-    <p className="mt-3 text-2xl font-bold tracking-tight tabular-nums"><AnimatedNumber value={value} /></p>
-    <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{detail}</p>
-  </CardContent></Card>
+/** A titled block of a page. Renders an h2. */
+export function Section({ id, title, description, action, children }: { id?: string; title: string; description?: ReactNode; action?: ReactNode; children: ReactNode }) {
+  return <section aria-labelledby={id} className="section">
+    <div className="section-head">
+      <div style={{ minWidth: 0 }}>
+        <Heading as="h2" id={id} size="4" weight="bold">{title}</Heading>
+        {description && <Text as="p" size="2" color="gray">{description}</Text>}
+      </div>
+      {action}
+    </div>
+    {children}
+  </section>
+}
+
+export interface StatItem { label: string; value: string | number; detail?: ReactNode; tone?: 'danger' }
+
+/** Key figures as one quiet strip. Each figure is a labelled group. */
+export function StatStrip({ label, items }: { label: string; items: StatItem[] }) {
+  return <section aria-label={label} className="stat-strip">
+    {items.map(item => <div key={item.label} role="group" aria-label={item.label} data-tone={item.tone} className="stat">
+      <Text as="p" size="2" color="gray" weight="medium">{item.label}</Text>
+      <p className="stat-value"><AnimatedNumber value={item.value} /></p>
+      {item.detail && <Text as="p" size="1" color="gray" mt="1">{item.detail}</Text>}
+    </div>)}
+  </section>
 }
 
 export function PreviewNotice({ children }: { children: ReactNode }) {
-  return <p className="mb-6 max-w-3xl text-sm leading-relaxed text-muted-foreground"><strong className="font-semibold text-foreground">Sample records.</strong> {children}</p>
+  return <Text as="p" size="2" color="gray" mb="5" style={{ maxWidth: '48rem' }}><Text weight="bold" color="gray" highContrast>Sample records.</Text> {children}</Text>
 }

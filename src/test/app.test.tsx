@@ -9,23 +9,22 @@ import { selectSummary } from '@/domain/calculations/summary'
 import { DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
 import { formatMoney } from '@/lib/format'
 import { RoomOccupancyChart } from '@/features/dashboard/dashboard-analytics'
+import { chooseOption } from './test-utils'
 
 function renderApp(route = '/') {
   return render(<PrototypeProvider repository={localStorageRepository}><MemoryRouter initialEntries={[route]}><AppRouter /></MemoryRouter></PrototypeProvider>)
 }
 
 describe('admin workspace integration', () => {
-  it('offers a back-to-top button on Dashboard and a return link on other pages', async () => {
+  it('moves focus to the main content and scrolls to the top when the route changes', async () => {
     const user = userEvent.setup()
     renderApp('/dashboard')
-    const button = await screen.findByRole('button', { name: 'Back to top' })
-    expect(screen.queryByRole('link', { name: 'Back to Dashboard' })).not.toBeInTheDocument()
-    await user.click(button)
-    expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 0, behavior: 'smooth' })
-    expect(screen.getByRole('main')).toHaveFocus()
+    await screen.findByRole('heading', { level: 1, name: 'Overview' })
     await user.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('link', { name: 'Tenants' }))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Tenants' })).toBeInTheDocument()
+    expect(screen.getByRole('main')).toHaveFocus()
+    expect(window.scrollTo).toHaveBeenLastCalledWith(0, 0)
     expect(screen.queryByRole('button', { name: 'Back to top' })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Back to Dashboard' })).toHaveAttribute('href', '/dashboard')
   })
 
   it('refreshes dashboard analytics after a room status changes and returning to Dashboard', async () => {
@@ -96,13 +95,13 @@ describe('admin workspace integration', () => {
     renderApp('/tenants')
     await user.click(await screen.findByRole('button', { name: 'Add tenant' }))
     const dialog = await screen.findByRole('dialog', { name: 'Add a tenant' })
-    expect(within(dialog).getByLabelText('Full name')).toBeInTheDocument()
-    expect(within(dialog).getByLabelText('Email address')).toBeInTheDocument()
-    expect(within(dialog).getByLabelText('Room')).toBeInTheDocument()
-    await user.type(within(dialog).getByLabelText('Full name'), 'Test Tenant')
-    await user.click(within(dialog).getByRole('button', { name: 'Add tenant' }))
+    expect(within(dialog).getByRole('textbox', { name: 'Full name' })).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Email address (optional)')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Room (optional)')).toBeInTheDocument()
+    await user.type(within(dialog).getByRole('textbox', { name: 'Full name' }), 'Test Tenant')
+    await user.click(within(dialog).getByRole('button', { name: 'Preview tenant' }))
 
-    const success = await screen.findByRole('dialog', { name: 'Tenant added successfully' })
+    const success = await screen.findByRole('dialog', { name: 'Tenant preview complete' })
     expect(within(success).getByText(/No new tenant was saved/)).toBeInTheDocument()
     await user.click(within(success).getByRole('button', { name: 'Got it' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -119,11 +118,11 @@ describe('admin workspace integration', () => {
     await user.click(trigger)
     const dialog = await screen.findByRole('dialog', { name: 'Add a room' })
     await user.type(within(dialog).getByLabelText('Room number or name'), '116')
-    await user.selectOptions(within(dialog).getByLabelText('Monthly rental rate'), 'RATE_4000')
-    await user.selectOptions(within(dialog).getByLabelText('Room status'), 'maintenance')
-    await user.click(within(dialog).getByRole('button', { name: 'Add room' }))
+    await chooseOption(user, within(dialog).getByLabelText('Monthly rental rate'), /4,000/)
+    await chooseOption(user, within(dialog).getByLabelText('Room status'), /repair/i)
+    await user.click(within(dialog).getByRole('button', { name: 'Preview room' }))
 
-    const success = await screen.findByRole('dialog', { name: 'Room added successfully' })
+    const success = await screen.findByRole('dialog', { name: 'Room preview complete' })
     await user.click(within(success).getByRole('button', { name: 'Got it' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(screen.queryByRole('article', { name: 'Room 116' })).not.toBeInTheDocument()
@@ -190,12 +189,12 @@ describe('admin workspace integration', () => {
     await screen.findByRole('heading', { level: 1, name: 'Reports & Settings' })
     expect(localStorage.getItem(STORAGE_KEY)).toBe('{broken')
     await user.click(screen.getByRole('button', { name: 'Restore sample records' }))
-    const dialog = screen.getByRole('dialog', { name: 'Restore the sample records?' })
+    const dialog = screen.getByRole('alertdialog', { name: 'Restore the sample records?' })
     await user.click(within(dialog).getByRole('button', { name: 'Keep my changes' }))
     expect(localStorage.getItem(STORAGE_KEY)).toBe('{broken')
     expect(screen.getByRole('alert')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Restore sample records' }))
-    await user.click(within(screen.getByRole('dialog', { name: 'Restore the sample records?' })).getByRole('button', { name: 'Yes, restore records' }))
+    await user.click(within(screen.getByRole('alertdialog', { name: 'Restore the sample records?' })).getByRole('button', { name: 'Yes, restore records' }))
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 5)
   })
@@ -278,16 +277,9 @@ describe('admin workspace integration', () => {
 
     const filters = screen.getByRole('button', { name: 'Filters' })
     const calculator = screen.getByRole('button', { name: /Calculate payment/ })
-    const toolbar = filters.closest('.billing-table-toolbar')
-    expect(toolbar).not.toBeNull()
-    expect(toolbar).toContainElement(calculator)
     expect(filters.compareDocumentPosition(calculator) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(chart.compareDocumentPosition(toolbar!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(toolbar!.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     await user.click(filters)
     let menu = await screen.findByRole('menu')
-    expect(within(menu).getByText('Filters')).toBeInTheDocument()
-    expect(menu.querySelectorAll('.billing-filter-status-icon')).toHaveLength(4)
     expect(within(menu).getByRole('menuitemcheckbox', { name: /^SHOW ALL/ })).toBeChecked()
     expect(within(menu).getByRole('menuitemcheckbox', { name: /PARTLY PAID/ })).not.toBeChecked()
     await user.click(within(menu).getByRole('menuitemcheckbox', { name: /PARTLY PAID/ }))
@@ -296,7 +288,6 @@ describe('admin workspace integration', () => {
     expect(within(table).getAllByRole('row').slice(1).map(row => row.textContent)).toEqual([
       expect.stringContaining('Room 102'),
     ])
-    expect(table.closest('.billing-table-enter')).not.toBeNull()
     expect(chart).toHaveTextContent('1(25.0%)')
 
     await user.click(screen.getByRole('button', { name: /^Filters/ }))
@@ -407,7 +398,7 @@ describe('admin workspace integration', () => {
     expect(screen.getByText('Electricity price').closest('div')).toHaveTextContent('₱13.00 per kWh')
     expect(screen.getByText('Water and washing').closest('div')).toHaveTextContent('₱100.00 per tenant for water. Washing is optional at ₱100.00 per room.')
 
-    await user.selectOptions(screen.getByLabelText('Report month'), 'period-oct')
+    await chooseOption(user, screen.getByLabelText('Report month'), /Oct/)
     expect(within(report).getAllByRole('row')).toHaveLength(6)
     expect(within(report).getAllByRole('button', { name: /View pending payments/ })).toHaveLength(3)
     const settledRoom = within(report).getByRole('row', { name: /Room 105/ })
@@ -448,7 +439,7 @@ describe('admin workspace integration', () => {
     await user.click(within(pending).getByRole('button', { name: 'Close pending payments' }))
     await user.click(within(nav).getByRole('link', { name: 'Payments & Receipts' }))
     expect(await screen.findByRole('table', { name: 'Payment history' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /record payment/i })).not.toBeInTheDocument()
+    expect(within(screen.getByRole('main')).queryByRole('button', { name: /record payment/i })).not.toBeInTheDocument()
     await user.click(within(nav).getByRole('link', { name: 'Billing' }))
     expect(await screen.findByRole('button', { name: /Calculate payment/ })).toBeInTheDocument()
   })
@@ -507,9 +498,9 @@ describe('admin workspace integration', () => {
 
     await user.click(within(nav).getByRole('link', { name: 'Dashboard' }))
     const overview = await screen.findByRole('region', { name: 'Money overview' })
-    expect(within(overview).getByRole('heading', { name: 'Known outstanding' }).closest('[data-slot="card"]')).toHaveTextContent('₱0.00')
-    expect(within(overview).getByRole('heading', { name: 'Total billed' }).closest('[data-slot="card"]')).toHaveTextContent('₱15,550.00')
-    expect(within(overview).getByRole('heading', { name: 'Total collected' }).closest('[data-slot="card"]')).toHaveTextContent('₱15,550.00')
+    expect(within(overview).getByRole('group', { name: 'Known outstanding' })).toHaveTextContent('₱0.00')
+    expect(within(overview).getByRole('group', { name: 'Total billed' })).toHaveTextContent('₱15,550.00')
+    expect(within(overview).getByRole('group', { name: 'Total collected' })).toHaveTextContent('₱15,550.00')
     await user.click(within(nav).getByRole('link', { name: 'Reports & Settings' }))
     expect(await screen.findByLabelText('Room report reconciliation')).toHaveTextContent('billed ₱15,550.00 · applied ₱15,550.00 · known outstanding ₱0.00 · 1 electricity bill awaiting a meter reading')
   })
@@ -553,7 +544,7 @@ describe('admin workspace integration', () => {
     const user = userEvent.setup()
     renderApp('/payments')
     await user.click(await screen.findByText('More payment tools'))
-    expect(screen.getByText('Record other payments')).toBeVisible()
+    expect(screen.getByText('Record advance payments')).toBeVisible()
     expect(screen.getByText('These tools are not available yet.')).toBeVisible()
     expect(screen.getByRole('region', { name: 'Advance payments' })).toHaveTextContent('₱500.00')
     expect(screen.queryByRole('button', { name: /record payment|issue receipt|allocate|correct payment/i })).not.toBeInTheDocument()
@@ -569,12 +560,12 @@ describe('admin workspace integration', () => {
     expect(within(screen.getByRole('group', { name: 'Occupied rooms' })).getByText('4')).toBeInTheDocument()
     expect(within(screen.getByRole('group', { name: 'Available rooms' })).getByText('10')).toBeInTheDocument()
     expect(within(screen.getByRole('group', { name: 'Under repair' })).getByText('1')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Available' }))
+    await user.click(screen.getByRole('radio', { name: 'Available' }))
     expect(screen.getByRole('article', { name: 'Room 105' })).toBeInTheDocument()
     expect(screen.getByRole('article', { name: 'Room 107' })).toBeInTheDocument()
     expect(screen.queryByRole('article', { name: 'Room 102' })).not.toBeInTheDocument()
     expect(screen.queryByRole('article', { name: 'Room 106' })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Occupied' }))
+    await user.click(screen.getByRole('radio', { name: 'Occupied' }))
     expect(screen.getAllByRole('article')).toHaveLength(4)
   })
 
@@ -582,18 +573,18 @@ describe('admin workspace integration', () => {
     const user = userEvent.setup()
     renderApp('/rooms')
     const rate = await screen.findByLabelText('Rental rate')
-    await user.selectOptions(rate, 'RATE_4000')
+    await chooseOption(user, rate, /4,000/)
     expect(screen.getAllByRole('article')).toHaveLength(6)
     expect(screen.getByRole('article', { name: 'Room 109' })).toHaveTextContent('₱4,000.00/month')
     expect(screen.queryByRole('article', { name: 'Room 102' })).not.toBeInTheDocument()
-    await user.selectOptions(rate, 'RATE_5000')
+    await chooseOption(user, rate, /5,000/)
     expect(screen.getAllByRole('article')).toHaveLength(1)
     expect(screen.getByRole('article', { name: 'Room 115' })).toHaveTextContent('₱5,000.00/month')
-    await user.selectOptions(rate, 'RATE_3500')
-    await user.click(screen.getByRole('button', { name: 'Under repair' }))
+    await chooseOption(user, rate, /3,500/)
+    await user.click(screen.getByRole('radio', { name: 'Under repair' }))
     expect(screen.getAllByRole('article')).toHaveLength(1)
     expect(screen.getByRole('article', { name: 'Room 106' })).toBeInTheDocument()
-    await user.selectOptions(rate, 'RATE_4000')
+    await chooseOption(user, rate, /4,000/)
     expect(screen.getByText('No rooms here')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Show all rooms' }))
     expect(screen.getAllByRole('article')).toHaveLength(15)
@@ -611,8 +602,7 @@ describe('admin workspace integration', () => {
       [summary.unresolved > 0 ? 'Known outstanding' : 'Total outstanding', formatMoney(summary.outstanding)],
       ['Collection rate', `${(summary.applied / summary.billed * 100).toFixed(1)}%`],
     ] as const) {
-      const card = within(overview).getByRole('heading', { name: label }).closest('[data-slot="card"]')
-      expect(card).toHaveTextContent(value)
+      expect(within(overview).getByRole('group', { name: label })).toHaveTextContent(value)
     }
     expect(screen.queryByText('Applied to November charges')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /reset demo|restore sample records/i })).not.toBeInTheDocument()

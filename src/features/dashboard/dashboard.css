@@ -1,0 +1,12 @@
+/* Dashboard-only layout. Colours and spacing come from Radix tokens. */
+
+.dash-charts { display: grid; gap: 0 32px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 64rem) { .dash-charts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.dash-chart-facts { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--gray-5); }
+
+/* Pending payments dialog */
+.pending-total { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.pending-body { margin-top: 8px; }
+.pending-category { padding: 16px 0; border-bottom: 1px solid var(--gray-5); }
+.pending-category-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 4px; }
+.pending-note { margin: 8px 0; padding: 8px 12px; border: 1px solid var(--gray-5); border-radius: var(--radius-3); background: var(--gray-2); }

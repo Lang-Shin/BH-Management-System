@@ -1,0 +1,18 @@
+.rooms-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px;
+  margin: 24px 0 16px;
+}
+.rooms-toolbar-field { display: inline-flex; align-items: center; gap: 8px; }
+.rooms-toolbar-count { margin-left: auto; }
+
+.rooms-grid {
+  display: grid; gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+}
+
+.room-card { display: flex; flex-direction: column; gap: 4px; }
+.room-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.room-card-tenants { margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid var(--gray-5); list-style: none; }
+.room-card-tenants > li { padding: 2px 0; }
+.room-card-action { margin-top: auto; padding-top: 16px; }
+.room-card-body { flex: 1; }

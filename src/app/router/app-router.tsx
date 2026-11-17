@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { Theme } from '@radix-ui/themes'
 import { AdminShell } from '@/components/layout/admin-shell'
 import { NotFound } from './not-found'
 
@@ -10,7 +11,7 @@ import Payments from '@/features/payments/payments-page'
 import Reports from '@/features/reports/reports-page'
 
 export function AppRouter() {
-  return <Routes><Route element={<AdminShell />}>
+  return <Theme accentColor="green" grayColor="sand" radius="medium" scaling="100%" panelBackground="solid"><Routes><Route element={<AdminShell />}>
     <Route index element={<Navigate to="/dashboard" replace />} />
     <Route path="dashboard" element={<Dashboard />} />
     <Route path="tenants" element={<Tenants />} />
@@ -19,5 +20,5 @@ export function AppRouter() {
     <Route path="payments" element={<Payments />} />
     <Route path="reports" element={<Reports />} />
     <Route path="*" element={<NotFound />} />
-  </Route></Routes>
+  </Route></Routes></Theme>
 }

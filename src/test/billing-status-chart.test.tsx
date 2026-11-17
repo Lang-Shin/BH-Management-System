@@ -1,8 +1,12 @@
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { Theme } from '@radix-ui/themes'
+import type { ReactNode } from 'react'
 import { createDemoData, DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
 import { BillingStatusChart } from '@/features/billing/billing-status-chart'
 import { billingStatusCounts, selectBillingRooms } from '@/features/billing/billing-room-status'
+
+const wrapper = ({ children }: { children: ReactNode }) => <Theme>{children}</Theme>
 
 describe('Billing room-status chart', () => {
   it('counts each room once using the same category-based Status as the table', () => {
@@ -13,7 +17,7 @@ describe('Billing room-status chart', () => {
       ['Room 101', 'PAID'], ['Room 102', 'PARTLY PAID'], ['Room 103', 'PAID'], ['Room 104', 'NOT YET PAID'],
     ])
     expect(billingStatusCounts(rooms)).toEqual({ total: 4, paid: 2, partlyPaid: 1, notPaid: 1 })
-    render(<BillingStatusChart rooms={rooms} periodLabel="November 2026" outstandingOnly={false} />)
+    render(<BillingStatusChart rooms={rooms} periodLabel="November 2026" outstandingOnly={false} />, { wrapper })
     const figure = screen.getByRole('figure', { name: 'Billing room payment status' })
     const paidRow = within(figure).getByText('PAID', { exact: true }).closest('div')!
     const legend = within(paidRow).getByRole('definition')
@@ -30,14 +34,14 @@ describe('Billing room-status chart', () => {
     const filtered = selectBillingRooms(data, 'period-oct', DEMO_DATE, true)
     expect(billingStatusCounts(filtered)).toEqual({ total: 3, paid: 0, partlyPaid: 1, notPaid: 2 })
     expect(filtered.map(room => room.context.label)).toEqual(['Room 102', 'Room 103', 'Room 104'])
-    render(<BillingStatusChart rooms={rooms} periodLabel="October 2026" outstandingOnly={false} />)
+    render(<BillingStatusChart rooms={rooms} periodLabel="October 2026" outstandingOnly={false} />, { wrapper })
     const figure = screen.getByRole('figure', { name: 'Billing room payment status' })
     expect(figure).toHaveTextContent('2 of 5 rooms fully paid')
     expect(figure).not.toHaveTextContent(/NaN|Infinity/)
   })
 
   it('shows an empty chart without NaN values or colored phantom segments', () => {
-    render(<BillingStatusChart rooms={[]} periodLabel="Empty month" outstandingOnly={false} />)
+    render(<BillingStatusChart rooms={[]} periodLabel="Empty month" outstandingOnly={false} />, { wrapper })
     const figure = screen.getByRole('figure', { name: 'Billing room payment status' })
     expect(figure).toHaveTextContent('No billed rooms match this view.')
     expect(figure).not.toHaveTextContent(/NaN|Infinity/)

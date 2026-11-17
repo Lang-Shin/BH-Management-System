@@ -1,13 +1,17 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
+import { Theme } from '@radix-ui/themes'
+import type { ReactNode } from 'react'
 import { createDemoData, DEMO_DATE } from '@/data/fixtures/demo'
 import { PaymentHistoryTable } from '@/components/shared/payment-history-table'
 import { formatDate, formatMoney } from '@/lib/format'
 import type { Payment, PrototypeAppState } from '@/domain/types/models'
 
+const wrapper = ({ children }: { children: ReactNode }) => <Theme>{children}</Theme>
+
 function renderPayment(data: PrototypeAppState, payment: Payment) {
-  return render(<PaymentHistoryTable data={data} payments={[payment]} />)
+  return render(<PaymentHistoryTable data={data} payments={[payment]} />, { wrapper })
 }
 
 function paymentFrom(data: PrototypeAppState, id: string): Payment {
@@ -19,8 +23,8 @@ function paymentFrom(data: PrototypeAppState, id: string): Payment {
 describe('Payment History transaction dialog', () => {
   it('removes What Was Paid and gives every payment a See Transaction button', () => {
     const data = createDemoData()
-    render(<PaymentHistoryTable data={data} payments={data.payments} />)
-    const table = screen.getByRole('table', { name: 'Payment history' })
+    render(<PaymentHistoryTable data={data} payments={data.payments} />, { wrapper })
+    const table = within(screen.getByRole('region', { name: 'Payment history' })).getByRole('table')
     expect(within(table).queryByRole('columnheader', { name: /what was paid/i })).not.toBeInTheDocument()
     expect(within(table).getAllByRole('button', { name: /See Transaction/ })).toHaveLength(data.payments.length)
     expect(within(table).getByRole('columnheader', { name: 'Receipt number' })).toBeInTheDocument()
@@ -38,10 +42,8 @@ describe('Payment History transaction dialog', () => {
     expect(within(dialog).getAllByText('Room 103')).toHaveLength(1)
     expect(dialog).toHaveTextContent(formatDate(payment.paidOn))
     expect(dialog).toHaveTextContent(formatMoney(payment.amountCents))
-    const amount = within(dialog).getByText('Amount paid').parentElement!
-    expect(amount).toHaveClass('transaction-amount-section')
-    expect(amount.parentElement).toHaveClass('transaction-metadata', 'grid-cols-2')
-    expect(amount.querySelector('dd')).toHaveTextContent(formatMoney(payment.amountCents))
+    const amount = within(dialog).getByText('Amount paid').closest('div')!
+    expect(within(amount).getByRole('definition')).toHaveTextContent(formatMoney(payment.amountCents))
     expect(dialog).toHaveTextContent('Recorded')
     expect(dialog).toHaveTextContent(receipt)
     expect(dialog).toHaveTextContent('Paid by: Jamie Santos')

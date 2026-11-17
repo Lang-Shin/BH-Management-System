@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import '@radix-ui/themes/styles.css'
 import '@fontsource-variable/nunito'
 import { App } from './app/App'
 import './styles/globals.css'

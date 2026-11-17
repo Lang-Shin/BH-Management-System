@@ -1,12 +1,10 @@
 import { useState, type CSSProperties } from 'react'
-import { DoorOpen } from 'lucide-react'
+import { Button, Heading, Select, SegmentedControl, Text } from '@radix-ui/themes'
 import { PageHeader } from '@/components/shared/page'
 import { EmptyState } from '@/components/shared/states'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { RoomSummary } from '@/components/shared/room-summary'
 import { AnimatedNumber } from '@/components/shared/animated-number'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { usePrototype } from '@/hooks/use-prototype'
 import { roomOccupancy, roomOccupants, selectRoomSummary, type RoomOccupancy } from '@/domain/calculations/summary'
 import { DEMO_DATE } from '@/data/fixtures/demo'
@@ -14,6 +12,7 @@ import { formatMoney } from '@/lib/format'
 import { ROOM_RATE_CATEGORIES, roomRate } from '@/lib/room-rates'
 import type { RoomCategoryId } from '@/domain/types/models'
 import { AddRoomDialog } from './add-room-dialog'
+import './rooms.css'
 
 type Filter = 'ALL' | RoomOccupancy
 type RateFilter = 'ALL' | RoomCategoryId
@@ -31,23 +30,47 @@ export default function Rooms() {
   const summary = selectRoomSummary(data, DEMO_DATE)
   const rooms = data.rooms.filter(room => (filter === 'ALL' || roomOccupancy(data, room, DEMO_DATE) === filter)
     && (rateFilter === 'ALL' || room.categoryId === rateFilter))
-  const filterIndex = filters.findIndex(item => item.value === filter)
+  const hasFilters = filter !== 'ALL' || rateFilter !== 'ALL'
+  function clearFilters() { setFilter('ALL'); setRateFilter('ALL') }
 
   return <>
     <PageHeader title="Rooms" description="A room is occupied when someone rents it, even if some beds are unused." action={<AddRoomDialog />} />
     <RoomSummary summary={summary} />
-    <div className="mb-6 flex flex-wrap items-center justify-between gap-4"><div className="room-segmented-control" role="group" aria-label="Show rooms" style={{ '--filter-index': filterIndex, '--filter-column': filterIndex % 2, '--filter-row': Math.floor(filterIndex / 2) } as CSSProperties}>{filters.map(item => <Button key={item.value} variant="ghost" className="room-filter" aria-pressed={filter === item.value} onClick={() => setFilter(item.value)}>{item.label}</Button>)}</div><div className="flex flex-wrap items-center gap-3"><label htmlFor="room-rate-filter" className="text-sm font-semibold">Rental rate</label><select id="room-rate-filter" value={rateFilter} onChange={event => setRateFilter(event.target.value as RateFilter)} className="min-h-12 rounded-lg border bg-card px-3 py-2 text-base"><option value="ALL">All rates</option>{ROOM_RATE_CATEGORIES.map(category => <option key={category.id} value={category.id}>{category.label}/month</option>)}</select></div><p role="status" className="text-sm text-muted-foreground">Showing <AnimatedNumber value={rooms.length} /> of <AnimatedNumber value={data.rooms.length} /> rooms</p></div>
+    <div className="rooms-toolbar">
+      <SegmentedControl.Root value={filter} onValueChange={value => { if (value) setFilter(value as Filter) }} aria-label="Show rooms">
+        {filters.map(item => <SegmentedControl.Item key={item.value} value={item.value}>{item.label}</SegmentedControl.Item>)}
+      </SegmentedControl.Root>
+      <div className="rooms-toolbar-field">
+        <Text as="label" htmlFor="room-rate-filter" size="2" weight="medium">Rental rate</Text>
+        <Select.Root value={rateFilter} onValueChange={value => setRateFilter(value as RateFilter)}>
+          <Select.Trigger id="room-rate-filter" variant="surface" color="gray" />
+          <Select.Content>
+            <Select.Item value="ALL">All rates</Select.Item>
+            {ROOM_RATE_CATEGORIES.map(category => <Select.Item key={category.id} value={category.id}>{category.label}/month</Select.Item>)}
+          </Select.Content>
+        </Select.Root>
+      </div>
+      {hasFilters && <Button variant="ghost" color="gray" onClick={clearFilters}>Clear filters</Button>}
+      <Text as="p" size="2" color="gray" role="status" aria-atomic="true" className="rooms-toolbar-count">Showing <AnimatedNumber value={rooms.length} /> of <AnimatedNumber value={data.rooms.length} /> rooms</Text>
+    </div>
     <p role="status" className="sr-only">{notice}</p>
-    {rooms.length === 0 ? <div key={`${filter}:${rateFilter}`} className="room-filter-empty"><EmptyState title="No rooms here" description="There are no rooms with this status and rental rate." action={<Button variant="outline" onClick={() => { setFilter('ALL'); setRateFilter('ALL') }}>Show all rooms</Button>} /></div> : <div key={`${filter}:${rateFilter}`} className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">{rooms.map((room, index) => {
-      const tenants = roomOccupants(data, room.id, DEMO_DATE)
-      const status = roomOccupancy(data, room, DEMO_DATE)
-      return <Card role="article" aria-label={`Room ${room.name}`} key={room.id} className="room-result-card shadow-none" style={{ '--room-card-delay': `${Math.min(index, 5) * 45}ms` } as CSSProperties}><CardContent>
-        <div className="flex flex-wrap items-center justify-between gap-3"><span className="rounded-xl bg-accent p-3 text-primary"><DoorOpen className="size-6" aria-hidden="true" /></span><StatusBadge status={statusLabels[status]} /></div>
-        <h2 className="mt-5 text-xl font-bold">Room {room.name}</h2><p className="mt-1 text-lg font-bold text-primary"><AnimatedNumber value={formatMoney(roomRate(room).monthlyRentCents)} /><span className="text-sm font-medium text-muted-foreground">/month</span></p><p className="mt-2 text-sm text-muted-foreground">Floor {room.floor} · <AnimatedNumber value={room.capacity} /> {room.capacity === 1 ? 'bed' : 'beds'}{room.capacity > 1 ? ' · Shared-capacity room' : ' · Single room'}</p>
-        <p className="mt-2 text-sm font-semibold">{statusLabels[status]} — <AnimatedNumber value={tenants.length} /> {tenants.length === 1 ? 'tenant' : 'tenants'}</p>
-        <div className="mt-5 border-t pt-4">{status === 'OCCUPIED' ? <><p className="mb-2 text-sm text-muted-foreground">{tenants.length === 1 ? 'Tenant' : 'Tenants'}</p><ul className="space-y-2 text-base font-medium">{tenants.map(t => <li key={t.id}>{t.name}</li>)}</ul></> : <p className="text-base text-muted-foreground">{status === 'UNDER_REPAIR' ? 'Not available while repairs are being done.' : 'Ready for a new tenant.'}</p>}</div>
-        {status !== 'OCCUPIED' && <Button variant="outline" className="mt-6 w-full" aria-label={status === 'UNDER_REPAIR' ? `Mark room ${room.name} as available` : `Mark room ${room.name} under repair`} onClick={() => { dispatch({ type: 'room/statusToggled', roomId: room.id }); setNotice(`Room ${room.name} is now ${status === 'UNDER_REPAIR' ? 'available' : 'under repair'}.`); }}>{status === 'UNDER_REPAIR' ? 'Mark as available' : 'Needs repair'}</Button>}
-      </CardContent></Card>
-    })}</div>}
+    {rooms.length === 0
+      ? <div key={`${filter}:${rateFilter}`}><EmptyState title={data.rooms.length ? 'No rooms here' : 'No rooms yet'} description={data.rooms.length ? 'There are no rooms with this status and rental rate.' : 'Add a room to start tracking its availability and rental rate.'} action={data.rooms.length ? <Button variant="outline" color="gray" onClick={clearFilters}>Show all rooms</Button> : <AddRoomDialog />} /></div>
+      : <div key={`${filter}:${rateFilter}`} className="rooms-grid">{rooms.map((room, index) => {
+        const tenants = roomOccupants(data, room.id, DEMO_DATE)
+        const status = roomOccupancy(data, room, DEMO_DATE)
+        return <article key={room.id} aria-label={`Room ${room.name}`} className="panel panel-pad room-card enter" style={{ '--enter-delay': `${Math.min(index, 5) * 45}ms` } as CSSProperties}>
+          <div className="room-card-head">
+            <Heading as="h2" size="4">Room {room.name}</Heading>
+            <StatusBadge status={statusLabels[status]} label={status === 'OCCUPIED' ? `Occupied — ${tenants.length} ${tenants.length === 1 ? 'tenant' : 'tenants'}` : statusLabels[status]} />
+          </div>
+          <Text as="p" size="3" weight="bold" className="num"><AnimatedNumber value={formatMoney(roomRate(room).monthlyRentCents)} /><Text weight="regular" color="gray" size="2">/month</Text></Text>
+          <Text as="p" size="2" color="gray">Floor {room.floor} · <AnimatedNumber value={room.capacity} /> {room.capacity === 1 ? 'bed' : 'beds'}{room.capacity > 1 ? ' · Shared-capacity room' : ' · Single room'}</Text>
+          <div className="room-card-body">{status === 'OCCUPIED'
+            ? <ul className="room-card-tenants" aria-label={tenants.length === 1 ? 'Tenant' : 'Tenants'}>{tenants.map(t => <li key={t.id}><Text size="2">{t.name}</Text></li>)}</ul>
+            : <Text as="p" size="2" color="gray" mt="3">{status === 'UNDER_REPAIR' ? 'Not available while repairs are being done.' : 'Ready for a new tenant.'}</Text>}</div>
+          {status !== 'OCCUPIED' && <div className="room-card-action"><Button variant="soft" color="gray" style={{ width: '100%' }} aria-label={status === 'UNDER_REPAIR' ? `Mark room ${room.name} as available` : `Mark room ${room.name} under repair`} onClick={() => { dispatch({ type: 'room/statusToggled', roomId: room.id }); setNotice(`Room ${room.name} is now ${status === 'UNDER_REPAIR' ? 'available' : 'under repair'}.`) }}>{status === 'UNDER_REPAIR' ? 'Mark as available' : 'Needs repair'}</Button></div>}
+        </article>
+      })}</div>}
   </>
 }

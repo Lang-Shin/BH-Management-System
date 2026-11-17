@@ -1,0 +1,18 @@
+.room-strip {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--gray-5); border-radius: var(--radius-4);
+  background: var(--color-panel-solid); overflow: hidden;
+}
+.room-strip-item { min-width: 0; padding: 16px 20px; }
+.room-strip-item + .room-strip-item { border-left: 1px solid var(--gray-5); }
+.room-strip-bar { height: 4px; margin-top: 12px; border-radius: 2px; background: var(--gray-4); overflow: hidden; }
+.room-strip-bar > span { display: block; height: 100%; background: var(--accent-9); transform-origin: left center; animation: analytics-grow 700ms var(--route-ease) 100ms backwards; }
+.room-strip-item[data-tone="repair"] .room-strip-bar > span { background: var(--gray-9); }
+
+@media (max-width: 40rem) {
+  .room-strip { grid-template-columns: 1fr; }
+  .room-strip-item + .room-strip-item { border-left: 0; border-top: 1px solid var(--gray-5); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .room-strip-bar > span { animation: none; }
+}

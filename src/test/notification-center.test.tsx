@@ -65,7 +65,7 @@ describe('notification center', () => {
     expect(await screen.findByRole('button', { name: 'Notifications, 3 unread' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Restore sample records' }))
-    await user.click(within(screen.getByRole('dialog', { name: 'Restore the sample records?' })).getByRole('button', { name: 'Yes, restore records' }))
+    await user.click(within(screen.getByRole('alertdialog', { name: 'Restore the sample records?' })).getByRole('button', { name: 'Yes, restore records' }))
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Notifications, 4 unread' })).toBeInTheDocument())
     expect(loadReadIds()).toEqual([])

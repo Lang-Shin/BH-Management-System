@@ -1,7 +1,12 @@
+import { Text } from '@radix-ui/themes'
+import './shared-parts.css'
+
 export function WorkflowPlaceholders({ title = 'More tools', items }: { title?: string; items: { title: string; description: string }[] }) {
-  return <details className="mt-8 rounded-xl border bg-card p-5 sm:p-6">
-    <summary className="min-h-12 cursor-pointer py-3 text-base font-semibold">{title}<span className="ml-3 inline-block rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">Coming later</span></summary>
-    <p className="mt-4 text-sm text-muted-foreground">These tools are not available yet.</p>
-    <dl className="mt-5 grid gap-5 md:grid-cols-2">{items.map(item => <div key={item.title}><dt className="text-base font-semibold">{item.title}</dt><dd className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.description}</dd></div>)}</dl>
+  return <details className="disclosure">
+    <summary>{title}<Text size="1" color="gray" weight="regular">Coming later</Text></summary>
+    <div className="disclosure-body">
+      <Text as="p" size="2" color="gray">These tools are not available yet.</Text>
+      <dl style={{ display: 'grid', gap: 16, margin: '16px 0 0' }}>{items.map(item => <div key={item.title}><dt><Text size="2" weight="bold">{item.title}</Text></dt><dd style={{ margin: '4px 0 0' }}><Text size="2" color="gray">{item.description}</Text></dd></div>)}</dl>
+    </div>
   </details>
 }

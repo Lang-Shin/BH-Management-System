@@ -1,6 +1,8 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
+import { Theme } from '@radix-ui/themes'
+import type { ReactNode } from 'react'
 import { createDemoData, DEMO_DATE } from '@/data/fixtures/demo'
 import { isPrototypeData } from '@/domain/validation/prototype-data'
 import { selectRoomFinance } from '@/domain/calculations/room-finance'
@@ -8,6 +10,8 @@ import { pendingPaymentCategories, pendingPaymentPeriods } from '@/features/dash
 import { OutstandingBalances } from '@/features/dashboard/outstanding-balances'
 import { PendingPaymentsDialog } from '@/features/dashboard/pending-payments-dialog'
 import type { Charge } from '@/domain/types/models'
+
+const wrapper = ({ children }: { children: ReactNode }) => <Theme>{children}</Theme>
 
 function historicalPendingFixture() {
   const data = createDemoData()
@@ -120,7 +124,7 @@ describe('room pending-payment presentation', () => {
     const data = historicalPendingFixture()
     const before = JSON.stringify(data)
     const user = userEvent.setup()
-    render(<OutstandingBalances data={data} asOf={DEMO_DATE} />)
+    render(<OutstandingBalances data={data} asOf={DEMO_DATE} />, { wrapper })
     const trigger = screen.getByRole('button', { name: 'View pending payments for Room 101' })
     expect(screen.queryByText('Alex Rivera')).not.toBeInTheDocument()
     await user.click(trigger)
@@ -172,7 +176,7 @@ describe('room pending-payment presentation', () => {
   it('shows cumulative unresolved electricity without inventing a peso amount', () => {
     const data = createDemoData()
     const room = selectRoomFinance(data, DEMO_DATE).find(item => item.id === 'room-4')!
-    render(<PendingPaymentsDialog data={data} room={room} asOf={DEMO_DATE} onClose={() => {}} onReturnFocus={() => {}} />)
+    render(<PendingPaymentsDialog data={data} room={room} asOf={DEMO_DATE} onClose={() => {}} onReturnFocus={() => {}} />, { wrapper })
     const dialog = screen.getByRole('dialog', { name: 'Room 104 · Pending Payments' })
     expect(dialog).toHaveTextContent('Known total still to pay')
     expect(dialog).toHaveTextContent('Excludes electricity awaiting calculation.')
@@ -186,7 +190,7 @@ describe('room pending-payment presentation', () => {
   it('shows only categories with pending months and keeps the washing note visible', async () => {
     const data = createDemoData()
     const user = userEvent.setup()
-    render(<OutstandingBalances data={data} asOf={DEMO_DATE} />)
+    render(<OutstandingBalances data={data} asOf={DEMO_DATE} />, { wrapper })
     await user.click(screen.getByRole('button', { name: 'View pending payments for Room 104' }))
     const dialog = screen.getByRole('dialog', { name: 'Room 104 · Pending Payments' })
     expect(within(dialog).getAllByRole('region').map(section => section.getAttribute('aria-label'))).toEqual(['Rent pending payments', 'Electricity pending payments', 'Water pending payments'])

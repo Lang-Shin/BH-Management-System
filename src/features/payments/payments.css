@@ -1,0 +1,16 @@
+.payments-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin-bottom: 12px; }
+.payments-toolbar-search { flex: 1 1 18rem; max-width: 26rem; }
+.payments-count { margin: 0 0 12px; }
+
+.receipt-preview { max-width: 32rem; margin-bottom: 20px; }
+.receipt-preview-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.receipt-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; margin: 16px 0 0; }
+.receipt-facts dd { margin: 2px 0 0; }
+.receipt-facts-wide { grid-column: 1 / -1; min-width: 0; }
+.receipt-facts-wide dd { overflow-wrap: anywhere; }
+.receipt-facts-total { padding-top: 12px; border-top: 1px solid var(--gray-5); }
+
+.receipt-coverage { margin: 8px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--gray-5); }
+.receipt-coverage > li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--gray-5); }
+.receipt-coverage-main { min-width: 0; }
+.receipt-coverage-id { overflow-wrap: anywhere; }

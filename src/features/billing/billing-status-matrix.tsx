@@ -1,52 +1,39 @@
-import { Check, CircleDashed, Clock3 } from 'lucide-react'
+import { Text } from '@radix-ui/themes'
 import type { PrototypeAppState } from '@/domain/types/models'
 import { financialTotals } from '@/domain/calculations/room-finance'
 import { unresolvedElectricity } from '@/domain/calculations/summary'
 import { DataTable } from '@/components/shared/data-table'
+import { StatusBadge } from '@/components/shared/status-badge'
 import { CATEGORY_LABELS } from '@/lib/labels'
 import { formatMoney } from '@/lib/format'
 import { billingCategories, selectBillingRooms, type BillingRoomStatus } from './billing-room-status'
 
-function PaidLabel() {
-  return <span className="paid-indicator"><span className="paid-indicator-icon"><Check aria-hidden="true" /></span><span>Paid</span></span>
-}
-
-function PaidCategoryLabel() {
-  return <span className="billing-paid-badge"><span aria-hidden="true" className="billing-paid-dot" />PAID</span>
-}
-
-function UnsettledLabel({ partial = false }: { partial?: boolean }) {
-  const Icon = partial ? CircleDashed : Clock3
-  return <span className="billing-state-pill" data-state={partial ? 'partial' : 'unpaid'}><span className="billing-state-icon"><Icon aria-hidden="true" /></span><span>{partial ? 'PARTLY PAID' : 'NOT YET PAID'}</span></span>
-}
-
-function MissingCategoryLabel({ washing = false }: { washing?: boolean }) {
-  return <span className="text-sm text-muted-foreground">{washing ? 'DID NOT AVAIL' : 'NO BILL'}</span>
-}
-
-function AwaitingReadingLabel() {
-  return <span className="text-sm font-semibold text-amber-900">AWAITING READING</span>
+const roomStatusLabels: Record<BillingRoomStatus, { status: string; label?: string }> = {
+  'PAID': { status: 'Paid' },
+  'PARTLY PAID': { status: 'Partly paid', label: 'PARTLY PAID' },
+  'NOT YET PAID': { status: 'Not yet paid', label: 'NOT YET PAID' },
 }
 
 function RoomStatus({ status }: { status: BillingRoomStatus }) {
-  if (status === 'PAID') return <PaidLabel />
-  return <UnsettledLabel partial={status === 'PARTLY PAID'} />
+  const { status: name, label } = roomStatusLabels[status]
+  return <StatusBadge status={name} label={label} />
 }
 
 export function BillingStatusMatrix({ data, periodId, asOf, outstandingOnly, statusFilter = null }: { data: PrototypeAppState; periodId: string; asOf: string; outstandingOnly: boolean; statusFilter?: BillingRoomStatus | null }) {
   const rooms = selectBillingRooms(data, periodId, asOf, outstandingOnly).filter(room => !statusFilter || room.billingStatus === statusFilter)
   return <DataTable rows={rooms} caption="Who has paid" columns={[
-    { key: 'room', label: 'Room', render: room => <div className="max-w-xs whitespace-normal"><p className="font-semibold">{room.context.label}</p><p className="mt-1 text-xs text-muted-foreground">{room.charges.length} individual charges</p></div> },
+    { key: 'room', label: 'Room', render: room => <div style={{ maxWidth: '20rem', whiteSpace: 'normal' }}><Text as="p" size="2" weight="medium">{room.context.label}</Text><Text as="p" size="1" color="gray">{room.charges.length} individual charges</Text></div> },
     ...billingCategories.map(category => ({ key: category, label: CATEGORY_LABELS[category], render: (room: typeof rooms[number]) => {
       const items = room.charges.filter(charge => charge.category === category)
       const awaitingReading = category === 'ELECTRICITY' && room.context.roomId
         ? unresolvedElectricity(data, asOf, periodId, room.context.roomId).length > 0
         : false
-      if (awaitingReading) return <AwaitingReadingLabel />
-      if (!items.length) return <MissingCategoryLabel washing={category === 'WASHING_MACHINE'} />
+      if (awaitingReading) return <Text size="2" color="amber" weight="medium">AWAITING READING</Text>
+      if (!items.length) return <Text size="2" color="gray">{category === 'WASHING_MACHINE' ? 'DID NOT AVAIL' : 'NO BILL'}</Text>
       const totals = financialTotals(data, items, asOf)
-      if (category === 'ELECTRICITY') return totals.outstanding > 0 ? <UnsettledLabel /> : <PaidCategoryLabel />
-      return totals.outstanding > 0 ? <p className="font-semibold tabular-nums">{formatMoney(totals.outstanding)}</p> : <PaidCategoryLabel />
+      if (totals.outstanding <= 0) return <Text size="2" color="gray">PAID</Text>
+      if (category === 'ELECTRICITY') return <Text size="2" color="red" weight="medium">NOT YET PAID</Text>
+      return <Text size="2" weight="medium" className="num">{formatMoney(totals.outstanding)}</Text>
     } })),
     { key: 'status', label: 'Status', render: room => <RoomStatus status={room.billingStatus} /> },
   ]} />
