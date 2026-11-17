@@ -30,7 +30,7 @@ npm run preview    # Serve the built application locally
 | Route | Foundation capability |
 | --- | --- |
 | `/dashboard` | Dashboard (titled Overview): simple money totals, bill payments, recent payments, upcoming bills, and room counts |
-| `/tenants` | Search, fictional profiles, assignment history, tenant/account statuses, demo notes |
+| `/tenants` | Search, persisted add/edit/delete, safe room transfers, move-out/archive, profiles, assignment history, tenant/account statuses, and demo notes |
 | `/rooms` | Occupied, available, and under-repair rooms; monthly rental-rate categories and clickable cards; occupancy filters; Room Details with tenants, beds, washing-machine subscription, meter summary, Save Changes, and Cancel |
 | `/billing` | Billing: choose a month; category cells show unpaid amounts for Rent/Water/Washing, Forest Green PAID dot badges, NOT YET PAID for Electricity, AWAITING READING when the current meter reading is missing, NO BILL for other missing categories, or DID NOT AVAIL when a room skipped optional washing; the room-level Status retains its styled Paid/PARTLY PAID/NOT YET PAID indicators; **Calculate payment** records a new room payment |
 | `/payments` | Transaction workspace with Transactions and Correction History tabs, room/receipt search, billing-month/date and status filters, pagination, See Transaction details, authorized Edit Payment corrections, advance credit, sample receipt snapshots, and receipt-detail dialogs; no payment creation |

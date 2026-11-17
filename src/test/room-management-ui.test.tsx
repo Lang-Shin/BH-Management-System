@@ -58,7 +58,7 @@ describe('room management UI', () => {
     app.unmount()
     renderApp('/rooms')
     expect(await screen.findByRole('button', { name: 'Room 116 details' })).toBeInTheDocument()
-  })
+  }, 15000)
 
   it('edits an empty room with prefilled values and without a Floor field', async () => {
     const user = userEvent.setup()

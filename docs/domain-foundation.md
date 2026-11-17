@@ -106,7 +106,7 @@ The fixture factory generates fresh objects for reset/tests; it is not an execut
 ## Page foundations
 
 - **Dashboard:** financial overview, independent category payment status, five recent payments, upcoming charge due dates, and assignment-based occupancy.
-- **Tenants:** searchable directory, profiles, dated assignments/agreed amounts, tenant status, derived account balance/credit, and fictional contacts.
+- **Tenants:** searchable directory, persisted add/edit/delete, validated contact details, capacity-aware room assignment and transfer, move-out/archive with unsettled-balance and credit guards, dated assignments/agreed amounts, tenant status, derived account balance/credit, and preserved financial history.
 - **Rooms:** private/shared configuration, full/partial/empty/maintenance states, dated occupants, persisted add/edit/delete, relationship-safe deletion checks, and preserved history. Rental-rate edits do not rewrite tenant agreements or issued bills, and occupied rooms cannot be changed to available or under repair from the edit form.
 - **Billing:** period selector, category matrix, detailed balances/status/due dates, effective-dated rates, room-based checkbox calculator, payment-time meter entry, calculated cumulative preview, review-before-save confirmation, confirmed readings, and charge snapshots. Billing is the only page that can create a payment.
 - **Payments & Receipts:** transaction and correction workspaces, immediate-settlement Edit Payment review, payment/allocation history, confirmed electricity interval details, partial-payment examples, advance credit, and fictional receipt snapshots.

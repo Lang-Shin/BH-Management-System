@@ -217,6 +217,7 @@
 .room-result-card,
 .room-filter-empty { animation: room-card-enter 360ms var(--route-ease) var(--room-card-delay, 0ms) backwards; }
 .room-management-notice { margin-bottom: 20px; padding: 11px 14px; border: 1px solid color-mix(in srgb, var(--forest-green) 20%, var(--border)); border-radius: 14px; background: color-mix(in srgb, var(--forest-green) 6%, var(--card)); color: var(--forest-green); font-size: 14px; font-weight: 650; }
+.tenant-management-notice { margin-bottom: 20px; padding: 11px 14px; border: 1px solid color-mix(in srgb, var(--forest-green) 20%, var(--border)); border-radius: 14px; background: color-mix(in srgb, var(--forest-green) 6%, var(--card)); color: var(--forest-green); font-size: 14px; font-weight: 650; }
 .room-result-card { cursor: pointer; transition: transform 180ms var(--route-ease), border-color 180ms ease, box-shadow 180ms ease; }
 .room-details-dialog[data-slot="dialog-content"] { width: calc(100vw - 2rem); max-width: 44rem; max-height: 90dvh; overflow-y: auto; overscroll-behavior: contain; padding: 24px; }
 .room-details-heading { align-items: flex-start; gap: 8px; text-align: left; }
@@ -238,6 +239,7 @@
 .room-details-readings li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 12px; font-size: 13px; }
 .room-details-readings li + li { border-top: 1px solid var(--border); }
 .room-details-management { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.tenant-details-management { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 2px; }
 .room-details-footer { display: flex; justify-content: flex-end; gap: 10px; }
 @media (width >= 40rem) {
   .room-details-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

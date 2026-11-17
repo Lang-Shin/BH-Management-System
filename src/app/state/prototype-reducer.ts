@@ -6,6 +6,7 @@ import { prepareElectricityPayment } from '@/domain/calculations/electricity-pay
 import { prepareRoomPayment } from '@/domain/calculations/room-payment'
 import { preparePaymentCorrection } from '@/domain/calculations/payment-correction'
 import { createRoom, deleteRoom, updateRoom } from '@/domain/calculations/room-management'
+import { createTenant, deleteTenant, moveOutTenant, updateTenant } from '@/domain/calculations/tenant-management'
 
 export function prototypeReducer(state: PrototypeData, action: StateAction): PrototypeData {
   switch (action.type) {
@@ -18,6 +19,22 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
           ? { ...tenant, notes: action.notes.trim().slice(0, 500) }
           : tenant),
       }
+    case 'tenant/created': {
+      const result = createTenant(state, action.draft, DEMO_DATE)
+      return result.ok ? result.data : state
+    }
+    case 'tenant/updated': {
+      const result = updateTenant(state, action.tenantId, action.draft, DEMO_DATE)
+      return result.ok ? result.data : state
+    }
+    case 'tenant/movedOut': {
+      const result = moveOutTenant(state, action.tenantId, DEMO_DATE)
+      return result.ok ? result.data : state
+    }
+    case 'tenant/deleted': {
+      const result = deleteTenant(state, action.tenantId, DEMO_DATE)
+      return result.ok ? result.data : state
+    }
     case 'room/created': {
       const result = createRoom(state, action.draft, DEMO_DATE)
       return result.ok ? result.data : state
