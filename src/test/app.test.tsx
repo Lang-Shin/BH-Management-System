@@ -115,31 +115,6 @@ describe('admin workspace integration', () => {
     expect(screen.queryByText('Quinn Mendoza')).not.toBeInTheDocument()
   })
 
-  it('previews adding a room without changing room records or counts', async () => {
-    const user = userEvent.setup()
-    renderApp('/rooms')
-    const trigger = await screen.findByRole('button', { name: 'Add room' })
-    const savedRooms = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}').data.rooms
-    await user.click(trigger)
-    const dialog = await screen.findByRole('dialog', { name: 'Add a room' })
-    await user.type(within(dialog).getByLabelText('Room number or name'), '116')
-    await user.selectOptions(within(dialog).getByLabelText('Monthly rental rate'), 'RATE_4000')
-    await user.selectOptions(within(dialog).getByLabelText('Room status'), 'maintenance')
-    await user.click(within(dialog).getByRole('button', { name: 'Add room' }))
-
-    const success = await screen.findByRole('dialog', { name: 'Room added successfully' })
-    await user.click(within(success).getByRole('button', { name: 'Got it' }))
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(screen.queryByRole('button', { name: 'Room 116 details' })).not.toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: /Room \d+ details/ })).toHaveLength(15)
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}').data.rooms).toEqual(savedRooms)
-
-    await user.click(trigger)
-    expect(within(screen.getByRole('dialog', { name: 'Add a room' })).getByLabelText('Room number or name')).toHaveValue('')
-    await user.click(screen.getByRole('button', { name: 'Cancel' }))
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-  })
-
   it('uses room checkboxes, calculates a live total, and protects paid bills', async () => {
     const user = userEvent.setup()
     renderApp('/billing')

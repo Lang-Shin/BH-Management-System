@@ -5,6 +5,7 @@ import { activeAssignments } from '@/domain/calculations/summary'
 import { prepareElectricityPayment } from '@/domain/calculations/electricity-payment'
 import { prepareRoomPayment } from '@/domain/calculations/room-payment'
 import { preparePaymentCorrection } from '@/domain/calculations/payment-correction'
+import { createRoom, deleteRoom, updateRoom } from '@/domain/calculations/room-management'
 
 export function prototypeReducer(state: PrototypeData, action: StateAction): PrototypeData {
   switch (action.type) {
@@ -17,6 +18,18 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
           ? { ...tenant, notes: action.notes.trim().slice(0, 500) }
           : tenant),
       }
+    case 'room/created': {
+      const result = createRoom(state, action.draft, DEMO_DATE)
+      return result.ok ? result.data : state
+    }
+    case 'room/updated': {
+      const result = updateRoom(state, action.roomId, action.draft, DEMO_DATE)
+      return result.ok ? result.data : state
+    }
+    case 'room/deleted': {
+      const result = deleteRoom(state, action.roomId, DEMO_DATE)
+      return result.ok ? result.data : state
+    }
     case 'room/statusToggled': {
       // An occupied room cannot be removed from available capacity.
       if (activeAssignments(state, DEMO_DATE).some(assignment => assignment.roomId === action.roomId)) return state

@@ -34,10 +34,10 @@ export default function Rooms() {
   const filterIndex = filters.findIndex(item => item.value === filter)
 
   return <>
-    <PageHeader title="Rooms" description="A room is occupied when someone rents it, even if some beds are unused." action={<AddRoomDialog />} />
+    <PageHeader title="Rooms" description="A room is occupied when someone rents it, even if some beds are unused." action={<AddRoomDialog onSaved={setNotice} />} />
     <RoomSummary summary={summary} />
     <div className="mb-6 flex flex-wrap items-center justify-between gap-4"><div className="room-segmented-control" role="group" aria-label="Show rooms" style={{ '--filter-index': filterIndex, '--filter-column': filterIndex % 2, '--filter-row': Math.floor(filterIndex / 2) } as CSSProperties}>{filters.map(item => <Button key={item.value} variant="ghost" className="room-filter" aria-pressed={filter === item.value} onClick={() => setFilter(item.value)}>{item.label}</Button>)}</div><p role="status" className="text-sm text-muted-foreground">Showing <AnimatedNumber value={rooms.length} /> of <AnimatedNumber value={data.rooms.length} /> rooms</p></div>
-    <p role="status" className="sr-only">{notice}</p>
+    {notice ? <p role="status" className="room-management-notice">{notice}</p> : <p role="status" className="sr-only" />}
     {rooms.length === 0 ? <div key={filter} className="room-filter-empty"><EmptyState title="No rooms here" description="There are no rooms with this status." action={<Button variant="outline" onClick={() => setFilter('ALL')}>Show all rooms</Button>} /></div> : <div key={filter} className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">{rooms.map((room, index) => {
       const tenants = roomOccupants(data, room.id, DEMO_DATE)
       const status = roomOccupancy(data, room, DEMO_DATE)
