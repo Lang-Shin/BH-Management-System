@@ -17,19 +17,30 @@ const settlementLabels = {
   REFUND_PENDING: 'Refund still pending.',
 } as const
 
-export function TransactionDialog({ data, payment, asOf, onClose, onReturnFocus, onEditPayment }: {
+export function TransactionDialog({ data, payment, asOf, onClose, onReturnFocus, onEditPayment, title = 'Transaction Details', description = 'Payment information for the selected room.' }: {
   data: PrototypeAppState
   payment: Payment
   asOf: string
   onClose: () => void
   onReturnFocus: () => void
   onEditPayment?: (payment: Payment, trigger: HTMLButtonElement) => void
+  title?: string
+  description?: string
 }) {
   const context = paymentRooms(data, payment, asOf)
   const payer = data.tenants.find(tenant => tenant.id === payment.tenantId)?.name
   const receipt = [...data.receipts].filter(item => item.paymentId === payment.id).sort((a, b) => b.revision - a.revision)[0]?.receiptNumber
   const advance = data.tenantCredits.some(credit => credit.sourcePaymentId === payment.id)
   const correction = data.paymentCorrections.find(item => item.correctedPaymentId === payment.id || item.originalPaymentId === payment.id)
+  const allocatedCents = data.paymentAllocations.filter(allocation => allocation.paymentId === payment.id && allocation.state === 'ACTIVE' && allocation.allocatedOn <= asOf)
+    .reduce((sum, allocation) => sum + allocation.amountCents, 0)
+  const editUnavailableReason = !onEditPayment ? null
+    : payment.state !== 'RECORDED' ? 'Voided payments cannot be edited.'
+      : correction ? 'This is a revised transaction. Review it in Correction History; a transaction can only be corrected once.'
+        : context.allocations.length === 0 ? (advance ? 'Advance payments have no bill categories to correct.' : 'This transaction has no bill allocations to correct.')
+          : allocatedCents !== payment.amountCents ? 'This transaction includes unallocated money, so it cannot be corrected safely from this dialog.'
+            : data.paymentCorrections.some(item => item.originalPaymentId === payment.id) ? 'This transaction has already been corrected.'
+              : null
   const allocationsSpanMultipleRooms = new Set(context.allocations.map(allocation => allocation.context.id)).size > 1
   const { open, requestClose, onOpenChange, onAnimationEnd } = useAnimatedDialogClose(onClose)
 
@@ -37,8 +48,8 @@ export function TransactionDialog({ data, payment, asOf, onClose, onReturnFocus,
     <DialogContent className="transaction-dialog" onAnimationEnd={onAnimationEnd} onCloseAutoFocus={event => { event.preventDefault(); onReturnFocus() }}>
       <DialogHeader className="transaction-dialog-heading">
         <span className="transaction-dialog-icon"><ReceiptText aria-hidden="true" /></span>
-        <DialogTitle>Transaction Details</DialogTitle>
-        <DialogDescription>Payment information for the selected room.</DialogDescription>
+        <DialogTitle>{title}</DialogTitle>
+        <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
 
       <section className="transaction-summary" aria-label="Payment summary">
@@ -84,7 +95,8 @@ export function TransactionDialog({ data, payment, asOf, onClose, onReturnFocus,
 
       <p className="break-all text-xs text-muted-foreground">Payment ID: {payment.id}</p>
       <DialogFooter className="transaction-dialog-footer">
-        {onEditPayment && payment.state === 'RECORDED' && context.allocations.length > 0 && <Button variant="outline" onClick={event => onEditPayment(payment, event.currentTarget)}>Edit Payment</Button>}
+        {editUnavailableReason && <p className="transaction-edit-unavailable">{editUnavailableReason}</p>}
+        {onEditPayment && !editUnavailableReason && <Button variant="outline" onClick={event => onEditPayment(payment, event.currentTarget)}>Edit Payment</Button>}
         <Button onFocus={event => event.currentTarget.scrollIntoView?.({ block: 'nearest' })} onClick={requestClose}>Done</Button>
       </DialogFooter>
     </DialogContent>

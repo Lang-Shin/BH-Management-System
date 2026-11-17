@@ -1,0 +1,195 @@
+import { useRef, useState } from 'react'
+import { ChevronLeft, ChevronRight, History, ReceiptText, Search } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { DataTable, type Column } from '@/components/shared/data-table'
+import { EmptyState } from '@/components/shared/states'
+import { StatusBadge } from '@/components/shared/status-badge'
+import { TransactionDialog } from '@/components/shared/transaction-dialog'
+import { usePrototype } from '@/hooks/use-prototype'
+import { latestPaymentReceipt } from '@/domain/calculations/payment-correction'
+import { paymentRooms } from '@/domain/calculations/room-finance'
+import type { CorrectionSettlementStatus, Payment, PaymentCorrection } from '@/domain/types/models'
+import { DEMO_DATE } from '@/data/fixtures/demo'
+import { formatDate, formatMoney } from '@/lib/format'
+import { cn } from '@/lib/utils'
+import { EditPaymentDialog } from '@/features/billing/edit-payment-dialog'
+
+type WorkspaceTab = 'transactions' | 'corrections'
+type TransactionStatus = 'ALL' | 'RECORDED' | 'CORRECTED'
+type CorrectionStatusFilter = 'ALL' | CorrectionSettlementStatus
+
+const correctionStatusLabels: Record<CorrectionSettlementStatus, string> = {
+  NO_DIFFERENCE: 'Balanced',
+  NO_MONEY_MOVED: 'Recording only',
+  ADDITIONAL_RECEIVED: 'Additional received',
+  ADDITIONAL_PENDING: 'Additional pending',
+  REFUND_COMPLETED: 'Refund completed',
+  REFUND_PENDING: 'Refund pending',
+}
+
+const correctionStatusOrder: CorrectionSettlementStatus[] = [
+  'NO_DIFFERENCE', 'NO_MONEY_MOVED', 'ADDITIONAL_RECEIVED', 'ADDITIONAL_PENDING', 'REFUND_COMPLETED', 'REFUND_PENDING',
+]
+
+function CorrectionStatusBadge({ status }: { status: CorrectionSettlementStatus }) {
+  const tone = status === 'ADDITIONAL_PENDING' || status === 'REFUND_PENDING'
+    ? 'border-amber-200 bg-amber-50 text-amber-900'
+    : status === 'ADDITIONAL_RECEIVED' || status === 'REFUND_COMPLETED' || status === 'NO_DIFFERENCE'
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+      : 'border-border bg-muted text-foreground'
+  return <Badge variant="outline" className={cn('max-w-full whitespace-normal text-center font-medium', tone)}><span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-current" />{correctionStatusLabels[status]}</Badge>
+}
+
+function transactionReceipt(data: ReturnType<typeof usePrototype>['data'], payment: Payment) {
+  return latestPaymentReceipt(data, payment.id)?.receiptNumber ?? 'No receipt yet'
+}
+
+export function PaymentsTransactionWorkspace() {
+  const { data } = usePrototype()
+  const [tab, setTab] = useState<WorkspaceTab>('transactions')
+  const [search, setSearch] = useState('')
+  const [month, setMonth] = useState('ALL')
+  const [status, setStatus] = useState<TransactionStatus | CorrectionStatusFilter>('ALL')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [notice, setNotice] = useState('')
+  const [selectedDialog, setSelectedDialog] = useState<{ paymentId: string; title: string; description: string } | null>(null)
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null)
+  const transactionTrigger = useRef<HTMLButtonElement | null>(null)
+  const transactionsTab = useRef<HTMLButtonElement | null>(null)
+  const correctionsTab = useRef<HTMLButtonElement | null>(null)
+
+  const selectedPayment = selectedDialog ? data.payments.find(payment => payment.id === selectedDialog.paymentId) : undefined
+  const period = data.billingPeriods.find(item => item.id === month)
+  const normalizedSearch = search.trim().toLowerCase()
+  const inSelectedMonth = (date: string) => month === 'ALL' || Boolean(period && date >= period.startDate && date <= period.endDate)
+  const recordedPayments = data.payments.filter(payment => payment.state === 'RECORDED' && payment.paidOn <= DEMO_DATE)
+
+  const transactionRows = recordedPayments.filter(payment => {
+    const receiptNumber = transactionReceipt(data, payment)
+    const roomLabel = paymentRooms(data, payment, DEMO_DATE).label
+    const effectiveStatus = payment.correction ? 'CORRECTED' : 'RECORDED'
+    const matchesSearch = !normalizedSearch || `${receiptNumber} ${roomLabel}`.toLowerCase().includes(normalizedSearch)
+    const matchesMonth = month === 'ALL' || inSelectedMonth(payment.paidOn)
+      || data.paymentAllocations.some(allocation => allocation.paymentId === payment.id
+        && data.charges.some(charge => charge.id === allocation.chargeId && charge.billingPeriodId === month))
+    const matchesStatus = status === 'ALL' || status === effectiveStatus
+    return matchesSearch && matchesMonth && matchesStatus
+  }).sort((a, b) => b.paidOn.localeCompare(a.paidOn))
+
+  const correctionRows = data.paymentCorrections.filter(correction => {
+    const correctedPayment = data.payments.find(payment => payment.id === correction.correctedPaymentId)
+    const correctedReceipt = data.receipts.find(receipt => receipt.id === correction.correctedReceiptId)
+    const originalReceipt = data.receipts.find(receipt => receipt.id === correction.originalReceiptId)
+    const roomLabel = correctedPayment ? paymentRooms(data, correctedPayment, DEMO_DATE).label : 'Room needs review'
+    const matchesSearch = !normalizedSearch || `${correctedReceipt?.receiptNumber ?? ''} ${originalReceipt?.receiptNumber ?? ''} ${roomLabel}`.toLowerCase().includes(normalizedSearch)
+    const matchesMonth = inSelectedMonth(correction.correctedAt)
+    const matchesStatus = status === 'ALL' || status === correction.settlementStatus
+    return matchesSearch && matchesMonth && matchesStatus
+  }).sort((a, b) => b.correctedAt.localeCompare(a.correctedAt))
+
+  const activeRows = tab === 'transactions' ? transactionRows : correctionRows
+  const pageCount = Math.max(1, Math.ceil(activeRows.length / pageSize))
+  const currentPage = Math.min(page, pageCount)
+  const startIndex = (currentPage - 1) * pageSize
+  const visibleRows = activeRows.slice(startIndex, startIndex + pageSize)
+  const hasFilters = normalizedSearch.length > 0 || month !== 'ALL' || status !== 'ALL'
+
+  function switchTab(next: WorkspaceTab) {
+    setTab(next)
+    setSearch('')
+    setMonth('ALL')
+    setStatus('ALL')
+    setPage(1)
+    setNotice('')
+  }
+
+  function resetFilters() {
+    setSearch('')
+    setMonth('ALL')
+    setStatus('ALL')
+    setPage(1)
+  }
+
+  function openTransaction(payment: Payment, trigger: HTMLButtonElement) {
+    transactionTrigger.current = trigger
+    setSelectedDialog({ paymentId: payment.id, title: 'Transaction Details', description: 'Payment information for the selected room.' })
+  }
+
+  function openCorrection(correction: PaymentCorrection, trigger: HTMLButtonElement) {
+    transactionTrigger.current = trigger
+    setSelectedDialog({ paymentId: correction.correctedPaymentId, title: 'Correction Details', description: 'Review the revised receipt, reason, and money handling for this correction.' })
+  }
+
+  const transactionColumns: Column<Payment>[] = [
+    { key: 'receipt', label: 'Receipt Number', render: payment => <span className="break-all font-semibold text-[var(--forest-green)]">{transactionReceipt(data, payment)}</span> },
+    { key: 'room', label: 'Room', render: payment => <span className="font-semibold">{paymentRooms(data, payment, DEMO_DATE).label}</span> },
+    { key: 'date', label: 'Date Paid', render: payment => formatDate(payment.paidOn) },
+    { key: 'amount', label: 'Amount Paid', align: 'right', render: payment => <span className="font-semibold tabular-nums">{formatMoney(payment.amountCents)}</span> },
+    { key: 'status', label: 'Status', render: payment => <StatusBadge status={payment.correction ? 'Corrected' : 'Recorded'} /> },
+    { key: 'transaction', label: 'Transaction', render: payment => <Button variant="outline" size="sm" aria-label={`See Transaction for ${paymentRooms(data, payment, DEMO_DATE).label}, ${formatDate(payment.paidOn)}, ${formatMoney(payment.amountCents)}`} onClick={event => openTransaction(payment, event.currentTarget)}>See Transaction</Button> },
+  ]
+
+  const correctionColumns: Column<PaymentCorrection>[] = [
+    { key: 'receipt', label: 'Receipt Number', render: correction => <span className="break-all font-semibold text-[var(--forest-green)]">{data.receipts.find(receipt => receipt.id === correction.correctedReceiptId)?.receiptNumber ?? 'No receipt'}</span> },
+    { key: 'room', label: 'Room', render: correction => {
+      const payment = data.payments.find(item => item.id === correction.correctedPaymentId)
+      return <span className="font-semibold">{payment ? paymentRooms(data, payment, DEMO_DATE).label : 'Room needs review'}</span>
+    } },
+    { key: 'date', label: 'Correction Date', render: correction => formatDate(correction.correctedAt) },
+    { key: 'original', label: 'Original Amount', align: 'right', render: correction => <span className="tabular-nums">{formatMoney(correction.originalAmountCents)}</span> },
+    { key: 'corrected', label: 'Corrected Amount', align: 'right', render: correction => <span className="font-semibold tabular-nums">{formatMoney(correction.correctedAmountCents)}</span> },
+    { key: 'status', label: 'Correction Status', render: correction => <CorrectionStatusBadge status={correction.settlementStatus} /> },
+    { key: 'details', label: 'Details', render: correction => <Button variant="outline" size="sm" aria-label={`View correction for ${data.receipts.find(receipt => receipt.id === correction.correctedReceiptId)?.receiptNumber ?? correction.id}`} onClick={event => openCorrection(correction, event.currentTarget)}>View</Button> },
+  ]
+
+  const correctionsEmpty = tab === 'corrections' && data.paymentCorrections.length === 0
+
+  return <section className="transaction-workspace" aria-labelledby="transaction-workspace-title">
+    <div className="transaction-workspace-heading">
+      <div>
+        <span className="payment-eyebrow">PAYMENT WORKSPACE</span>
+        <h2 id="transaction-workspace-title" className="mt-1 text-xl font-semibold">Transactions</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Review recorded payments, inspect their allocation details, and correct eligible transactions.</p>
+      </div>
+      <span className="transaction-workspace-count"><ReceiptText className="size-4" aria-hidden="true" />{transactionRows.length} recorded</span>
+    </div>
+
+    <div className="transaction-tabs" role="tablist" aria-label="Payment transaction views">
+      <button ref={transactionsTab} id="transactions-tab" type="button" role="tab" aria-selected={tab === 'transactions'} aria-controls="transactions-panel" tabIndex={tab === 'transactions' ? 0 : -1} className="transaction-tab" onClick={() => switchTab('transactions')} onKeyDown={event => { if (event.key === 'ArrowRight') { switchTab('corrections'); requestAnimationFrame(() => correctionsTab.current?.focus()) } }}><ReceiptText className="size-4" aria-hidden="true" />Transactions<span className="transaction-tab-count">{transactionRows.length}</span></button>
+      <button ref={correctionsTab} id="corrections-tab" type="button" role="tab" aria-selected={tab === 'corrections'} aria-controls="corrections-panel" tabIndex={tab === 'corrections' ? 0 : -1} className="transaction-tab" onClick={() => switchTab('corrections')} onKeyDown={event => { if (event.key === 'ArrowLeft') { switchTab('transactions'); requestAnimationFrame(() => transactionsTab.current?.focus()) } }}><History className="size-4" aria-hidden="true" />Correction History<span className="transaction-tab-count">{data.paymentCorrections.length}</span></button>
+    </div>
+
+    {notice && <p role="status" className="transaction-workspace-notice">{notice}</p>}
+
+    <div className="transaction-toolbar">
+      <label className="transaction-search" htmlFor="transaction-search"><Search className="size-4" aria-hidden="true" /><span className="sr-only">Search by room or receipt number</span><input id="transaction-search" type="search" value={search} onChange={event => { setSearch(event.target.value); setPage(1) }} placeholder="Search room or receipt number" autoComplete="off" /></label>
+      <label className="transaction-filter"><span>Billing month or date</span><select value={month} onChange={event => { setMonth(event.target.value); setPage(1) }}><option value="ALL">All dates</option>{data.billingPeriods.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+      <label className="transaction-filter"><span>Status</span><select value={status} onChange={event => { setStatus(event.target.value as TransactionStatus | CorrectionStatusFilter); setPage(1) }}><option value="ALL">All statuses</option>{tab === 'transactions' ? <><option value="RECORDED">Recorded</option><option value="CORRECTED">Corrected</option></> : correctionStatusOrder.map(item => <option key={item} value={item}>{correctionStatusLabels[item]}</option>)}</select></label>
+    </div>
+
+    <div id="transactions-panel" role="tabpanel" aria-labelledby="transactions-tab" hidden={tab !== 'transactions'}>
+      {tab === 'transactions' && (visibleRows.length > 0
+        ? <DataTable rows={visibleRows as Payment[]} columns={transactionColumns} caption="Transactions" />
+        : <EmptyState title={hasFilters ? 'No transactions match' : 'No transactions recorded'} description={hasFilters ? 'Try another room or receipt number, or clear the filters to see all payments.' : 'Recorded payments will appear here after they are saved from Billing.'} action={hasFilters ? <Button variant="outline" onClick={resetFilters}>Clear search and filters</Button> : undefined} />)}
+    </div>
+
+    <div id="corrections-panel" role="tabpanel" aria-labelledby="corrections-tab" hidden={tab !== 'corrections'}>
+      {tab === 'corrections' && (visibleRows.length > 0
+        ? <DataTable rows={visibleRows as PaymentCorrection[]} columns={correctionColumns} caption="Correction history" />
+        : <EmptyState title={correctionsEmpty ? 'No corrections recorded yet' : 'No corrections match'} description={correctionsEmpty ? 'Corrections saved from an eligible transaction will appear here with the original and revised receipt totals.' : 'Try another room or receipt number, or clear the filters to see all corrections.'} action={!correctionsEmpty && hasFilters ? <Button variant="outline" onClick={resetFilters}>Clear search and filters</Button> : undefined} />)}
+    </div>
+
+    <div className="transaction-pagination">
+      <p aria-live="polite">Showing {activeRows.length === 0 ? 0 : startIndex + 1}–{Math.min(startIndex + pageSize, activeRows.length)} of {activeRows.length} {tab === 'transactions' ? 'transactions' : 'corrections'}</p>
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="transaction-page-size"><span>Rows per page</span><select value={pageSize} onChange={event => { setPageSize(Number(event.target.value)); setPage(1) }}>{[5, 10, 20].map(size => <option key={size} value={size}>{size}</option>)}</select></label>
+        <div className="flex items-center gap-2"><Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage(current => Math.max(1, current - 1))}><ChevronLeft className="size-4" aria-hidden="true" />Previous</Button><span className="min-w-20 text-center text-sm text-muted-foreground">Page {currentPage} of {pageCount}</span><Button variant="outline" size="sm" disabled={currentPage >= pageCount} onClick={() => setPage(current => Math.min(pageCount, current + 1))}>Next<ChevronRight className="size-4" aria-hidden="true" /></Button></div>
+      </div>
+    </div>
+
+    {selectedPayment && <TransactionDialog key={`${selectedPayment.id}:${selectedDialog?.title}`} data={data} payment={selectedPayment} asOf={DEMO_DATE} title={selectedDialog?.title} description={selectedDialog?.description} onClose={() => setSelectedDialog(null)} onReturnFocus={() => transactionTrigger.current?.focus()} onEditPayment={selectedDialog?.title === 'Transaction Details' ? payment => { setSelectedDialog(null); setEditingPaymentId(payment.id) } : undefined} />}
+    {editingPaymentId && <EditPaymentDialog paymentId={editingPaymentId} onClose={() => setEditingPaymentId(null)} onReturnFocus={() => { if (transactionTrigger.current?.isConnected) transactionTrigger.current.focus(); else transactionsTab.current?.focus() }} onSaved={setNotice} />}
+  </section>
+}

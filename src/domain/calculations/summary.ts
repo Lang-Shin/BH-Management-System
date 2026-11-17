@@ -65,6 +65,14 @@ export function tenantAccount(data: PrototypeAppState, tenantId: string, asOf: s
   return { balance, credit, status: overdue ? 'Overdue' : balance > 0 ? 'Outstanding' : credit > 0 ? 'Credit available' : 'Clear' }
 }
 
+/** Cash received recognizes refunds only when completed and additional money only when received. */
+export function paymentCashReceived(data: PrototypeAppState, payment: { id: string; amountCents: number }): number {
+  const correction = data.paymentCorrections.find(item => item.correctedPaymentId === payment.id)
+  return correction && (correction.settlementStatus === 'NO_MONEY_MOVED' || correction.settlementStatus === 'REFUND_PENDING')
+    ? correction.originalAmountCents
+    : payment.amountCents
+}
+
 /** Billing-period charges and cash received during that period are distinct. */
 export function selectSummary(data: PrototypeAppState, asOf: string, periodId?: string) {
   const charges = issuedCharges(data, asOf, periodId)
@@ -73,7 +81,7 @@ export function selectSummary(data: PrototypeAppState, asOf: string, periodId?: 
   const unresolved = unresolvedElectricity(data, asOf, periodId).length
   const period = data.billingPeriods.find(p => p.id === periodId)
   const received = data.payments.filter(p => p.state === 'RECORDED' && p.paidOn <= asOf
-    && (!period || (p.paidOn >= period.startDate && p.paidOn <= period.endDate))).reduce((sum, p) => sum + p.amountCents, 0)
+    && (!period || (p.paidOn >= period.startDate && p.paidOn <= period.endDate))).reduce((sum, p) => sum + paymentCashReceived(data, p), 0)
   return {
     tenants: data.tenants.filter(t => t.status === 'ACTIVE').length,
     ...selectRoomSummary(data, asOf),

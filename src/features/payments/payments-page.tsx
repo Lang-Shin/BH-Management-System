@@ -3,7 +3,6 @@ import { Wallet, Banknote, CircleDollarSign } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PageHeader, PreviewNotice, StatCard } from '@/components/shared/page'
 import { AnimatedNumber } from '@/components/shared/animated-number'
-import { PaymentHistoryTable } from '@/components/shared/payment-history-table'
 import { DataTable } from '@/components/shared/data-table'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { StatusBadge } from '@/components/shared/status-badge'
@@ -13,6 +12,7 @@ import { creditRemaining, selectSummary } from '@/domain/calculations/summary'
 import { DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
 import { formatDate, formatMoney } from '@/lib/format'
 import { ReceiptDialog } from './receipt-dialog'
+import { PaymentsTransactionWorkspace } from './payments-transaction-workspace'
 import { paymentRooms } from '@/domain/calculations/room-finance'
 
 export default function Payments() {
@@ -21,7 +21,6 @@ export default function Payments() {
   const receiptTrigger = useRef<HTMLButtonElement | null>(null)
   const selectedReceipt = data.receipts.find(item => item.id === selectedReceiptId)
   const summary = selectSummary(data, DEMO_DATE, DEMO_PERIOD)
-  const payments = data.payments.filter(p => p.state === 'RECORDED' && p.paidOn <= DEMO_DATE).sort((a, b) => b.paidOn.localeCompare(a.paidOn))
   const receipt = [...data.receipts].filter(r => r.state === 'ISSUED').sort((a, b) => b.issuedOn.localeCompare(a.issuedOn))[0]
   const receiptPayment = data.payments.find(p => p.id === receipt?.paymentId)
 
@@ -33,7 +32,7 @@ export default function Payments() {
       <StatCard label="Advance payments" value={formatMoney(summary.credit)} detail="Money kept for a future bill." icon={CircleDollarSign} />
       <StatCard label="Partly paid bills" value={summary.partial} detail="November bills that still have an amount left to pay." icon={Banknote} />
     </section>
-    <h2 className="mb-4 text-xl font-semibold">Payment history</h2><PaymentHistoryTable data={data} payments={payments} />
+    <PaymentsTransactionWorkspace />
     <h2 className="mt-8 mb-2 text-xl font-semibold">Money paid in advance</h2><p className="mb-5 text-base text-muted-foreground">This money is kept for later. It has not yet been used to pay a bill.</p><DataTable rows={data.tenantCredits} caption="Advance payments" columns={[
       { key: 'tenant', label: 'Tenant', render: c => data.tenants.find(t => t.id === c.tenantId)?.name },
       { key: 'created', label: 'Date paid', render: c => formatDate(c.createdOn) },
