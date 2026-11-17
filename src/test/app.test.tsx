@@ -457,6 +457,9 @@ describe('admin workspace integration', () => {
     expect(await screen.findByRole('button', { name: /Calculate payment/ })).toBeInTheDocument()
     expect(screen.queryByText('Payment transactions and corrections')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Edit Payment' })).not.toBeInTheDocument()
+    expect(screen.queryByText('More billing tools')).not.toBeInTheDocument()
+    expect(screen.queryByText('Make another bill type')).not.toBeInTheDocument()
+    expect(screen.queryByText('Coming later')).not.toBeInTheDocument()
   })
 
   it('records a combined room payment from Billing and updates history, receipts, and summaries', async () => {

@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { ReceiptText, CircleAlert, Wallet } from 'lucide-react'
 import { PageHeader, PreviewNotice, StatCard } from '@/components/shared/page'
 import { AnimatedNumber } from '@/components/shared/animated-number'
-import { WorkflowPlaceholders } from '@/components/shared/workflow-placeholders'
 import { usePrototype } from '@/hooks/use-prototype'
 import { selectSummary } from '@/domain/calculations/summary'
 import { DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
@@ -40,8 +39,5 @@ export default function Billing() {
       <BillingStatusMatrix data={data} periodId={periodId} asOf={DEMO_DATE} outstandingOnly={false} statusFilter={statusFilter} />
     </div>
     <ElectricityPreview data={data} periodId={periodId} asOf={DEMO_DATE} />
-    <WorkflowPlaceholders title="More billing tools" items={[
-      { title: 'Make another bill type', description: 'Electricity uses the payment-time meter workflow. Adding rent, water, and optional washing bills will be available later.' },
-    ]} />
   </>
 }
