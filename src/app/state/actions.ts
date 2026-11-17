@@ -1,4 +1,4 @@
-import type { ChargeCategory, PrototypeData } from '@/domain/types/models'
+import type { ChargeCategory, CorrectionSettlementStatus, PrototypeData } from '@/domain/types/models'
 
 export type PrototypeAction =
   | { type: 'tenant/noteUpdated'; tenantId: string; notes: string }
@@ -6,6 +6,7 @@ export type PrototypeAction =
   | { type: 'room/washingMachineUpdated'; roomId: string; enabled: boolean }
   | { type: 'electricity/paymentConfirmed'; obligationId: string; currentReadingMilliKwh: number; paidOn: string }
   | { type: 'room/paymentConfirmed'; roomId: string; periodId: string; selected: ChargeCategory[]; electricityReadingMilliKwh: number | null; asOf: string }
+  | { type: 'payment/corrected'; paymentId: string; selectedCategories: ChargeCategory[]; correctedElectricityReadingMilliKwh: number | null; reason: string; settlementStatus: CorrectionSettlementStatus | ''; correctedAt: string }
   | { type: 'demo/reset' }
 
 export type StateAction = PrototypeAction | { type: 'data/loaded'; data: PrototypeData }

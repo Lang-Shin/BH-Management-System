@@ -1,4 +1,4 @@
-import type { Charge, MeterReading, Payment, PaymentAllocation, PrototypeAppState, RoomAssignment, RoomCategoryId } from '@/domain/types/models'
+import type { Charge, MeterReading, Payment, PaymentAllocation, PaymentCorrection, PrototypeAppState, RoomAssignment, RoomCategoryId } from '@/domain/types/models'
 import { ROOM_RATE_BY_ID } from '@/lib/room-rates'
 
 export const DEMO_DATE = '2026-11-13'
@@ -167,7 +167,8 @@ export function createDemoData(): PrototypeAppState {
   })
   payments.push({ id: 'payment-advance', tenantId: 'tenant-6', amountCents: 50_000, paidOn: '2026-11-12', method: 'cash', state: 'RECORDED', correction: null })
   const tenantCredits = [{ id: 'credit-6', tenantId: 'tenant-6', sourcePaymentId: 'payment-advance', amountCents: 50_000, createdOn: '2026-11-12' }]
-  const receipts = payments.map((payment, index) => ({ id: `receipt-${index + 1}`, paymentId: payment.id, receiptNumber: `DEMO-RCT-${String(index + 1).padStart(3, '0')}`, issuedOn: payment.paidOn, amountCents: payment.amountCents, allocationIds: paymentAllocations.filter(a => a.paymentId === payment.id).map(a => a.id), state: 'ISSUED' as const }))
+  const receipts = payments.map((payment, index) => ({ id: `receipt-${index + 1}`, paymentId: payment.id, receiptNumber: `DEMO-RCT-${String(index + 1).padStart(3, '0')}`, issuedOn: payment.paidOn, amountCents: payment.amountCents, allocationIds: paymentAllocations.filter(a => a.paymentId === payment.id).map(a => a.id), state: 'ISSUED' as const, revision: 1, supersedesReceiptId: null }))
+  const paymentCorrections: PaymentCorrection[] = []
   const auditEvents = [{ id: 'audit-seed', actorId: 'demo-admin', occurredOn: DEMO_DATE, action: 'DEMO_SEEDED' as const, entityType: 'PROTOTYPE' as const, entityId: 'demo-workspace', reason: 'Fictional fixture snapshot prepared; no real transaction or authenticated actor.', beforeSnapshot: null, afterSnapshot: 'Sample records loaded' }]
-  return { tenants, rooms, roomAssignments, electricityMeters, meterReadings, electricityBillObligations, electricityRates, billingPeriods, charges, payments, paymentAllocations, tenantCredits, receipts, auditEvents }
+  return { tenants, rooms, roomAssignments, electricityMeters, meterReadings, electricityBillObligations, electricityRates, billingPeriods, charges, payments, paymentAllocations, tenantCredits, receipts, paymentCorrections, auditEvents }
 }

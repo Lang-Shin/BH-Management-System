@@ -53,7 +53,16 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     && (r.reversalAuditEventId === null || id(r.reversalAuditEventId)))) return false
   if (!rows(value, 'tenantCredits', r => id(r.tenantId) && id(r.sourcePaymentId) && positive(r.amountCents) && date(r.createdOn))) return false
   if (!rows(value, 'receipts', r => id(r.paymentId) && id(r.receiptNumber) && date(r.issuedOn) && positive(r.amountCents)
-    && oneOf(r.state, ['ISSUED', 'VOIDED']) && Array.isArray(r.allocationIds) && r.allocationIds.length <= 1000 && r.allocationIds.every(id))) return false
+    && oneOf(r.state, ['ISSUED', 'VOIDED', 'SUPERSEDED']) && Array.isArray(r.allocationIds) && r.allocationIds.length <= 1000 && r.allocationIds.every(id)
+    && Number.isSafeInteger(r.revision) && (r.revision as number) >= 1 && (r.supersedesReceiptId === null || id(r.supersedesReceiptId)))) return false
+  if (!rows(value, 'paymentCorrections', r => id(r.originalPaymentId) && id(r.correctedPaymentId) && id(r.originalReceiptId)
+    && id(r.correctedReceiptId) && date(r.correctedAt) && id(r.correctedBy) && text(r.reason) && r.reason.length <= 500
+    && money(r.originalAmountCents) && money(r.correctedAmountCents) && Number.isSafeInteger(r.differenceCents)
+    && oneOf(r.settlementStatus, ['NO_DIFFERENCE', 'NO_MONEY_MOVED', 'ADDITIONAL_RECEIVED', 'ADDITIONAL_PENDING', 'REFUND_COMPLETED', 'REFUND_PENDING'])
+    && money(r.settlementAmountCents) && Array.isArray(r.originalCategories) && r.originalCategories.every(category => oneOf(category, ['RENT', 'ELECTRICITY', 'WATER', 'WASHING_MACHINE']))
+    && Array.isArray(r.correctedCategories) && r.correctedCategories.every(category => oneOf(category, ['RENT', 'ELECTRICITY', 'WATER', 'WASHING_MACHINE']))
+    && (r.originalElectricityReadingMilliKwh === null || money(r.originalElectricityReadingMilliKwh))
+    && (r.correctedElectricityReadingMilliKwh === null || money(r.correctedElectricityReadingMilliKwh)) && id(r.auditEventId))) return false
   if (!rows(value, 'auditEvents', r => id(r.actorId) && date(r.occurredOn) && id(r.entityId) && text(r.reason)
     && oneOf(r.action, ['DEMO_SEEDED', 'READING_CORRECTED', 'CHARGE_CORRECTED', 'PAYMENT_CORRECTED', 'ALLOCATION_REVERSED', 'ELECTRICITY_PAYMENT_RECORDED', 'ROOM_PAYMENT_RECORDED'])
     && oneOf(r.entityType, ['PROTOTYPE', 'METER_READING', 'CHARGE', 'PAYMENT', 'PAYMENT_ALLOCATION'])
@@ -63,7 +72,7 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
   const data = value as unknown as PrototypeAppState
   if ([data.tenants, data.rooms, data.roomAssignments, data.electricityMeters, data.meterReadings,
     data.electricityBillObligations, data.electricityRates, data.billingPeriods, data.charges, data.payments,
-    data.paymentAllocations, data.tenantCredits, data.receipts, data.auditEvents]
+    data.paymentAllocations, data.tenantCredits, data.receipts, data.paymentCorrections, data.auditEvents]
     .some(items => new Set(items.map(item => item.id)).size !== items.length)) return false
   const tenant = (key: string) => data.tenants.find(t => t.id === key)
   const audit = (key: string) => data.auditEvents.find(a => a.id === key)
@@ -172,10 +181,31 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
   if (new Set(data.receipts.map(r => r.receiptNumber)).size !== data.receipts.length) return false
   if (!data.receipts.every(r => {
     const payment = data.payments.find(p => p.id === r.paymentId)
+    const original = r.supersedesReceiptId && data.receipts.find(item => item.id === r.supersedesReceiptId)
     return payment && r.amountCents === payment.amountCents && r.issuedOn >= payment.paidOn
       && (r.state !== 'ISSUED' || payment.state === 'RECORDED') && new Set(r.allocationIds).size === r.allocationIds.length
       && r.allocationIds.every(key => data.paymentAllocations.some(a => a.id === key && a.paymentId === r.paymentId && a.allocatedOn <= r.issuedOn))
+      && (r.revision === 1 ? r.supersedesReceiptId === null : Boolean(original && original.state === 'SUPERSEDED' && original.revision === r.revision - 1 && original.paymentId !== r.paymentId))
   })) return false
+  if (!data.paymentCorrections.every(correction => {
+    const originalPayment = data.payments.find(payment => payment.id === correction.originalPaymentId)
+    const correctedPayment = data.payments.find(payment => payment.id === correction.correctedPaymentId)
+    const originalReceipt = data.receipts.find(receipt => receipt.id === correction.originalReceiptId)
+    const correctedReceipt = data.receipts.find(receipt => receipt.id === correction.correctedReceiptId)
+    const event = audit(correction.auditEventId)
+    const difference = correction.correctedAmountCents - correction.originalAmountCents
+    const expectedSettlement = correction.settlementStatus === 'NO_DIFFERENCE' || correction.settlementStatus === 'NO_MONEY_MOVED' ? 0 : Math.abs(difference)
+    return originalPayment?.state === 'VOIDED' && correctedPayment?.state === 'RECORDED'
+      && correctedPayment.correction?.supersedesId === originalPayment.id && correctedPayment.tenantId === originalPayment.tenantId
+      && originalReceipt?.state === 'SUPERSEDED' && correctedReceipt?.state === 'ISSUED'
+      && originalReceipt.paymentId === originalPayment.id
+      && correctedReceipt.paymentId === correctedPayment.id && correctedReceipt.supersedesReceiptId === originalReceipt.id
+      && difference === correction.differenceCents && correction.settlementAmountCents === expectedSettlement
+      && correction.correctedCategories.every(category => correction.originalCategories.includes(category))
+      && event?.action === 'PAYMENT_CORRECTED' && event.entityType === 'PAYMENT' && event.entityId === correctedPayment.id
+      && event.reason === correction.reason
+  })) return false
+  if (new Set(data.paymentCorrections.map(correction => correction.correctedPaymentId)).size !== data.paymentCorrections.length) return false
   return data.auditEvents.every(a => a.entityType === 'PROTOTYPE'
     || (a.entityType === 'METER_READING' && data.meterReadings.some(r => r.id === a.entityId))
     || (a.entityType === 'CHARGE' && data.charges.some(c => c.id === a.entityId))

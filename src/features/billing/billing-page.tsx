@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ReceiptText, CircleAlert, Wallet } from 'lucide-react'
 import { PageHeader, PreviewNotice, StatCard } from '@/components/shared/page'
 import { AnimatedNumber } from '@/components/shared/animated-number'
@@ -19,18 +19,25 @@ import { BillingStatusChart } from './billing-status-chart'
 import { selectBillingRooms } from './billing-room-status'
 import { BillingFiltersMenu } from './billing-filters-menu'
 import type { BillingRoomStatus } from './billing-room-status'
+import { PaymentHistoryTable } from '@/components/shared/payment-history-table'
+import { EditPaymentDialog } from './edit-payment-dialog'
 
 export default function Billing() {
   const { data } = usePrototype()
   const [periodId, setPeriodId] = useState(DEMO_PERIOD)
   const [statusFilter, setStatusFilter] = useState<BillingRoomStatus | null>(null)
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null)
+  const [correctionNotice, setCorrectionNotice] = useState('')
+  const editTrigger = useRef<HTMLButtonElement | null>(null)
   const summary = selectSummary(data, DEMO_DATE, periodId)
   const charges = issuedCharges(data, DEMO_DATE, periodId)
   const billingRooms = selectBillingRooms(data, periodId, DEMO_DATE, false)
+  const transactionPayments = data.payments.filter(payment => payment.state === 'RECORDED' && payment.paidOn <= DEMO_DATE)
+    .sort((a, b) => b.paidOn.localeCompare(a.paidOn))
 
   return <>
     <PageHeader title="Billing" description="Check rent, electricity, water, and washing payments in one place." />
-    <PreviewNotice>Electricity bills are created only when you confirm a payment-time meter reading. Calculate Payment settles existing rent, water, washing, and electricity bills; other bill-generation and correction workflows will be added later.</PreviewNotice>
+    <PreviewNotice>Electricity bills are created only when you confirm a payment-time meter reading. Calculate Payment settles existing rent, water, washing, and electricity bills; Edit Payment corrects an already-recorded transaction. Other bill-generation workflows will be added later.</PreviewNotice>
     <div className="mb-6"><div className="max-w-full"><label htmlFor="billing-period" className="mb-2 block text-base font-semibold">Choose a month</label><select id="billing-period" value={periodId} onChange={e => { setPeriodId(e.target.value); setStatusFilter(null) }} className="min-h-14 max-w-full rounded-lg border bg-card px-4 py-3 text-base">{data.billingPeriods.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}</select></div></div>
     <section className="mb-7 grid gap-5 xl:grid-cols-3" aria-label="Bills overview">
       <StatCard label="Total bills" value={formatMoney(summary.billed)} detail="All bills for the month you chose." icon={ReceiptText} />
@@ -45,6 +52,12 @@ export default function Billing() {
     <div key={statusFilter ?? 'ALL'} className="billing-table-enter">
       <BillingStatusMatrix data={data} periodId={periodId} asOf={DEMO_DATE} outstandingOnly={false} statusFilter={statusFilter} />
     </div>
+    <details className="mt-7 rounded-xl border bg-card p-5 sm:p-6"><summary className="min-h-12 cursor-pointer py-2 text-lg font-semibold">Payment transactions and corrections</summary>
+      <p className="mt-4 mb-5 text-sm text-muted-foreground">Choose <strong className="text-foreground">See Transaction</strong> to inspect a payment, then <strong className="text-foreground">Edit Payment</strong> to correct its categories, electricity reading, or recorded amount. This is the only place where payment corrections can be saved.</p>
+      <p role="status" className="mb-3 text-sm text-primary">{correctionNotice}</p>
+      <PaymentHistoryTable data={data} payments={transactionPayments} asOf={DEMO_DATE} caption="Billing transaction history" onEditPayment={(payment, trigger) => { editTrigger.current = trigger; setEditingPaymentId(payment.id) }} />
+    </details>
+    {editingPaymentId && <EditPaymentDialog paymentId={editingPaymentId} onClose={() => setEditingPaymentId(null)} onReturnFocus={() => { if (editTrigger.current?.isConnected) editTrigger.current.focus() }} onSaved={setCorrectionNotice} />}
     <details className="mt-7 rounded-xl border bg-card p-5 sm:p-6"><summary className="min-h-12 cursor-pointer py-2 text-lg font-semibold">View bill amounts and due dates</summary><div className="mt-5"><DataTable rows={charges} caption="Bill amounts and due dates" columns={[
       { key: 'room', label: 'Room', render: c => <span className="font-semibold">{chargeRoom(data, c).label}</span> },
       { key: 'tenant', label: 'Charge owner / ID', render: c => <div className="max-w-xs whitespace-normal"><p>{data.tenants.find(t => t.id === c.tenantId)?.name}</p><p className="mt-1 break-all text-xs text-muted-foreground">{c.id}</p></div> },
@@ -58,7 +71,6 @@ export default function Billing() {
     <ElectricityPreview data={data} periodId={periodId} asOf={DEMO_DATE} />
     <WorkflowPlaceholders title="More billing tools" items={[
       { title: 'Make another bill type', description: 'Electricity uses the payment-time meter workflow. Adding rent, water, and optional washing bills will be available later.' },
-      { title: 'Correct a bill', description: 'Corrections will keep a record of what changed and why. This tool is not available yet.' },
     ]} />
   </>
 }

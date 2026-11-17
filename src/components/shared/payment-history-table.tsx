@@ -42,7 +42,7 @@ function PaymentCategoryBoxes({ data, payment, asOf }: { data: PrototypeAppState
   </details>
 }
 
-export function PaymentHistoryTable({ data, payments, caption = 'Payment history', compact = false, asOf = DEMO_DATE, transactionDisplay = 'button' }: { data: PrototypeAppState; payments: Payment[]; caption?: string; compact?: boolean; asOf?: string; transactionDisplay?: 'button' | 'categories' }) {
+export function PaymentHistoryTable({ data, payments, caption = 'Payment history', compact = false, asOf = DEMO_DATE, transactionDisplay = 'button', onEditPayment }: { data: PrototypeAppState; payments: Payment[]; caption?: string; compact?: boolean; asOf?: string; transactionDisplay?: 'button' | 'categories'; onEditPayment?: (payment: Payment, trigger: HTMLButtonElement) => void }) {
   const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null)
   const [transactionSession, setTransactionSession] = useState(0)
   const transactionTrigger = useRef<HTMLButtonElement | null>(null)
@@ -53,7 +53,7 @@ export function PaymentHistoryTable({ data, payments, caption = 'Payment history
     { key: 'amount', label: 'Amount paid', align: 'right', render: p => <span className="font-semibold tabular-nums">{formatMoney(p.amountCents)}</span> },
   ]
   if (!compact) columns.push(
-    { key: 'status', label: 'Status', render: () => <StatusBadge status="Recorded" /> },
+    { key: 'status', label: 'Status', render: p => <StatusBadge status={p.correction ? 'Corrected' : 'Recorded'} /> },
     { key: 'receipt', label: 'Receipt number', render: p => <span className="text-sm">{data.receipts.find(r => r.paymentId === p.id && r.state === 'ISSUED')?.receiptNumber ?? 'No receipt yet'}</span> },
   )
   columns.push({ key: 'details', label: 'Transaction', render: p => transactionDisplay === 'categories'
@@ -61,6 +61,6 @@ export function PaymentHistoryTable({ data, payments, caption = 'Payment history
     : <Button variant="outline" aria-label={`See Transaction for ${paymentRooms(data, p, asOf).label}, ${formatDate(p.paidOn)}, ${formatMoney(p.amountCents)}`} onClick={event => { transactionTrigger.current = event.currentTarget; setSelectedPaymentId(p.id); setTransactionSession(session => session + 1) }}>See Transaction</Button> })
   return <>
     <DataTable rows={payments} caption={caption} columns={columns} />
-    {selectedPayment && <TransactionDialog key={`${selectedPayment.id}:${transactionSession}`} data={data} payment={selectedPayment} asOf={asOf} onClose={() => setSelectedPaymentId(null)} onReturnFocus={() => transactionTrigger.current?.focus()} />}
+    {selectedPayment && <TransactionDialog key={`${selectedPayment.id}:${transactionSession}`} data={data} payment={selectedPayment} asOf={asOf} onClose={() => setSelectedPaymentId(null)} onReturnFocus={() => transactionTrigger.current?.focus()} onEditPayment={onEditPayment ? (payment) => { if (transactionTrigger.current) onEditPayment(payment, transactionTrigger.current); setSelectedPaymentId(null) } : undefined} />}
   </>
 }

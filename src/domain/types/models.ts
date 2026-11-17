@@ -165,7 +165,38 @@ export interface Receipt {
   amountCents: number
   /** Allocation IDs at issue time, not a live view of future allocations. */
   allocationIds: string[]
-  state: 'ISSUED' | 'VOIDED'
+  state: 'ISSUED' | 'VOIDED' | 'SUPERSEDED'
+  revision: number
+  supersedesReceiptId: string | null
+}
+
+export type CorrectionSettlementStatus =
+  | 'NO_DIFFERENCE'
+  | 'NO_MONEY_MOVED'
+  | 'ADDITIONAL_RECEIVED'
+  | 'ADDITIONAL_PENDING'
+  | 'REFUND_COMPLETED'
+  | 'REFUND_PENDING'
+
+export interface PaymentCorrection {
+  id: string
+  originalPaymentId: string
+  correctedPaymentId: string
+  originalReceiptId: string
+  correctedReceiptId: string
+  correctedAt: string
+  correctedBy: string
+  reason: string
+  originalAmountCents: number
+  correctedAmountCents: number
+  differenceCents: number
+  settlementStatus: CorrectionSettlementStatus
+  settlementAmountCents: number
+  originalCategories: ChargeCategory[]
+  correctedCategories: ChargeCategory[]
+  originalElectricityReadingMilliKwh: number | null
+  correctedElectricityReadingMilliKwh: number | null
+  auditEventId: string
 }
 
 export interface AuditEvent {
@@ -195,6 +226,7 @@ export interface PrototypeAppState {
   paymentAllocations: PaymentAllocation[]
   tenantCredits: TenantCredit[]
   receipts: Receipt[]
+  paymentCorrections: PaymentCorrection[]
   auditEvents: AuditEvent[]
 }
 

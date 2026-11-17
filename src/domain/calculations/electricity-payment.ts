@@ -39,7 +39,7 @@ export function prepareElectricityPayment(
   const receiptNumber = nextReceiptNumber(data)
   const receipt: Receipt = {
     id: `receipt-${paymentId}`, paymentId, receiptNumber, issuedOn: paidOn,
-    amountCents: calculation.charge.amountCents, allocationIds: [allocationId], state: 'ISSUED',
+    amountCents: calculation.charge.amountCents, allocationIds: [allocationId], state: 'ISSUED', revision: 1, supersedesReceiptId: null,
   }
   const payment: Payment = {
     id: paymentId, tenantId: calculation.charge.tenantId, amountCents: calculation.charge.amountCents,

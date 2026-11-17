@@ -210,7 +210,7 @@ export function prepareRoomPayment(data: PrototypeAppState, input: RoomPaymentIn
     const payment: Payment = { id: paymentId, tenantId, amountCents, paidOn: input.asOf, method: 'cash', state: 'RECORDED', correction: null }
     const receipt: Receipt = {
       id: `receipt-${paymentId}`, paymentId, receiptNumber: receiptNumbers[receiptIndex++]!, issuedOn: input.asOf,
-      amountCents, allocationIds: allocations.filter(allocation => allocation.paymentId === paymentId).map(allocation => allocation.id), state: 'ISSUED',
+      amountCents, allocationIds: allocations.filter(allocation => allocation.paymentId === paymentId).map(allocation => allocation.id), state: 'ISSUED', revision: 1, supersedesReceiptId: null,
     }
     payments.push(payment)
     receipts.push(receipt)

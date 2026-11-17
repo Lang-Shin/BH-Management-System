@@ -4,6 +4,7 @@ import type { StateAction } from './actions'
 import { activeAssignments } from '@/domain/calculations/summary'
 import { prepareElectricityPayment } from '@/domain/calculations/electricity-payment'
 import { prepareRoomPayment } from '@/domain/calculations/room-payment'
+import { preparePaymentCorrection } from '@/domain/calculations/payment-correction'
 
 export function prototypeReducer(state: PrototypeData, action: StateAction): PrototypeData {
   switch (action.type) {
@@ -41,6 +42,14 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
       const result = prepareRoomPayment(state, {
         roomId: action.roomId, periodId: action.periodId, selected: action.selected,
         electricityReadingMilliKwh: action.electricityReadingMilliKwh, asOf: action.asOf,
+      })
+      return result.ok ? result.data : state
+    }
+    case 'payment/corrected': {
+      const result = preparePaymentCorrection(state, {
+        paymentId: action.paymentId, selectedCategories: action.selectedCategories,
+        correctedElectricityReadingMilliKwh: action.correctedElectricityReadingMilliKwh,
+        reason: action.reason, settlementStatus: action.settlementStatus, correctedAt: action.correctedAt,
       })
       return result.ok ? result.data : state
     }
