@@ -65,7 +65,7 @@ export function tenantAccount(data: PrototypeAppState, tenantId: string, asOf: s
   return { balance, credit, status: overdue ? 'Overdue' : balance > 0 ? 'Outstanding' : credit > 0 ? 'Credit available' : 'Clear' }
 }
 
-/** Cash received recognizes refunds only when completed and additional money only when received. */
+/** New corrections are settled immediately; legacy pending statuses remain excluded from cash received. */
 export function paymentCashReceived(data: PrototypeAppState, payment: { id: string; amountCents: number }): number {
   const correction = data.paymentCorrections.find(item => item.correctedPaymentId === payment.id)
   return correction && (correction.settlementStatus === 'NO_MONEY_MOVED' || correction.settlementStatus === 'REFUND_PENDING')

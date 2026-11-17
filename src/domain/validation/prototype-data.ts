@@ -58,7 +58,7 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
   if (!rows(value, 'paymentCorrections', r => id(r.originalPaymentId) && id(r.correctedPaymentId) && id(r.originalReceiptId)
     && id(r.correctedReceiptId) && date(r.correctedAt) && id(r.correctedBy) && text(r.reason) && r.reason.length <= 500
     && money(r.originalAmountCents) && money(r.correctedAmountCents) && Number.isSafeInteger(r.differenceCents)
-    && oneOf(r.settlementStatus, ['NO_DIFFERENCE', 'NO_MONEY_MOVED', 'ADDITIONAL_RECEIVED', 'ADDITIONAL_PENDING', 'REFUND_COMPLETED', 'REFUND_PENDING'])
+    && oneOf(r.settlementStatus, ['CORRECTED', 'REFUNDED', 'ADDITIONAL_RECEIVED', 'NO_DIFFERENCE', 'NO_MONEY_MOVED', 'ADDITIONAL_PENDING', 'REFUND_COMPLETED', 'REFUND_PENDING'])
     && money(r.settlementAmountCents) && Array.isArray(r.originalCategories) && r.originalCategories.every(category => oneOf(category, ['RENT', 'ELECTRICITY', 'WATER', 'WASHING_MACHINE']))
     && Array.isArray(r.correctedCategories) && r.correctedCategories.every(category => oneOf(category, ['RENT', 'ELECTRICITY', 'WATER', 'WASHING_MACHINE']))
     && (r.originalElectricityReadingMilliKwh === null || money(r.originalElectricityReadingMilliKwh))
@@ -194,7 +194,7 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     const correctedReceipt = data.receipts.find(receipt => receipt.id === correction.correctedReceiptId)
     const event = audit(correction.auditEventId)
     const difference = correction.correctedAmountCents - correction.originalAmountCents
-    const expectedSettlement = correction.settlementStatus === 'NO_DIFFERENCE' || correction.settlementStatus === 'NO_MONEY_MOVED' ? 0 : Math.abs(difference)
+    const expectedSettlement = correction.settlementStatus === 'CORRECTED' || correction.settlementStatus === 'NO_DIFFERENCE' || correction.settlementStatus === 'NO_MONEY_MOVED' ? 0 : Math.abs(difference)
     return originalPayment?.state === 'VOIDED' && correctedPayment?.state === 'RECORDED'
       && correctedPayment.correction?.supersedesId === originalPayment.id && correctedPayment.tenantId === originalPayment.tenantId
       && originalReceipt?.state === 'SUPERSEDED' && correctedReceipt?.state === 'ISSUED'

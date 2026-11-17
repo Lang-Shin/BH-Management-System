@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { useAnimatedDialogClose } from '@/components/ui/use-animated-dialog-close'
 import { usePrototype } from '@/hooks/use-prototype'
 import { parseMeterReadingMilliKwh } from '@/domain/calculations/electricity-calculation'
-import { latestPaymentReceipt, buildPaymentCorrectionQuote, preparePaymentCorrection } from '@/domain/calculations/payment-correction'
+import { latestPaymentReceipt, buildPaymentCorrectionQuote, preparePaymentCorrection, correctionSettlementText } from '@/domain/calculations/payment-correction'
 import { paymentRooms } from '@/domain/calculations/room-finance'
 import type { ChargeCategory, CorrectionSettlementStatus } from '@/domain/types/models'
 import { DEMO_DATE } from '@/data/fixtures/demo'
@@ -13,14 +13,6 @@ import { formatDate, formatMoney } from '@/lib/format'
 import { CATEGORY_LABELS } from '@/lib/labels'
 
 const icons = { RENT: House, ELECTRICITY: Zap, WATER: Droplets, WASHING_MACHINE: WashingMachine }
-const settlementText: Record<CorrectionSettlementStatus, string> = {
-  NO_DIFFERENCE: 'No additional payment or refund required.',
-  NO_MONEY_MOVED: 'Recording correction only; no money moved.',
-  ADDITIONAL_RECEIVED: 'Tenant paid the additional amount to the landlord.',
-  ADDITIONAL_PENDING: 'Tenant must pay the additional amount to the landlord.',
-  REFUND_COMPLETED: 'Refund has been returned to the tenant.',
-  REFUND_PENDING: 'Landlord must return the refund to the tenant.',
-}
 const correctionReasonOptions = ['Incorrect bill selected', 'Incorrect electricity reading', 'Incorrect recorded amount', 'Incorrect room or period']
 
 export function EditPaymentDialog({ paymentId, onClose, onReturnFocus, onSaved }: {
@@ -48,6 +40,7 @@ export function EditPaymentDialog({ paymentId, onClose, onReturnFocus, onSaved }
   const [reasonChoice, setReasonChoice] = useState('')
   const [reasonDetails, setReasonDetails] = useState('')
   const [settlement, setSettlement] = useState<CorrectionSettlementStatus | ''>('')
+  const [settlementConfirmed, setSettlementConfirmed] = useState(false)
   const [step, setStep] = useState<'edit' | 'review' | 'success'>('edit')
   const [submitError, setSubmitError] = useState('')
   const [saved, setSaved] = useState<{ receiptNumber: string; amountCents: number; settlement: string; settlementAmountCents: number } | null>(null)
@@ -61,7 +54,7 @@ export function EditPaymentDialog({ paymentId, onClose, onReturnFocus, onSaved }
         <DialogTitle className="mt-2 text-2xl">Payment corrected</DialogTitle>
         <DialogDescription className="mt-2">Revised receipt {saved.receiptNumber} · Amount {formatMoney(saved.amountCents)}.</DialogDescription>
         <p className="mt-3 text-sm font-semibold">{saved.settlement}</p>
-        {saved.settlementAmountCents > 0 && <p className="mt-1 text-sm text-muted-foreground">Money difference: {formatMoney(saved.settlementAmountCents)}.</p>}
+        {saved.settlementAmountCents > 0 && <p className="mt-1 text-sm text-muted-foreground">Confirmed settlement amount: {formatMoney(saved.settlementAmountCents)}.</p>}
         <Button autoFocus className="mt-5 w-full" onClick={requestClose}>Got it</Button>
       </div>
     </DialogContent>
@@ -86,11 +79,12 @@ export function EditPaymentDialog({ paymentId, onClose, onReturnFocus, onSaved }
     </DialogContent>
   </Dialog>
   const difference = quote.differenceCents
-  const settlementOptions: CorrectionSettlementStatus[] = difference === 0
-    ? ['NO_DIFFERENCE'] : difference < 0
-      ? ['NO_MONEY_MOVED', 'REFUND_COMPLETED', 'REFUND_PENDING']
-      : ['NO_MONEY_MOVED', 'ADDITIONAL_RECEIVED', 'ADDITIONAL_PENDING']
   const canReview = quote.canReview && !readingError
+  const settlementReady = difference === 0
+    ? true
+    : difference > 0
+      ? settlement === 'ADDITIONAL_RECEIVED' && settlementConfirmed
+      : settlement === 'CORRECTED' || (settlement === 'REFUNDED' && settlementConfirmed)
   const rooms = paymentRooms(data, payment, DEMO_DATE)
   const periods = [...new Set(originalCategories.flatMap(category => data.paymentAllocations
     .filter(allocation => allocation.paymentId === payment.id && allocation.state === 'ACTIVE')
@@ -102,19 +96,23 @@ export function EditPaymentDialog({ paymentId, onClose, onReturnFocus, onSaved }
   function toggle(category: ChargeCategory) {
     setSelected(current => current.includes(category) ? current.filter(item => item !== category) : [...current, category])
     setSettlement('')
+    setSettlementConfirmed(false)
     setSubmitError('')
   }
 
   function review() {
     if (!canReview) return
+    setSettlement(difference === 0 ? 'CORRECTED' : difference > 0 ? 'ADDITIONAL_RECEIVED' : '')
+    setSettlementConfirmed(false)
     setStep('review')
     setSubmitError('')
   }
 
   function confirm() {
+    if (!settlementReady) return
     const result = preparePaymentCorrection(data, {
       paymentId, selectedCategories: selected, correctedElectricityReadingMilliKwh: selectedElectricity ? parsedReading : null,
-      reason, settlementStatus: settlement, correctedAt: DEMO_DATE,
+      reason, settlementStatus: settlement, moneyExchangeConfirmed: settlementConfirmed, correctedAt: DEMO_DATE,
     })
     if (!result.ok) {
       setSubmitError('The correction could not be saved because the transaction changed or is no longer safe to correct.')
@@ -123,11 +121,11 @@ export function EditPaymentDialog({ paymentId, onClose, onReturnFocus, onSaved }
     dispatch({
       type: 'payment/corrected', paymentId, selectedCategories: selected,
       correctedElectricityReadingMilliKwh: selectedElectricity ? parsedReading : null,
-      reason, settlementStatus: settlement, correctedAt: DEMO_DATE,
+      reason, settlementStatus: settlement, moneyExchangeConfirmed: settlementConfirmed, correctedAt: DEMO_DATE,
     })
     setSaved({
       receiptNumber: result.receipt.receiptNumber, amountCents: result.receipt.amountCents,
-      settlement: settlementText[result.correction.settlementStatus], settlementAmountCents: result.correction.settlementAmountCents,
+      settlement: correctionSettlementText(result.correction), settlementAmountCents: result.correction.settlementAmountCents,
     })
     setStep('success')
     onSaved(`Payment corrected · ${result.receipt.receiptNumber}`)
@@ -180,14 +178,8 @@ export function EditPaymentDialog({ paymentId, onClose, onReturnFocus, onSaved }
             <textarea aria-label="Correction details (optional)" maxLength={280} value={reasonDetails} onChange={event => setReasonDetails(event.target.value)} placeholder="Add details if needed" className="min-h-20 w-full rounded-xl border bg-card px-3 py-2" />
             {reason.trim().length < 3 && <p className="text-xs text-muted-foreground">A reason is required before confirmation.</p>}
           </div>
-          {difference !== 0 && <div className="mt-5 grid gap-2">
-            <label htmlFor="edit-settlement" className="text-sm font-semibold">How was the money difference handled?</label>
-            <select id="edit-settlement" value={settlement} onChange={event => { setSettlement(event.target.value as CorrectionSettlementStatus); setSubmitError('') }} className="h-12 w-full rounded-xl border bg-card px-3">
-              <option value="">Choose an option</option>
-              {settlementOptions.map(option => <option key={option} value={option}>{settlementText[option]}</option>)}
-            </select>
-          </div>}
-          {difference === 0 && <p className="mt-4 text-sm text-muted-foreground">{settlementText.NO_DIFFERENCE}</p>}
+          {difference !== 0 && <p className="mt-4 text-sm text-muted-foreground">{difference < 0 ? 'You will confirm whether money was actually returned before saving.' : 'You will confirm that the additional money was received before saving.'}</p>}
+          {difference === 0 && <p className="mt-4 text-sm text-muted-foreground">No additional payment or refund required.</p>}
           {(quote.error || submitError) && selected.length > 0 && !readingError && <p role="alert" className="mt-3 text-sm text-destructive">{submitError || quote.error}</p>}
           {selected.length === 0 && <p role="alert" className="mt-3 text-sm text-destructive">Select at least one category. Reversing the entire transaction is not available from simple Edit Payment.</p>}
         </div>
@@ -199,18 +191,49 @@ export function EditPaymentDialog({ paymentId, onClose, onReturnFocus, onSaved }
       {step === 'review' && <div className="room-payment-confirm">
         <span className="payment-eyebrow">REVIEW CORRECTION</span>
         <DialogTitle className="mt-2 text-2xl">Confirm correction</DialogTitle>
-        <DialogDescription className="mt-2">Review the corrected categories and money handling before saving.</DialogDescription>
+        <DialogDescription className="mt-2">Review the corrected categories and confirm any money exchange before saving.</DialogDescription>
         <dl className="room-payment-summary">
           <div><dt>Room</dt><dd>{rooms.label}</dd></div>
           <div><dt>Original transaction</dt><dd>{formatDate(payment.paidOn)} · {receipt.receiptNumber}</dd></div>
           <div><dt>Original amount</dt><dd>{formatMoney(payment.amountCents)}</dd></div>
           {quote.categories.map(option => <div key={option.category}><dt>{CATEGORY_LABELS[option.category]}</dt><dd>{selected.includes(option.category) ? formatMoney(option.correctedAmountCents) : 'Removed'}</dd></div>)}
-          <div className="room-payment-summary-total"><dt>{difference === 0 ? 'No difference' : difference > 0 ? 'Additional payment' : 'Refund'}</dt><dd>{formatMoney(Math.abs(difference))}</dd></div>
+          <div className="room-payment-summary-total"><dt>{difference === 0 ? 'No difference' : difference > 0 ? 'Additional payment' : 'Lower corrected amount'}</dt><dd>{formatMoney(Math.abs(difference))}</dd></div>
         </dl>
-        <p className="mt-4 text-sm font-semibold">{settlementText[settlement || 'NO_DIFFERENCE']}</p>
+
+        {difference > 0 && <section className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4" aria-labelledby="additional-payment-title">
+          <h2 id="additional-payment-title" className="font-semibold text-amber-950">Tenant must pay an additional {formatMoney(difference)} to the landlord.</h2>
+          <p className="mt-1 text-sm text-amber-950/80">Confirm only after the tenant has actually paid. If the money has not changed hands, cancel and save nothing.</p>
+          <label className="mt-3 flex items-start gap-2 text-sm font-medium text-amber-950">
+            <input type="checkbox" checked={settlementConfirmed} onChange={event => setSettlementConfirmed(event.target.checked)} className="mt-0.5 size-4 shrink-0" />
+            <span>I confirm that {formatMoney(difference)} has been received from the tenant.</span>
+          </label>
+        </section>}
+
+        {difference < 0 && <section className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4" aria-labelledby="overpayment-title">
+          <h2 id="overpayment-title" className="font-semibold text-amber-950">The corrected bill is lower by {formatMoney(Math.abs(difference))}.</h2>
+          <fieldset className="mt-3">
+            <legend className="text-sm font-semibold text-amber-950">What happened to the money?</legend>
+            <label className="mt-2 flex items-start gap-2 text-sm text-amber-950">
+              <input type="radio" name="overpayment-handling" checked={settlement === 'CORRECTED'} onChange={() => { setSettlement('CORRECTED'); setSettlementConfirmed(false) }} className="mt-0.5 size-4 shrink-0" />
+              <span><strong className="block">Recorded amount was wrong — no extra money was collected.</strong><span className="block text-xs text-amber-950/80">Correct the record without creating a refund.</span></span>
+            </label>
+            <label className="mt-3 flex items-start gap-2 text-sm text-amber-950">
+              <input type="radio" name="overpayment-handling" checked={settlement === 'REFUNDED'} onChange={() => { setSettlement('REFUNDED'); setSettlementConfirmed(false) }} className="mt-0.5 size-4 shrink-0" />
+              <span><strong className="block">Landlord must return {formatMoney(Math.abs(difference))} to the tenant.</strong><span className="block text-xs text-amber-950/80">Choose this if the tenant actually paid more than the corrected bill.</span></span>
+            </label>
+          </fieldset>
+          {settlement === 'REFUNDED' && <label className="mt-3 flex items-start gap-2 border-t border-amber-200 pt-3 text-sm font-medium text-amber-950">
+            <input type="checkbox" checked={settlementConfirmed} onChange={event => setSettlementConfirmed(event.target.checked)} className="mt-0.5 size-4 shrink-0" />
+            <span>I confirm that {formatMoney(Math.abs(difference))} has been returned to the tenant.</span>
+          </label>}
+          <p className="mt-2 text-xs text-amber-950/80">Do not confirm money as returned unless it has actually been handed back.</p>
+        </section>}
+
+        {difference === 0 && <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">No additional payment or refund required.</p>}
+
         <p className="mt-2 text-sm"><span className="text-muted-foreground">Reason:</span> {reason}</p>
         {submitError && <p role="alert" className="mt-3 text-sm text-destructive">{submitError}</p>}
-        <div className="mt-5 flex gap-3"><Button variant="outline" onClick={() => setStep('edit')}><ArrowLeft aria-hidden="true" />Back</Button><Button className="flex-1" onClick={confirm}>Confirm correction</Button></div>
+        <div className="mt-5 flex gap-3"><Button variant="outline" onClick={() => setStep('edit')}><ArrowLeft aria-hidden="true" />Back</Button><Button className="flex-1" onClick={confirm} disabled={!settlementReady}>Confirm correction</Button></div>
       </div>}
     </DialogContent>
   </Dialog>

@@ -7,6 +7,7 @@ import type { PrototypeAppState, Receipt } from '@/domain/types/models'
 import { formatDate, formatMoney } from '@/lib/format'
 import { CATEGORY_LABELS } from '@/lib/labels'
 import { chargeRoom, paymentRooms } from '@/domain/calculations/room-finance'
+import { correctionSettlementText, isLegacyPendingCorrection } from '@/domain/calculations/payment-correction'
 
 export function ReceiptDialog({ data, receipt, onClose, onReturnFocus }: {
   data: PrototypeAppState
@@ -40,7 +41,7 @@ export function ReceiptDialog({ data, receipt, onClose, onReturnFocus }: {
         <p className="font-semibold">Revised from {originalReceipt?.receiptNumber ?? 'the original receipt'}</p>
         <p className="mt-2 text-sm"><span className="text-muted-foreground">Reason:</span> {correction.reason}</p>
         <p className="mt-1 text-sm"><span className="text-muted-foreground">Corrected bill total:</span> {formatMoney(correction.correctedAmountCents)} · <span className="text-muted-foreground">Difference:</span> {formatMoney(Math.abs(correction.differenceCents))}</p>
-        <p className="mt-2 text-sm font-semibold">{correction.settlementStatus === 'ADDITIONAL_PENDING' ? 'Additional payment is still pending; it is not included as received.' : correction.settlementStatus === 'REFUND_PENDING' ? 'Refund is still pending.' : correction.settlementStatus === 'REFUND_COMPLETED' ? 'Refund has been completed.' : correction.settlementStatus === 'ADDITIONAL_RECEIVED' ? 'Additional payment has been received.' : correction.settlementStatus === 'NO_MONEY_MOVED' ? 'Recording correction only; no money moved.' : 'No additional payment or refund required.'}</p>
+        <p className={isLegacyPendingCorrection(correction.settlementStatus) ? 'mt-2 text-sm font-semibold text-amber-900' : 'mt-2 text-sm font-semibold'}>{correctionSettlementText(correction)}</p>
       </section>}
       <dl className="grid min-w-0 grid-cols-2 gap-3 rounded-2xl border bg-muted/40 p-4 text-sm">
         <div className="col-span-2"><dt className="text-muted-foreground">Room context</dt><dd className="mt-1 font-semibold">{payment ? paymentRooms(data, payment, receipt.issuedOn, receipt.allocationIds).label : 'Room needs review'}</dd></div>

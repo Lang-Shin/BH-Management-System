@@ -7,7 +7,7 @@ import { EmptyState } from '@/components/shared/states'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { TransactionDialog } from '@/components/shared/transaction-dialog'
 import { usePrototype } from '@/hooks/use-prototype'
-import { latestPaymentReceipt } from '@/domain/calculations/payment-correction'
+import { currentCorrectionStatuses, isLegacyCorrectionStatus, isLegacyPendingCorrection, latestPaymentReceipt, legacyCorrectionStatuses } from '@/domain/calculations/payment-correction'
 import { paymentRooms } from '@/domain/calculations/room-finance'
 import type { CorrectionSettlementStatus, Payment, PaymentCorrection } from '@/domain/types/models'
 import { DEMO_DATE } from '@/data/fixtures/demo'
@@ -20,22 +20,21 @@ type TransactionStatus = 'ALL' | 'RECORDED' | 'CORRECTED'
 type CorrectionStatusFilter = 'ALL' | CorrectionSettlementStatus
 
 const correctionStatusLabels: Record<CorrectionSettlementStatus, string> = {
-  NO_DIFFERENCE: 'Balanced',
-  NO_MONEY_MOVED: 'Recording only',
-  ADDITIONAL_RECEIVED: 'Additional received',
-  ADDITIONAL_PENDING: 'Additional pending',
-  REFUND_COMPLETED: 'Refund completed',
-  REFUND_PENDING: 'Refund pending',
+  CORRECTED: 'Corrected',
+  REFUNDED: 'Refunded',
+  ADDITIONAL_RECEIVED: 'Additional payment received',
+  NO_DIFFERENCE: 'Corrected (legacy)',
+  NO_MONEY_MOVED: 'Recording only (legacy)',
+  REFUND_COMPLETED: 'Refunded (legacy)',
+  REFUND_PENDING: 'Refund pending (legacy)',
+  ADDITIONAL_PENDING: 'Additional pending (legacy)',
 }
 
-const correctionStatusOrder: CorrectionSettlementStatus[] = [
-  'NO_DIFFERENCE', 'NO_MONEY_MOVED', 'ADDITIONAL_RECEIVED', 'ADDITIONAL_PENDING', 'REFUND_COMPLETED', 'REFUND_PENDING',
-]
-
+const correctionStatusOrder: CorrectionSettlementStatus[] = [...currentCorrectionStatuses, ...legacyCorrectionStatuses]
 function CorrectionStatusBadge({ status }: { status: CorrectionSettlementStatus }) {
-  const tone = status === 'ADDITIONAL_PENDING' || status === 'REFUND_PENDING'
+  const tone = isLegacyPendingCorrection(status)
     ? 'border-amber-200 bg-amber-50 text-amber-900'
-    : status === 'ADDITIONAL_RECEIVED' || status === 'REFUND_COMPLETED' || status === 'NO_DIFFERENCE'
+    : status === 'ADDITIONAL_RECEIVED' || status === 'REFUNDED' || status === 'CORRECTED' || status === 'NO_DIFFERENCE' || status === 'REFUND_COMPLETED'
       ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
       : 'border-border bg-muted text-foreground'
   return <Badge variant="outline" className={cn('max-w-full whitespace-normal text-center font-medium', tone)}><span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-current" />{correctionStatusLabels[status]}</Badge>
@@ -65,6 +64,9 @@ export function PaymentsTransactionWorkspace() {
   const normalizedSearch = search.trim().toLowerCase()
   const inSelectedMonth = (date: string) => month === 'ALL' || Boolean(period && date >= period.startDate && date <= period.endDate)
   const recordedPayments = data.payments.filter(payment => payment.state === 'RECORDED' && payment.paidOn <= DEMO_DATE)
+  const legacyPendingCorrections = data.paymentCorrections.filter(correction => isLegacyPendingCorrection(correction.settlementStatus))
+  const availableCorrectionStatuses = correctionStatusOrder.filter(status => !isLegacyCorrectionStatus(status)
+    || data.paymentCorrections.some(correction => correction.settlementStatus === status))
 
   const transactionRows = recordedPayments.filter(payment => {
     const receiptNumber = transactionReceipt(data, payment)
@@ -166,7 +168,7 @@ export function PaymentsTransactionWorkspace() {
     <div className="transaction-toolbar">
       <label className="transaction-search" htmlFor="transaction-search"><Search className="size-4" aria-hidden="true" /><span className="sr-only">Search by room or receipt number</span><input id="transaction-search" type="search" value={search} onChange={event => { setSearch(event.target.value); setPage(1) }} placeholder="Search room or receipt number" autoComplete="off" /></label>
       <label className="transaction-filter"><span>Billing month or date</span><select value={month} onChange={event => { setMonth(event.target.value); setPage(1) }}><option value="ALL">All dates</option>{data.billingPeriods.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
-      <label className="transaction-filter"><span>Status</span><select value={status} onChange={event => { setStatus(event.target.value as TransactionStatus | CorrectionStatusFilter); setPage(1) }}><option value="ALL">All statuses</option>{tab === 'transactions' ? <><option value="RECORDED">Recorded</option><option value="CORRECTED">Corrected</option></> : correctionStatusOrder.map(item => <option key={item} value={item}>{correctionStatusLabels[item]}</option>)}</select></label>
+      <label className="transaction-filter"><span>Status</span><select value={status} onChange={event => { setStatus(event.target.value as TransactionStatus | CorrectionStatusFilter); setPage(1) }}><option value="ALL">All statuses</option>{tab === 'transactions' ? <><option value="RECORDED">Recorded</option><option value="CORRECTED">Corrected</option></> : availableCorrectionStatuses.map(item => <option key={item} value={item}>{correctionStatusLabels[item]}</option>)}</select></label>
     </div>
 
     <div id="transactions-panel" role="tabpanel" aria-labelledby="transactions-tab" hidden={tab !== 'transactions'}>
@@ -176,6 +178,7 @@ export function PaymentsTransactionWorkspace() {
     </div>
 
     <div id="corrections-panel" role="tabpanel" aria-labelledby="corrections-tab" hidden={tab !== 'corrections'}>
+      {tab === 'corrections' && legacyPendingCorrections.length > 0 && <p role="status" className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{legacyPendingCorrections.length === 1 ? 'One older correction still has a pending settlement status.' : `${legacyPendingCorrections.length} older corrections still have pending settlement statuses.`} They are preserved unchanged and are not counted as completed. Review those records before treating any money as returned or received.</p>}
       {tab === 'corrections' && (visibleRows.length > 0
         ? <DataTable rows={visibleRows as PaymentCorrection[]} columns={correctionColumns} caption="Correction history" />
         : <EmptyState title={correctionsEmpty ? 'No corrections recorded yet' : 'No corrections match'} description={correctionsEmpty ? 'Corrections saved from an eligible transaction will appear here with the original and revised receipt totals.' : 'Try another room or receipt number, or clear the filters to see all corrections.'} action={!correctionsEmpty && hasFilters ? <Button variant="outline" onClick={resetFilters}>Clear search and filters</Button> : undefined} />)}

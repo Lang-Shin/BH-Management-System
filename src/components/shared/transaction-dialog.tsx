@@ -4,18 +4,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useAnimatedDialogClose } from '@/components/ui/use-animated-dialog-close'
 import { StatusBadge } from './status-badge'
 import type { Payment, PrototypeAppState } from '@/domain/types/models'
+import { correctionSettlementText, isLegacyPendingCorrection } from '@/domain/calculations/payment-correction'
 import { paymentRooms } from '@/domain/calculations/room-finance'
 import { formatDate, formatMoney } from '@/lib/format'
 import { CATEGORY_LABELS } from '@/lib/labels'
-
-const settlementLabels = {
-  NO_DIFFERENCE: 'No additional payment or refund required.',
-  NO_MONEY_MOVED: 'Recording correction only; no money moved.',
-  ADDITIONAL_RECEIVED: 'Additional payment received.',
-  ADDITIONAL_PENDING: 'Additional payment still pending.',
-  REFUND_COMPLETED: 'Refund completed.',
-  REFUND_PENDING: 'Refund still pending.',
-} as const
 
 export function TransactionDialog({ data, payment, asOf, onClose, onReturnFocus, onEditPayment, title = 'Transaction Details', description = 'Payment information for the selected room.' }: {
   data: PrototypeAppState
@@ -72,7 +64,7 @@ export function TransactionDialog({ data, payment, asOf, onClose, onReturnFocus,
           <div><dt className="text-muted-foreground">Original recorded amount</dt><dd className="font-semibold">{formatMoney(correction.originalAmountCents)}</dd></div>
           <div><dt className="text-muted-foreground">Corrected bill total</dt><dd className="font-semibold">{formatMoney(correction.correctedAmountCents)}</dd></div>
           <div><dt className="text-muted-foreground">Difference</dt><dd className="font-semibold">{formatMoney(Math.abs(correction.differenceCents))}</dd></div>
-          <div><dt className="text-muted-foreground">Money handling</dt><dd className="font-semibold">{settlementLabels[correction.settlementStatus]}</dd></div>
+          <div><dt className="text-muted-foreground">Money handling</dt><dd className={isLegacyPendingCorrection(correction.settlementStatus) ? 'font-semibold text-amber-900' : 'font-semibold'}>{correctionSettlementText(correction)}</dd></div>
           <div className="sm:col-span-2"><dt className="text-muted-foreground">Reason</dt><dd className="font-semibold">{correction.reason}</dd></div>
         </dl>
       </section>}

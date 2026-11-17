@@ -49,7 +49,8 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
       const result = preparePaymentCorrection(state, {
         paymentId: action.paymentId, selectedCategories: action.selectedCategories,
         correctedElectricityReadingMilliKwh: action.correctedElectricityReadingMilliKwh,
-        reason: action.reason, settlementStatus: action.settlementStatus, correctedAt: action.correctedAt,
+        reason: action.reason, settlementStatus: action.settlementStatus,
+        moneyExchangeConfirmed: action.moneyExchangeConfirmed, correctedAt: action.correctedAt,
       })
       return result.ok ? result.data : state
     }

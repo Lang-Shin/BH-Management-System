@@ -171,9 +171,12 @@ export interface Receipt {
 }
 
 export type CorrectionSettlementStatus =
+  | 'CORRECTED'
+  | 'REFUNDED'
+  | 'ADDITIONAL_RECEIVED'
+  /** Legacy statuses remain readable so older saved demonstrations are never rewritten silently. */
   | 'NO_DIFFERENCE'
   | 'NO_MONEY_MOVED'
-  | 'ADDITIONAL_RECEIVED'
   | 'ADDITIONAL_PENDING'
   | 'REFUND_COMPLETED'
   | 'REFUND_PENDING'

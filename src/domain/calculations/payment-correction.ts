@@ -3,8 +3,45 @@ import type {
   PaymentCorrection, PrototypeAppState, Receipt,
 } from '@/domain/types/models'
 import { chargeRoom } from './room-finance'
+import { formatMoney } from '@/lib/format'
 
 const categoryOrder: ChargeCategory[] = ['RENT', 'ELECTRICITY', 'WATER', 'WASHING_MACHINE']
+
+export const currentCorrectionStatuses: CorrectionSettlementStatus[] = ['CORRECTED', 'REFUNDED', 'ADDITIONAL_RECEIVED']
+export const legacyCorrectionStatuses: CorrectionSettlementStatus[] = ['NO_DIFFERENCE', 'NO_MONEY_MOVED', 'REFUND_COMPLETED', 'REFUND_PENDING', 'ADDITIONAL_PENDING']
+
+export function isLegacyCorrectionStatus(status: CorrectionSettlementStatus): boolean {
+  return legacyCorrectionStatuses.includes(status)
+}
+
+export function isLegacyPendingCorrection(status: CorrectionSettlementStatus): boolean {
+  return status === 'REFUND_PENDING' || status === 'ADDITIONAL_PENDING'
+}
+
+/** Keeps the incorrect-recording and actual-refund distinction visible without running a migration. */
+export function correctionSettlementText(correction: Pick<PaymentCorrection, 'settlementStatus' | 'differenceCents' | 'settlementAmountCents'>): string {
+  const amount = formatMoney(correction.settlementAmountCents)
+  switch (correction.settlementStatus) {
+    case 'CORRECTED':
+      return correction.differenceCents === 0
+        ? 'No additional payment or refund required.'
+        : 'Recorded amount corrected; no refund was required.'
+    case 'REFUNDED':
+      return `Refund of ${amount} returned to the tenant.`
+    case 'ADDITIONAL_RECEIVED':
+      return `Additional payment of ${amount} received from the tenant.`
+    case 'NO_DIFFERENCE':
+      return 'Legacy correction: no additional payment or refund was recorded.'
+    case 'NO_MONEY_MOVED':
+      return 'Legacy correction: recorded amount corrected without a refund.'
+    case 'REFUND_COMPLETED':
+      return 'Legacy correction: refund recorded as completed.'
+    case 'REFUND_PENDING':
+      return 'Legacy refund pending — no completed refund is recorded. Review this older record before treating the money as returned.'
+    case 'ADDITIONAL_PENDING':
+      return 'Legacy additional payment pending — no receipt of money is recorded. Review this older record before treating the money as received.'
+  }
+}
 
 export interface CorrectionCategoryOption {
   category: ChargeCategory
@@ -43,6 +80,7 @@ export interface PaymentCorrectionInput {
   correctedElectricityReadingMilliKwh: number | null
   reason: string
   settlementStatus: CorrectionSettlementStatus | ''
+  moneyExchangeConfirmed?: boolean
   correctedAt: string
 }
 
@@ -130,24 +168,28 @@ export function buildPaymentCorrectionQuote(data: PrototypeAppState, input: Paym
   }
   const correctedTotalCents = selectedCategories.reduce((sum, category) => sum + (categories.find(option => option.category === category)?.correctedAmountCents ?? 0), 0)
   const differenceCents = correctedTotalCents - payment.amountCents
-  const settlementStatus = differenceCents === 0 ? 'NO_DIFFERENCE' as const : input.settlementStatus
-  const validSettlement = differenceCents === 0
-    ? settlementStatus === 'NO_DIFFERENCE'
-    : differenceCents < 0
-      ? ['NO_MONEY_MOVED', 'REFUND_COMPLETED', 'REFUND_PENDING'].includes(settlementStatus)
-      : ['NO_MONEY_MOVED', 'ADDITIONAL_RECEIVED', 'ADDITIONAL_PENDING'].includes(settlementStatus)
-  const settlementAmountCents = settlementStatus === 'NO_MONEY_MOVED' || settlementStatus === 'NO_DIFFERENCE' ? 0 : Math.abs(differenceCents)
+  const settlementStatus = differenceCents === 0 ? 'CORRECTED' as const : input.settlementStatus
+  const settlementAmountCents = settlementStatus === 'CORRECTED' ? 0 : differenceCents === 0 ? 0 : Math.abs(differenceCents)
   const reason = input.reason.trim()
   const error = selectedCategories.length === 0 ? 'Select at least one category; reversing the whole transaction is blocked.'
     : reason.length < 3 ? 'Enter a reason for the correction.'
       : reason.length > 500 ? 'Keep the correction reason under 500 characters.'
-        : !validSettlement ? 'Choose how the money difference was handled.'
-          : null
+        : null
   return {
     payment, receipt, categories, originalAmountCents: payment.amountCents, correctedTotalCents,
     differenceCents, selectedCategories, correctedElectricityReadingMilliKwh, settlementStatus,
     settlementAmountCents, canReview: !error, error,
   }
+}
+
+function settlementStatusForQuote(differenceCents: number, status: CorrectionSettlementStatus | '', confirmed: boolean): CorrectionSettlementStatus | null {
+  if (differenceCents === 0) return status === 'CORRECTED' || status === '' ? 'CORRECTED' : null
+  if (differenceCents < 0) {
+    if (status === 'CORRECTED') return 'CORRECTED'
+    if (status === 'REFUNDED' && confirmed) return 'REFUNDED'
+    return null
+  }
+  return status === 'ADDITIONAL_RECEIVED' && confirmed ? 'ADDITIONAL_RECEIVED' : null
 }
 
 export function preparePaymentCorrection(data: PrototypeAppState, input: PaymentCorrectionInput): PaymentCorrectionResult {
@@ -157,9 +199,11 @@ export function preparePaymentCorrection(data: PrototypeAppState, input: Payment
     if (quote.selectedCategories.length === 0) return { ok: false, reason: 'NO_CATEGORIES' }
     if (input.reason.trim().length < 3) return { ok: false, reason: 'REASON_REQUIRED' }
     if (input.reason.trim().length > 500) return { ok: false, reason: 'REASON_TOO_LONG' }
-    if (!quote.settlementStatus) return { ok: false, reason: 'INVALID_SETTLEMENT' }
     return { ok: false, reason: 'INVALID_TOTAL' }
   }
+  const settlementStatus = settlementStatusForQuote(quote.differenceCents, input.settlementStatus, input.moneyExchangeConfirmed === true)
+  if (!settlementStatus) return { ok: false, reason: 'INVALID_SETTLEMENT' }
+  const settlementAmountCents = settlementStatus === 'CORRECTED' ? 0 : Math.abs(quote.differenceCents)
   const original = quote.payment
   const originalReceipt = quote.receipt
   const previousCorrections = data.paymentCorrections.filter(correction => correction.originalPaymentId === original.id)
@@ -205,8 +249,7 @@ export function preparePaymentCorrection(data: PrototypeAppState, input: Payment
     })
   })
   const nonElectricTotal = nonElectricAllocations.reduce((sum, line) => sum + line.amountCents, 0)
-  const additionalPending = quote.settlementStatus === 'ADDITIONAL_PENDING'
-  const amountToRecord = additionalPending ? original.amountCents : quote.correctedTotalCents
+  const amountToRecord = quote.correctedTotalCents
   const newAllocations: PaymentAllocation[] = nonElectricAllocations.map(line => ({
     id: `allocation-${correctedPaymentId}-${line.charge.id}`, paymentId: correctedPaymentId, chargeId: line.charge.id,
     amountCents: line.amountCents, allocatedOn: input.correctedAt, creditId: null, state: 'ACTIVE', reversalAuditEventId: null,
@@ -244,8 +287,8 @@ export function preparePaymentCorrection(data: PrototypeAppState, input: Payment
     id: correctionId, originalPaymentId: original.id, correctedPaymentId, originalReceiptId: originalReceipt.id, correctedReceiptId,
     correctedAt: input.correctedAt, correctedBy: 'demo-admin', reason: input.reason.trim(),
     originalAmountCents: original.amountCents, correctedAmountCents: quote.correctedTotalCents,
-    differenceCents: quote.differenceCents, settlementStatus: quote.settlementStatus as CorrectionSettlementStatus,
-    settlementAmountCents: quote.settlementAmountCents, originalCategories, correctedCategories: quote.selectedCategories,
+    differenceCents: quote.differenceCents, settlementStatus,
+    settlementAmountCents, originalCategories, correctedCategories: quote.selectedCategories,
     originalElectricityReadingMilliKwh: electricityOption?.originalCurrentReading.readingMilliKwh ?? null,
     correctedElectricityReadingMilliKwh: quote.correctedElectricityReadingMilliKwh, auditEventId,
   }
