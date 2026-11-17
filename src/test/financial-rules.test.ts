@@ -58,8 +58,7 @@ describe('owner payment rules', () => {
 
   it('preserves the rate used for the confirmed interval when the current rate later changes', () => {
     const data = createDemoData()
-    const futureRate = data.electricityRates.find(rate => rate.id === 'rate-dec')!
-    futureRate.rateCentsPerKwh = 1_400
+    data.electricityRates.push({ id: 'rate-future', label: 'Future sample rate', rateCentsPerKwh: 1_400, effectiveFrom: '2026-12-01', recordedOn: DEMO_DATE })
     const result = calculateElectricityCharge(data, 'electricity-nov-room-4-awaiting', { readingMilliKwh: 325_000, readOn: DEMO_DATE })
     expect(result.ok).toBe(true)
     if (!result.ok) return

@@ -1,13 +1,15 @@
-import { useRef, useState, type FormEvent } from 'react'
+﻿import { useRef, useState, type FormEvent } from 'react'
 import { Check, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { usePrototype } from '@/hooks/use-prototype'
 import { validateRoomDraft, type RoomDraft, type RoomDraftErrors } from '@/domain/calculations/room-management'
+import { activeRoomRentRate, ROOM_RATE_CATEGORY_IDS } from '@/domain/calculations/billing-rates'
+import { roomCategoryLabel } from '@/lib/room-rates'
 import { DEMO_DATE } from '@/data/fixtures/demo'
+import { formatMoney } from '@/lib/format'
 import type { RoomCategoryId } from '@/domain/types/models'
-import { ROOM_RATE_CATEGORIES } from '@/lib/room-rates'
 
 const fieldClass = 'h-12 w-full rounded-xl border border-input bg-card px-3 text-base outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50'
 
@@ -76,7 +78,10 @@ export function AddRoomDialog({ onSaved }: { onSaved?: (message: string) => void
               <div className="grid gap-2">
                 <label htmlFor="add-room-rate" className="text-sm font-semibold">Monthly rental rate</label>
                 <select id="add-room-rate" value={categoryId} onChange={event => { setCategoryId(event.target.value as RoomCategoryId); setErrors({}) }} aria-invalid={Boolean(errors.categoryId)} className={fieldClass}>
-                  {ROOM_RATE_CATEGORIES.map(category => <option key={category.id} value={category.id}>{category.label}/month</option>)}
+                  {ROOM_RATE_CATEGORY_IDS.map(id => {
+                    const rate = activeRoomRentRate(data, id, DEMO_DATE)
+                    return <option key={id} value={id}>{roomCategoryLabel(id)} · {rate ? formatMoney(rate.monthlyRentCents) : 'Rate needs review'}/month</option>
+                  })}
                 </select>
                 {errors.categoryId && <p role="alert" className="text-sm text-destructive">{errors.categoryId}</p>}
               </div>

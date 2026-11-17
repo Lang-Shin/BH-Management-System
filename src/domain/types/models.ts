@@ -69,8 +69,26 @@ export interface ElectricityRate {
   id: string
   rateCentsPerKwh: number
   effectiveFrom: string
+  /** When the configuration change was recorded, distinct from its effective date. */
+  recordedOn: string
   /** New effective-dated records replace rates; issued charges retain snapshots. */
   label: string
+}
+
+export interface RoomRentRate {
+  id: string
+  /** Stable category identity; the amount is never used as a room reference. */
+  categoryId: RoomCategoryId
+  monthlyRentCents: number
+  effectiveFrom: string
+  recordedOn: string
+}
+
+export interface UtilityRate {
+  id: string
+  rateCents: number
+  effectiveFrom: string
+  recordedOn: string
 }
 
 export interface BillingPeriod {
@@ -223,6 +241,9 @@ export interface PrototypeAppState {
   meterReadings: MeterReading[]
   electricityBillObligations: ElectricityBillObligation[]
   electricityRates: ElectricityRate[]
+  roomRentRates: RoomRentRate[]
+  waterRates: UtilityRate[]
+  washingRates: UtilityRate[]
   billingPeriods: BillingPeriod[]
   charges: Charge[]
   payments: Payment[]

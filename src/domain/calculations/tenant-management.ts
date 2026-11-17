@@ -1,6 +1,6 @@
 import type { PrototypeAppState, RoomAssignment, Tenant } from '@/domain/types/models'
 import { isIsoDate } from '@/domain/validation/date'
-import { ROOM_RATE_BY_ID } from '@/lib/room-rates'
+import { roomMonthlyRentCents } from './billing-rates'
 import { activeAssignments, tenantAccount, unresolvedElectricity } from './summary'
 
 export interface TenantDraft {
@@ -128,7 +128,7 @@ function newAssignment(data: PrototypeAppState, tenantId: string, roomId: string
   const room = data.rooms.find(item => item.id === roomId)!
   return {
     id: randomId('assignment'), tenantId, roomId, startDate, endDate: null,
-    agreedRentCents: ROOM_RATE_BY_ID[room.categoryId].monthlyRentCents,
+    agreedRentCents: roomMonthlyRentCents(data, room, startDate),
   }
 }
 

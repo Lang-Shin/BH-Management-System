@@ -1,4 +1,5 @@
 import type { ChargeCategory, CorrectionSettlementStatus, PrototypeData } from '@/domain/types/models'
+import type { RatePlan } from '@/domain/calculations/billing-rates'
 import type { RoomDraft } from '@/domain/calculations/room-management'
 import type { TenantDraft } from '@/domain/calculations/tenant-management'
 
@@ -8,6 +9,7 @@ export type PrototypeAction =
   | { type: 'tenant/updated'; tenantId: string; draft: TenantDraft }
   | { type: 'tenant/movedOut'; tenantId: string }
   | { type: 'tenant/deleted'; tenantId: string }
+  | { type: 'rates/planned'; plan: RatePlan }
   | { type: 'room/created'; draft: RoomDraft }
   | { type: 'room/updated'; roomId: string; draft: RoomDraft }
   | { type: 'room/deleted'; roomId: string }

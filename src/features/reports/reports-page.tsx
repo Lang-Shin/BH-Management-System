@@ -14,9 +14,9 @@ import { WorkflowPlaceholders } from '@/components/shared/workflow-placeholders'
 import { ResetDemoButton } from '@/components/shared/reset-demo-button'
 import { usePrototype } from '@/hooks/use-prototype'
 import { selectSummary } from '@/domain/calculations/summary'
-import { DEMO_DATE, DEMO_PERIOD, DEMO_RATES } from '@/data/fixtures/demo'
+import { DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
 import { formatDate, formatMoney } from '@/lib/format'
-import { ROOM_RATE_CATEGORIES } from '@/lib/room-rates'
+import { activeElectricityRate, activeRoomRentRate, activeWashingRate, activeWaterRate, ROOM_RATE_CATEGORY_IDS } from '@/domain/calculations/billing-rates'
 import type { AuditEvent } from '@/domain/types/models'
 
 const changeLabels: Record<AuditEvent['action'], string> = {
@@ -37,7 +37,10 @@ export default function Reports() {
   const roomTotals = selectSummary(data, DEMO_DATE, roomPeriod)
   const summary = selectSummary(data, DEMO_DATE, DEMO_PERIOD)
   const periods = data.billingPeriods.map(period => ({ ...period, summary: selectSummary(data, DEMO_DATE, period.id) }))
-  const currentRate = [...data.electricityRates].filter(r => r.effectiveFrom <= DEMO_DATE).sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0]
+  const currentRate = activeElectricityRate(data, DEMO_DATE)
+  const waterRate = activeWaterRate(data, DEMO_DATE)
+  const washingRate = activeWashingRate(data, DEMO_DATE)
+  const roomRates = ROOM_RATE_CATEGORY_IDS.map(categoryId => ({ categoryId, rate: activeRoomRentRate(data, categoryId, DEMO_DATE), roomCount: data.rooms.filter(room => room.categoryId === categoryId).length })).filter(item => item.rate)
 
   function downloadRoomReport() {
     const blob = new Blob(['\uFEFF', roomReportCsv(data, DEMO_DATE, roomPeriod)], { type: 'text/csv;charset=utf-8;' })
@@ -86,11 +89,11 @@ export default function Reports() {
     </section>
     <Card className="mt-8 shadow-none"><CardHeader><CardTitle>House settings</CardTitle><CardDescription>You can view these settings. Changing them will be added later.</CardDescription></CardHeader><CardContent><dl className="grid gap-6 text-base sm:grid-cols-2">{([
       ['Currency', 'Philippine peso (₱)'],
-      ['Monthly rent', ROOM_RATE_CATEGORIES.map(category => `${category.label} (${category.roomCount} ${category.roomCount === 1 ? 'room' : 'rooms'})`).join(' · ')],
+      ['Monthly rent', roomRates.map(item => `${formatMoney(item.rate!.monthlyRentCents)} (${item.roomCount} ${item.roomCount === 1 ? 'room' : 'rooms'})`).join(' · ')],
       ['When rent is due', 'To be confirmed'],
       ['Electricity price', currentRate ? <><AnimatedNumber value={formatMoney(currentRate.rateCentsPerKwh)} /> per kWh, starting {formatDate(currentRate.effectiveFrom)}</> : 'No price set'],
       ['Sharing the electricity bill', 'Who uses each meter and how to share the bill still need to be agreed'],
-      ['Water and washing', <><AnimatedNumber value={formatMoney(DEMO_RATES.waterCentsPerTenant)} /> per tenant for water. Washing is optional at <AnimatedNumber value={formatMoney(DEMO_RATES.washingCentsPerRoom)} /> per room.</>],
+      ['Water and washing', <><AnimatedNumber value={formatMoney(waterRate?.rateCents ?? 0)} /> per tenant for water. Washing is optional at <AnimatedNumber value={formatMoney(washingRate?.rateCents ?? 0)} /> per room.</>],
     ] as const).map(([label, value]) => <div key={label} className="rounded-lg border bg-muted/40 p-4"><dt className="text-xs font-semibold text-muted-foreground">{label}</dt><dd className="mt-2 text-sm leading-relaxed font-medium">{value}</dd></div>)}</dl></CardContent></Card>
     <details open={Boolean(storageWarning)} className="mt-7 rounded-xl border bg-card p-5 sm:p-6"><summary className="min-h-12 cursor-pointer py-2 text-lg font-semibold">More settings and sample records</summary>
       <section className="mt-5" aria-labelledby="sample-records"><h2 id="sample-records" className="mb-3 text-xl font-semibold">Start again with sample records</h2><p className="mb-5 max-w-2xl text-base text-muted-foreground">Restore the original sample records and remove your saved notes and room changes. This is only for trying the app.</p><ResetDemoButton /></section>

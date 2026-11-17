@@ -2,6 +2,7 @@ import { createDemoData, DEMO_DATE } from '@/data/fixtures/demo'
 import type { PrototypeData } from '@/domain/types/models'
 import type { StateAction } from './actions'
 import { activeAssignments } from '@/domain/calculations/summary'
+import { applyRateChange } from '@/domain/calculations/billing-rates'
 import { prepareElectricityPayment } from '@/domain/calculations/electricity-payment'
 import { prepareRoomPayment } from '@/domain/calculations/room-payment'
 import { preparePaymentCorrection } from '@/domain/calculations/payment-correction'
@@ -35,6 +36,8 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
       const result = deleteTenant(state, action.tenantId, DEMO_DATE)
       return result.ok ? result.data : state
     }
+    case 'rates/planned':
+      return applyRateChange(state, action.plan)
     case 'room/created': {
       const result = createRoom(state, action.draft, DEMO_DATE)
       return result.ok ? result.data : state

@@ -2,6 +2,7 @@ import type { Charge, ChargeCategory, MeterReading, Payment, PrototypeAppState, 
 import { chargeBalance, issuedCharges, unresolvedElectricity } from './summary'
 import { chargeRoom, roomContext } from './room-finance'
 import { calculateElectricityCharge, latestSettledReading, type ElectricityCharge } from './electricity-calculation'
+import { activeElectricityRate } from './billing-rates'
 
 export const roomPaymentCategories: ChargeCategory[] = ['RENT', 'ELECTRICITY', 'WATER', 'WASHING_MACHINE']
 
@@ -82,7 +83,7 @@ export function buildRoomPaymentQuote(data: PrototypeAppState, input: RoomPaymen
       continue
     }
     const previous = latestSettledReading(data, obligation.meterId)
-    const rate = [...data.electricityRates].filter(item => item.effectiveFrom <= input.asOf).sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0]
+    const rate = activeElectricityRate(data, input.asOf)
     if (!previous || !rate) {
       options.push({ category, state: 'INVALID_READING', amountCents: null, chargeIds: [], detail: 'Meter baseline unavailable', obligationId: obligation.id })
       continue

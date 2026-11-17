@@ -6,6 +6,9 @@ const pesoFormatter = new Intl.NumberFormat('en-PH', {
 const dateFormatter = new Intl.DateTimeFormat('en', {
   month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC',
 })
+const monthFormatter = new Intl.DateTimeFormat('en', {
+  month: 'long', year: 'numeric', timeZone: 'UTC',
+})
 
 export function formatMoney(cents: number): string {
   if (!Number.isSafeInteger(cents)) throw new RangeError('Currency formatting requires safe integer centavos')
@@ -15,4 +18,9 @@ export function formatMoney(cents: number): string {
 export function formatDate(date: string): string {
   if (!isIsoDate(date)) return 'Invalid date'
   return dateFormatter.format(new Date(`${date}T00:00:00Z`))
+}
+
+export function formatMonthYear(date: string): string {
+  if (!isIsoDate(date)) return 'Invalid date'
+  return monthFormatter.format(new Date(`${date}T00:00:00Z`))
 }

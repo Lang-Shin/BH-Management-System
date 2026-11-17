@@ -1,12 +1,37 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createDemoData } from '@/data/fixtures/demo'
+import { initialWashingRates, initialWaterRates, initialRoomRentRates } from '@/domain/calculations/billing-rates'
 import { parsePrototypeSnapshot } from './prototype-storage'
 import { localStorageRepository, STORAGE_KEY } from './local-storage-repository'
+
+function version7Snapshot() {
+  const data = structuredClone(createDemoData()) as unknown as Record<string, unknown>
+  delete data.roomRentRates
+  delete data.waterRates
+  delete data.washingRates
+  data.electricityRates = (data.electricityRates as Record<string, unknown>[]).map(rate => {
+    const copy = { ...rate }
+    delete copy.recordedOn
+    return copy
+  })
+  return JSON.stringify({ version: 7, data })
+}
 
 describe('safe prototype snapshot parsing', () => {
   it('returns validated typed data from a supported envelope', () => {
     const data = createDemoData()
-    expect(parsePrototypeSnapshot(JSON.stringify({ version: 7, data }))).toEqual({ ok: true, data })
+    expect(parsePrototypeSnapshot(JSON.stringify({ version: 8, data }))).toEqual({ ok: true, data })
+  })
+
+  it('migrates version 7 snapshots without losing saved records', () => {
+    const result = parsePrototypeSnapshot(version7Snapshot())
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.data.rooms).toHaveLength(15)
+    expect(result.data.roomRentRates).toEqual(initialRoomRentRates())
+    expect(result.data.waterRates).toEqual(initialWaterRates())
+    expect(result.data.washingRates).toEqual(initialWashingRates())
+    expect(result.data.electricityRates.every(rate => rate.recordedOn === rate.effectiveFrom)).toBe(true)
   })
 
   it.each([

@@ -1,29 +1,32 @@
 import { describe, expect, it } from 'vitest'
 import { createDemoData, DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
+import { activeRoomRentRate, ROOM_RATE_CATEGORY_IDS } from '@/domain/calculations/billing-rates'
 import { isPrototypeData } from '@/domain/validation/prototype-data'
-import { ROOM_RATE_BY_ID, ROOM_RATE_CATEGORIES, roomMonthlyRateLabel, roomRate } from '@/lib/room-rates'
+import { roomMonthlyRateLabel, roomRate } from '@/lib/room-rates'
 
 describe('rental-rate room categories', () => {
   it('defines exactly the approved rate categories and room counts', () => {
-    expect(ROOM_RATE_CATEGORIES.map(category => [category.id, category.monthlyRentCents, category.roomCount])).toEqual([
+    const data = createDemoData()
+    expect(ROOM_RATE_CATEGORY_IDS.map(categoryId => {
+      const rate = activeRoomRentRate(data, categoryId, DEMO_DATE)
+      return [categoryId, rate?.monthlyRentCents, data.rooms.filter(room => room.categoryId === categoryId).length]
+    })).toEqual([
       ['RATE_3500', 350_000, 8], ['RATE_4000', 400_000, 6], ['RATE_5000', 500_000, 1],
     ])
-    expect(ROOM_RATE_CATEGORIES.reduce((sum, category) => sum + category.roomCount, 0)).toBe(15)
-    expect(ROOM_RATE_CATEGORIES.map(category => category.label)).toEqual(['₱3,500', '₱4,000', '₱5,000'])
+    expect(data.rooms).toHaveLength(15)
   })
 
   it('assigns all 15 fixture rooms to the approved categories', () => {
     const data = createDemoData()
-    expect(data.rooms).toHaveLength(15)
-    const counts = new Map(ROOM_RATE_CATEGORIES.map(category => [category.id, data.rooms.filter(room => room.categoryId === category.id).length]))
+    const counts = new Map(ROOM_RATE_CATEGORY_IDS.map(categoryId => [categoryId, data.rooms.filter(room => room.categoryId === categoryId).length]))
     expect([...counts]).toEqual([['RATE_3500', 8], ['RATE_4000', 6], ['RATE_5000', 1]])
-    expect(roomMonthlyRateLabel(data.rooms.find(room => room.name === '101')!)).toBe('₱3,500.00/month')
-    expect(roomMonthlyRateLabel(data.rooms.find(room => room.name === '109')!)).toBe('₱4,000.00/month')
-    expect(roomMonthlyRateLabel(data.rooms.find(room => room.name === '115')!)).toBe('₱5,000.00/month')
+    expect(roomMonthlyRateLabel(data, data.rooms.find(room => room.name === '101')!, DEMO_DATE)).toBe('₱3,500.00/month')
+    expect(roomMonthlyRateLabel(data, data.rooms.find(room => room.name === '109')!, DEMO_DATE)).toBe('₱4,000.00/month')
+    expect(roomMonthlyRateLabel(data, data.rooms.find(room => room.name === '115')!, DEMO_DATE)).toBe('₱5,000.00/month')
     expect(JSON.stringify(data.rooms)).not.toMatch(/Public CR|Private CR|Aircon/)
   })
 
-  it('locks the monthly rent snapshot while preserving the configured category rate', () => {
+  it('locks issued rent while preserving the configured category rate', () => {
     const data = createDemoData()
     const rent = data.charges.find(charge => charge.id === 'rent-nov-room-1')!
     expect(rent.category === 'RENT' ? rent.amountCents : 0).toBe(350_000)
@@ -31,8 +34,7 @@ describe('rental-rate room categories', () => {
     room.categoryId = 'RATE_5000'
     expect(isPrototypeData(data)).toBe(true)
     expect(rent.category === 'RENT' ? rent.amountCents : 0).toBe(350_000)
-    expect(roomRate(room).monthlyRentCents).toBe(500_000)
-    expect(ROOM_RATE_BY_ID.RATE_4000.monthlyRentCents).toBe(400_000)
+    expect(roomRate(data, room, DEMO_DATE)?.monthlyRentCents).toBe(500_000)
   })
 
   it('keeps room rate and occupancy filters independent in their source data', () => {

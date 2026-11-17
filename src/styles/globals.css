@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 @import "tw-animate-css";
 
 @font-face {
@@ -1099,3 +1099,68 @@
     }
   }
 }
+
+/* Billing Rates */
+.billing-rates-heading { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.billing-rates-period { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border: 1px solid color-mix(in srgb, var(--forest-green) 14%, var(--border)); border-radius: 999px; background: color-mix(in srgb, var(--forest-green) 5%, var(--card)); color: var(--forest-green); font-size: 12px; font-weight: 700; }
+.billing-rates-notice { margin-bottom: 16px; padding: 11px 14px; border: 1px solid color-mix(in srgb, var(--forest-green) 20%, var(--border)); border-radius: 14px; background: color-mix(in srgb, var(--forest-green) 6%, var(--card)); color: var(--forest-green); font-size: 14px; font-weight: 650; }
+.billing-rate-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.billing-rate-card { display: flex; flex-direction: column; width: 100%; min-width: 0; min-height: 226px; padding: 20px; border: 1px solid color-mix(in srgb, white 40%, var(--border)); border-radius: 22px; background: linear-gradient(150deg, color-mix(in srgb, white 52%, var(--card)), var(--card) 58%); color: var(--forest-green); text-align: left; box-shadow: inset 0 1px 0 rgb(255 255 255 / 65%), 0 3px 8px -6px color-mix(in srgb, var(--forest-green) 22%, transparent), 0 18px 32px -26px color-mix(in srgb, var(--forest-green) 45%, transparent); transition: transform 200ms var(--route-ease), border-color 200ms ease, box-shadow 200ms ease; }
+.billing-rate-card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--forest-green) 32%, var(--border)); box-shadow: inset 0 1px 0 rgb(255 255 255 / 75%), 0 10px 22px -14px color-mix(in srgb, var(--forest-green) 42%, transparent), 0 24px 40px -30px color-mix(in srgb, var(--forest-green) 55%, transparent); }
+.billing-rate-card:focus-visible { outline: 3px solid color-mix(in srgb, var(--forest-green) 45%, transparent); outline-offset: 3px; }
+.billing-rate-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.billing-rate-icon { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid color-mix(in srgb, var(--forest-green) 13%, var(--border)); border-radius: 15px; background: color-mix(in srgb, var(--forest-green) 8%, var(--card)); }
+.billing-rate-icon svg { width: 22px; height: 22px; }
+.billing-rate-edit { display: inline-flex; align-items: center; gap: 2px; color: var(--muted-foreground); font-size: 12px; font-weight: 750; }
+.billing-rate-edit svg:first-child { width: 14px; height: 14px; }
+.billing-rate-edit svg:last-child { width: 16px; height: 16px; }
+.billing-rate-category { display: block; margin-top: 17px; color: var(--muted-foreground); font-size: 12px; font-weight: 750; letter-spacing: 0.055em; text-transform: uppercase; }
+.billing-rate-value { display: block; margin-top: 6px; color: var(--forest-green); font-size: clamp(1.2rem, 2.4vw, 1.55rem); font-weight: 800; line-height: 1.28; letter-spacing: -0.025em; }
+.billing-rate-unit { display: block; margin-top: 3px; color: var(--muted-foreground); font-size: 13px; font-weight: 650; }
+.billing-rate-detail { display: block; margin-top: 13px; color: var(--muted-foreground); font-size: 13px; line-height: 1.5; }
+.billing-rate-scheduled { display: inline-flex; align-self: flex-start; margin-top: 12px; padding: 4px 9px; border: 1px solid color-mix(in srgb, var(--tomato-red) 22%, var(--border)); border-radius: 999px; background: color-mix(in srgb, var(--tomato-red) 6%, var(--card)); color: color-mix(in srgb, var(--tomato-red) 72%, var(--forest-green)); font-size: 12px; font-weight: 750; }
+.billing-rates-footnote { margin-top: 14px; max-width: 58rem; color: var(--muted-foreground); font-size: 12px; line-height: 1.55; }
+.billing-rate-dialog { width: calc(100vw - 2rem); max-width: 36rem; }
+.billing-rate-dialog-icon { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid color-mix(in srgb, var(--forest-green) 13%, var(--border)); border-radius: 15px; background: color-mix(in srgb, var(--forest-green) 8%, var(--card)); color: var(--forest-green); }
+.billing-rate-dialog-icon svg { width: 22px; height: 22px; }
+.billing-rate-dialog-section { margin-top: 4px; padding: 15px; border: 1px solid var(--border); border-radius: 17px; background: color-mix(in srgb, var(--oat-milk) 72%, var(--card)); }
+.billing-rate-dialog-section h2 { font-size: 15px; font-weight: 750; }
+.billing-rate-current-list { display: grid; gap: 9px; margin-top: 12px; font-size: 14px; }
+.billing-rate-current-list > div { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
+.billing-rate-current-list dt { color: var(--muted-foreground); }
+.billing-rate-current-list dd { text-align: right; font-weight: 750; white-space: nowrap; }
+.billing-rate-current-value { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-top: 10px; font-size: 26px; font-weight: 800; letter-spacing: -0.025em; }
+.billing-rate-current-value span { color: var(--muted-foreground); font-size: 13px; font-weight: 650; letter-spacing: 0; }
+.billing-rate-inputs { display: grid; gap: 14px; margin-top: 13px; }
+.billing-rate-input-wrap { display: flex; align-items: center; min-height: 48px; border: 1px solid var(--input); border-radius: 12px; background: var(--card); overflow: hidden; }
+.billing-rate-input-wrap:focus-within { border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 18%, transparent); }
+.billing-rate-input-wrap > span { padding-left: 13px; color: var(--muted-foreground); font-weight: 700; }
+.billing-rate-input-wrap input { width: 100%; min-width: 0; min-height: 46px; border: 0; background: transparent; padding: 10px 13px 10px 5px; color: var(--forest-green); font: inherit; font-size: 16px; font-weight: 700; outline: 0; }
+.billing-rate-input-wrap input[aria-invalid="true"] { color: var(--destructive); }
+.billing-rate-scheduled-note { margin-top: 12px; padding: 10px 11px; border: 1px solid color-mix(in srgb, var(--tomato-red) 20%, var(--border)); border-radius: 11px; background: color-mix(in srgb, var(--tomato-red) 5%, var(--card)); color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
+.billing-rate-effective { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 10px; font-size: 14px; }
+.billing-rate-effective strong { font-size: 17px; }
+.billing-rate-effective span { color: var(--muted-foreground); }
+.billing-rate-protection { display: flex; gap: 8px; margin-top: 12px; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
+.billing-rate-protection svg { width: 16px; height: 16px; flex: none; margin-top: 2px; color: var(--forest-green); }
+.billing-rate-history { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; }
+.billing-rate-history summary { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; color: var(--forest-green); font-size: 13px; font-weight: 750; }
+.billing-rate-history summary svg { width: 16px; height: 16px; }
+.billing-rate-history ul { display: grid; gap: 7px; margin-top: 10px; }
+.billing-rate-history li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); font-size: 12px; }
+.billing-rate-history li > span { display: flex; flex-direction: column; gap: 1px; }
+.billing-rate-history li > span:last-child { text-align: right; font-weight: 700; }
+.billing-rate-history small { color: var(--muted-foreground); font-size: 11px; font-weight: 600; }
+.billing-rate-review { display: grid; gap: 12px; }
+.billing-rate-review > div { display: grid; gap: 5px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.billing-rate-review > div:last-child { padding-bottom: 0; border-bottom: 0; }
+.billing-rate-review dt { color: var(--muted-foreground); font-size: 13px; font-weight: 650; }
+.billing-rate-review dd { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; font-size: 14px; }
+.billing-rate-review dd > span { display: inline-flex; align-items: baseline; gap: 5px; }
+.billing-rate-review dd > span small { color: var(--muted-foreground); font-size: 11px; font-weight: 750; letter-spacing: 0.04em; text-transform: uppercase; }
+.billing-rate-review dd del { color: var(--muted-foreground); font-size: 14px; }
+.billing-rate-review dd strong { color: var(--forest-green); font-size: 18px; }
+.billing-rate-review dd > small { width: 100%; color: var(--muted-foreground); font-size: 12px; }
+@media (min-width: 40rem) { .billing-rate-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 39.999rem) { .billing-rate-card { min-height: 0; } .billing-rate-value { font-size: 1.35rem; } }
+@media (prefers-reduced-motion: reduce) { .billing-rate-card { transition: none; } .billing-rate-card:hover { transform: none; } }

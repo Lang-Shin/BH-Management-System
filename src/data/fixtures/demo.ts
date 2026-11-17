@@ -1,14 +1,17 @@
 import type { Charge, MeterReading, Payment, PaymentAllocation, PaymentCorrection, PrototypeAppState, RoomAssignment, RoomCategoryId } from '@/domain/types/models'
-import { ROOM_RATE_BY_ID } from '@/lib/room-rates'
+import {
+  DEFAULT_ELECTRICITY_RATE_CENTS, DEFAULT_RENT_CENTS, DEFAULT_WASHING_RATE_CENTS, DEFAULT_WATER_RATE_CENTS,
+  initialRoomRentRates, initialWashingRates, initialWaterRates,
+} from '@/domain/calculations/billing-rates'
 
 export const DEMO_DATE = '2026-11-13'
 export const DEMO_PERIOD = 'period-nov'
 
 export const DEMO_RATES = {
-  rentCentsPerRoom: 350_000,
-  waterCentsPerTenant: 10_000,
-  electricityCentsPerKwh: 1_300,
-  washingCentsPerRoom: 10_000,
+  rentCentsPerRoom: DEFAULT_RENT_CENTS.RATE_3500,
+  waterCentsPerTenant: DEFAULT_WATER_RATE_CENTS,
+  electricityCentsPerKwh: DEFAULT_ELECTRICITY_RATE_CENTS,
+  washingCentsPerRoom: DEFAULT_WASHING_RATE_CENTS,
 } as const
 
 const names = ['Alex Rivera', 'Sam Navarro', 'Jamie Santos', 'Morgan Cruz', 'Taylor Reyes', 'Jordan Flores', 'Casey Ramos', 'Riley Garcia', 'Avery Lim', 'Quinn Mendoza']
@@ -51,11 +54,14 @@ export function createDemoData(): PrototypeAppState {
     { tenant: 9, room: 1, endDate: '2026-09-30' },
     { tenant: 10, room: 5, endDate: '2026-10-31' },
   ]
+  const roomRentRates = initialRoomRentRates()
+  const waterRates = initialWaterRates()
+  const washingRates = initialWashingRates()
   const roomAssignments: RoomAssignment[] = assignmentSpecs.map(({ tenant, room, endDate }) => {
     const assignedRoom = rooms[room - 1]!
     return {
       id: `assignment-${tenant}`, tenantId: `tenant-${tenant}`, roomId: `room-${room}`,
-      startDate: '2026-09-01', endDate, agreedRentCents: ROOM_RATE_BY_ID[assignedRoom.categoryId].monthlyRentCents,
+      startDate: '2026-09-01', endDate, agreedRentCents: DEFAULT_RENT_CENTS[assignedRoom.categoryId],
     }
   })
   const billingPeriods = [
@@ -83,9 +89,8 @@ export function createDemoData(): PrototypeAppState {
       status: 'CONFIRMED' as const, confirmedBy: 'demo-admin', correction: null }
   }))
   const electricityRates = [
-    { id: 'rate-oct', label: 'Historical sample rate', rateCentsPerKwh: DEMO_RATES.electricityCentsPerKwh, effectiveFrom: '2026-10-01' },
-    { id: 'rate-nov', label: 'Current sample rate', rateCentsPerKwh: DEMO_RATES.electricityCentsPerKwh, effectiveFrom: '2026-11-01' },
-    { id: 'rate-dec', label: 'Future sample rate', rateCentsPerKwh: DEMO_RATES.electricityCentsPerKwh, effectiveFrom: '2026-12-01' },
+    { id: 'rate-oct', label: 'Historical sample rate', rateCentsPerKwh: DEMO_RATES.electricityCentsPerKwh, effectiveFrom: '2026-10-01', recordedOn: '2026-10-01' },
+    { id: 'rate-nov', label: 'Current sample rate', rateCentsPerKwh: DEMO_RATES.electricityCentsPerKwh, effectiveFrom: '2026-11-01', recordedOn: '2026-11-01' },
   ]
 
   const rentPayer: Record<string, number> = { 'room-1': 1, 'room-2': 4, 'room-3': 3, 'room-4': 5, 'room-5': 10 }
@@ -170,5 +175,5 @@ export function createDemoData(): PrototypeAppState {
   const receipts = payments.map((payment, index) => ({ id: `receipt-${index + 1}`, paymentId: payment.id, receiptNumber: `DEMO-RCT-${String(index + 1).padStart(3, '0')}`, issuedOn: payment.paidOn, amountCents: payment.amountCents, allocationIds: paymentAllocations.filter(a => a.paymentId === payment.id).map(a => a.id), state: 'ISSUED' as const, revision: 1, supersedesReceiptId: null }))
   const paymentCorrections: PaymentCorrection[] = []
   const auditEvents = [{ id: 'audit-seed', actorId: 'demo-admin', occurredOn: DEMO_DATE, action: 'DEMO_SEEDED' as const, entityType: 'PROTOTYPE' as const, entityId: 'demo-workspace', reason: 'Fictional fixture snapshot prepared; no real transaction or authenticated actor.', beforeSnapshot: null, afterSnapshot: 'Sample records loaded' }]
-  return { tenants, rooms, roomAssignments, electricityMeters, meterReadings, electricityBillObligations, electricityRates, billingPeriods, charges, payments, paymentAllocations, tenantCredits, receipts, paymentCorrections, auditEvents }
+  return { tenants, rooms, roomAssignments, electricityMeters, meterReadings, electricityBillObligations, electricityRates, roomRentRates, waterRates, washingRates, billingPeriods, charges, payments, paymentAllocations, tenantCredits, receipts, paymentCorrections, auditEvents }
 }

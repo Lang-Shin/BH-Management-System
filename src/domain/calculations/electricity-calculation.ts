@@ -1,4 +1,5 @@
 import type { Charge, MeterReading, PrototypeAppState } from '@/domain/types/models'
+import { activeElectricityRate } from './billing-rates'
 
 export type ElectricityCalculationError =
   | 'OBLIGATION_NOT_FOUND'
@@ -44,9 +45,7 @@ export function calculateElectricityCharge(data: PrototypeAppState, obligationId
   if (current.readOn <= previous.readOn) return { ok: false, reason: 'READING_DATE_INVALID' }
   if (current.readingMilliKwh < previous.readingMilliKwh) return { ok: false, reason: 'READING_BELOW_PREVIOUS' }
   if (current.readingMilliKwh === previous.readingMilliKwh) return { ok: false, reason: 'READING_NOT_ADVANCED' }
-  const rate = [...data.electricityRates]
-    .filter(item => item.effectiveFrom <= current.readOn)
-    .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0]
+  const rate = activeElectricityRate(data, current.readOn)
   if (!rate) return { ok: false, reason: 'RATE_NOT_FOUND' }
 
   const intervalId = `${obligation.meterId}:${previous.id}>${current.readingMilliKwh}`

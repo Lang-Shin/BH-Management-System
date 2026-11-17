@@ -156,7 +156,7 @@ describe('admin workspace integration', () => {
     await user.click(screen.getByRole('button', { name: 'Restore sample records' }))
     await user.click(within(screen.getByRole('dialog', { name: 'Restore the sample records?' })).getByRole('button', { name: 'Yes, restore records' }))
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 7)
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 8)
   })
 
   it('shows a log-out button that opens a centered clarification dialog without signing out', async () => {
@@ -362,7 +362,7 @@ describe('admin workspace integration', () => {
     expect(screen.getByLabelText('Room report reconciliation')).toHaveTextContent('billed ₱15,225.00 · applied ₱11,525.00 · known outstanding ₱3,700.00 · 2 electricity bills awaiting a meter reading')
     expect(screen.getByRole('table', { name: 'Monthly summary' })).toHaveTextContent('Electricity awaiting reading')
     expect(screen.getByRole('button', { name: 'Download room CSV' })).toBeInTheDocument()
-    expect(screen.getByText('Monthly rent').closest('div')).toHaveTextContent('₱3,500 (8 rooms) · ₱4,000 (6 rooms) · ₱5,000 (1 room)')
+    expect(screen.getByText('Monthly rent').closest('div')).toHaveTextContent('₱3,500.00 (8 rooms) · ₱4,000.00 (6 rooms) · ₱5,000.00 (1 room)')
     expect(screen.getByText('Electricity price').closest('div')).toHaveTextContent('₱13.00 per kWh')
     expect(screen.getByText('Water and washing').closest('div')).toHaveTextContent('₱100.00 per tenant for water. Washing is optional at ₱100.00 per room.')
 

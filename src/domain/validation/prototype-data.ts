@@ -33,7 +33,11 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     && oneOf(r.status, ['DRAFT', 'CONFIRMED', 'SUPERSEDED']) && (r.confirmedBy === null || id(r.confirmedBy)) && correction(r.correction))) return false
   if (!rows(value, 'electricityBillObligations', r => id(r.roomId) && id(r.tenantId) && id(r.billingPeriodId)
     && id(r.meterId) && id(r.previousReadingId) && date(r.createdAt) && date(r.dueDate) && r.state === 'AWAITING_READING')) return false
-  if (!rows(value, 'electricityRates', r => positive(r.rateCentsPerKwh) && date(r.effectiveFrom) && text(r.label))) return false
+  if (!rows(value, 'electricityRates', r => positive(r.rateCentsPerKwh) && date(r.effectiveFrom) && date(r.recordedOn) && text(r.label))) return false
+  if (!rows(value, 'roomRentRates', r => oneOf(r.categoryId, ['RATE_3500', 'RATE_4000', 'RATE_5000'])
+    && positive(r.monthlyRentCents) && date(r.effectiveFrom) && date(r.recordedOn))) return false
+  if (!rows(value, 'waterRates', r => positive(r.rateCents) && date(r.effectiveFrom) && date(r.recordedOn))) return false
+  if (!rows(value, 'washingRates', r => positive(r.rateCents) && date(r.effectiveFrom) && date(r.recordedOn))) return false
   if (!rows(value, 'billingPeriods', r => id(r.label) && date(r.startDate) && date(r.endDate) && oneOf(r.status, ['OPEN', 'CLOSED']))) return false
   if (!rows(value, 'charges', r => {
     if (!(id(r.tenantId) && id(r.billingPeriodId) && text(r.description) && positive(r.amountCents)
@@ -71,9 +75,19 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
   // Each collection and its discriminated field shapes have been checked above.
   const data = value as unknown as PrototypeAppState
   if ([data.tenants, data.rooms, data.roomAssignments, data.electricityMeters, data.meterReadings,
-    data.electricityBillObligations, data.electricityRates, data.billingPeriods, data.charges, data.payments,
-    data.paymentAllocations, data.tenantCredits, data.receipts, data.paymentCorrections, data.auditEvents]
+    data.electricityBillObligations, data.electricityRates, data.roomRentRates, data.waterRates, data.washingRates,
+    data.billingPeriods, data.charges, data.payments, data.paymentAllocations, data.tenantCredits, data.receipts,
+    data.paymentCorrections, data.auditEvents]
     .some(items => new Set(items.map(item => item.id)).size !== items.length)) return false
+  if (new Set(data.electricityRates.map(rate => rate.effectiveFrom)).size !== data.electricityRates.length
+    || new Set(data.roomRentRates.map(rate => `${rate.categoryId}:${rate.effectiveFrom}`)).size !== data.roomRentRates.length
+    || new Set(data.waterRates.map(rate => rate.effectiveFrom)).size !== data.waterRates.length
+    || new Set(data.washingRates.map(rate => rate.effectiveFrom)).size !== data.washingRates.length) return false
+  const rentCategoryIds = ['RATE_3500', 'RATE_4000', 'RATE_5000'] as const
+  if (!rentCategoryIds.every(categoryId => data.roomRentRates.some(rate => rate.categoryId === categoryId))
+    || data.electricityRates.length === 0 || data.waterRates.length === 0 || data.washingRates.length === 0) return false
+  if (![...data.electricityRates, ...data.roomRentRates, ...data.waterRates, ...data.washingRates]
+    .every(rate => rate.recordedOn <= rate.effectiveFrom)) return false
   const tenant = (key: string) => data.tenants.find(t => t.id === key)
   const audit = (key: string) => data.auditEvents.find(a => a.id === key)
   const sum = (amounts: number[]) => amounts.reduce((total, amount) => total + amount, 0)

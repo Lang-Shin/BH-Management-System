@@ -52,7 +52,7 @@ describe('shared fictional financial model', () => {
     if (electricity.category !== 'ELECTRICITY') throw new Error('Fixture missing electricity basis')
     expect(electricity.electricity).toMatchObject({ previousReadingMilliKwh: 300_000, currentReadingMilliKwh: 312_000, consumptionMilliKwh: 12_000, appliedRateCentsPerKwh: 1_300 })
     expect(electricity.amountCents).toBe(15_600)
-    data.electricityRates.push({ id: 'new-rate', label: 'Later test rate', rateCentsPerKwh: 2_000, effectiveFrom: '2027-01-01' })
+    data.electricityRates.push({ id: 'new-rate', label: 'Later test rate', rateCentsPerKwh: 2_000, effectiveFrom: '2027-01-01', recordedOn: '2027-01-01' })
     expect(isPrototypeData(data)).toBe(true)
     expect(electricity.amountCents).toBe(15_600)
     expect(electricity.electricity.appliedRateCentsPerKwh).toBe(1_300)
@@ -124,7 +124,7 @@ describe('prototype reducer and persistence', () => {
     expect(changed.tenants[0]?.notes).toBe('Sample reminder')
     expect(await localStorageRepository.save(changed)).toBeNull()
     expect((await localStorageRepository.load()).data).toEqual(changed)
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 7)
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 8)
   })
 
   it('protects occupied rooms and preserves historical assignments during maintenance toggles', () => {

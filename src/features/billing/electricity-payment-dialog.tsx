@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useAnimatedDialogClose } from '@/components/ui/use-animated-dialog-close'
 import { usePrototype } from '@/hooks/use-prototype'
 import { calculateElectricityCharge, latestSettledReading, parseMeterReadingMilliKwh } from '@/domain/calculations/electricity-calculation'
+import { activeElectricityRate } from '@/domain/calculations/billing-rates'
 import { prepareElectricityPayment } from '@/domain/calculations/electricity-payment'
 import { DEMO_DATE } from '@/data/fixtures/demo'
 import { formatDate, formatMoney } from '@/lib/format'
@@ -41,7 +42,7 @@ export function ElectricityPaymentDialog({ obligationId, onClose, onReturnFocus,
   const obligation = data.electricityBillObligations.find(item => item.id === obligationId)
   const room = data.rooms.find(item => item.id === obligation?.roomId)
   const previous = obligation ? latestSettledReading(data, obligation.meterId) : null
-  const rate = [...data.electricityRates].filter(item => item.effectiveFrom <= DEMO_DATE).sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0]
+  const rate = activeElectricityRate(data, DEMO_DATE)
   const parsed = parseMeterReadingMilliKwh(reading)
   const calculation = obligation && parsed !== null
     ? calculateElectricityCharge(data, obligationId, { readingMilliKwh: parsed, readOn: DEMO_DATE })

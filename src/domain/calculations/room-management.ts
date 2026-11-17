@@ -1,5 +1,5 @@
 import type { PrototypeAppState, Room, RoomCategoryId } from '@/domain/types/models'
-import { ROOM_RATE_BY_ID } from '@/lib/room-rates'
+import { ROOM_RATE_CATEGORY_IDS } from './billing-rates'
 import { activeAssignments, chargeBalance } from './summary'
 
 export interface RoomDraft {
@@ -81,7 +81,7 @@ export function validateRoomDraft(data: PrototypeAppState, draft: RoomDraft, opt
   if (draft.capacity === null || !Number.isSafeInteger(draft.capacity) || draft.capacity <= 0) {
     errors.capacity = 'Enter a whole number of beds greater than zero.'
   }
-  if (!draft.categoryId || !ROOM_RATE_BY_ID[draft.categoryId]) errors.categoryId = 'Choose a supported monthly rental rate.'
+  if (!draft.categoryId || !ROOM_RATE_CATEGORY_IDS.includes(draft.categoryId)) errors.categoryId = 'Choose a supported monthly rental rate.'
   if (draft.kind !== 'PRIVATE' && draft.kind !== 'SHARED') errors.kind = 'Choose a supported room type.'
   if (draft.status !== 'available' && draft.status !== 'maintenance') errors.status = 'Choose a supported room status.'
 
