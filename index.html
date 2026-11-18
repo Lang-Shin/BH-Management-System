@@ -3,7 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#134e4a" />
+    <meta name="theme-color" content="#f1ece2" />
+    <script>
+      // Apply the saved or system appearance before first paint to avoid a light flash.
+      try {
+        var saved = localStorage.getItem('bhms.appearance')
+        var dark = saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches
+        if (dark) document.documentElement.classList.add('dark')
+      } catch (error) { /* storage unavailable */ }
+    </script>
     <meta name="description" content="An interactive boarding house admin prototype using fictional demonstration data." />
     <title>BHMS · Admin prototype</title>
   </head>

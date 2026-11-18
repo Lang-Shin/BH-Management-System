@@ -16,6 +16,6 @@ export function ResetDemoButton() {
         <DialogFooter><DialogClose asChild><Button variant="outline">Keep my changes</Button></DialogClose><Button onClick={() => { clearReadIds(); dispatch({ type: 'demo/reset' }); setOpen(false); setNotice('The original sample records have been restored.'); }}>Yes, restore records</Button></DialogFooter>
       </DialogContent>
     </Dialog>
-    <p role="status" className="mt-3 text-sm text-primary">{notice}</p>
+    <p role="status" className="mt-3 text-sm text-[var(--tint)]">{notice}</p>
   </>
 }

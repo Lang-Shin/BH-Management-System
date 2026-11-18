@@ -12,7 +12,7 @@ export function PageHeader({ title, description, action }: { title: string; desc
 
 export function StatCard({ label, value, detail, icon: Icon }: { label: string; value: string | number; detail: ReactNode; icon: LucideIcon }) {
   return <Card className="min-w-0 gap-0 py-5"><CardContent>
-    <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-semibold text-muted-foreground">{label}</h2><span className="stat-glass-icon shrink-0 text-primary"><Icon className="size-[18px]" aria-hidden="true" /></span></div>
+    <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-semibold text-muted-foreground">{label}</h2><span className="stat-glass-icon shrink-0 text-[var(--tint)]"><Icon className="size-[18px]" aria-hidden="true" /></span></div>
     <p className="mt-3 text-2xl font-bold tracking-tight tabular-nums"><AnimatedNumber value={value} /></p>
     <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{detail}</p>
   </CardContent></Card>

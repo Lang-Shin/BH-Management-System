@@ -125,7 +125,7 @@ export function PaymentsTransactionWorkspace() {
   }
 
   const transactionColumns: Column<Payment>[] = [
-    { key: 'receipt', label: 'Receipt Number', render: payment => <span className="break-all font-semibold text-[var(--forest-green)]">{transactionReceipt(data, payment)}</span> },
+    { key: 'receipt', label: 'Receipt Number', render: payment => <span className="break-all font-semibold text-[var(--tint)]">{transactionReceipt(data, payment)}</span> },
     { key: 'room', label: 'Room', render: payment => <span className="font-semibold">{paymentRooms(data, payment, DEMO_DATE).label}</span> },
     { key: 'date', label: 'Date Paid', render: payment => formatDate(payment.paidOn) },
     { key: 'amount', label: 'Amount Paid', align: 'right', render: payment => <span className="font-semibold tabular-nums">{formatMoney(payment.amountCents)}</span> },
@@ -134,7 +134,7 @@ export function PaymentsTransactionWorkspace() {
   ]
 
   const correctionColumns: Column<PaymentCorrection>[] = [
-    { key: 'receipt', label: 'Receipt Number', render: correction => <span className="break-all font-semibold text-[var(--forest-green)]">{data.receipts.find(receipt => receipt.id === correction.correctedReceiptId)?.receiptNumber ?? 'No receipt'}</span> },
+    { key: 'receipt', label: 'Receipt Number', render: correction => <span className="break-all font-semibold text-[var(--tint)]">{data.receipts.find(receipt => receipt.id === correction.correctedReceiptId)?.receiptNumber ?? 'No receipt'}</span> },
     { key: 'room', label: 'Room', render: correction => {
       const payment = data.payments.find(item => item.id === correction.correctedPaymentId)
       return <span className="font-semibold">{payment ? paymentRooms(data, payment, DEMO_DATE).label : 'Room needs review'}</span>

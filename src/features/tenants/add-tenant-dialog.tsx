@@ -62,7 +62,7 @@ export function AddTenantDialog({ onSaved }: { onSaved?: (message: string) => vo
           </>
         : <>
             <DialogHeader className="items-start">
-              <span className="mb-1 flex size-12 items-center justify-center rounded-full bg-accent text-primary"><Check className="size-6" aria-hidden="true" /></span>
+              <span className="mb-1 flex size-12 items-center justify-center rounded-full bg-accent text-[var(--tint)]"><Check className="size-6" aria-hidden="true" /></span>
               <DialogTitle>Tenant added successfully</DialogTitle>
               <DialogDescription className="text-base leading-relaxed" role="status">Tenant {savedName} was added and saved to the tenant list. Room occupancy reflects any assignment made here.</DialogDescription>
             </DialogHeader>
