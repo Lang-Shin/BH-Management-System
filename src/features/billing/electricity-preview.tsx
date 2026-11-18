@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import type { PrototypeAppState } from '@/domain/types/models'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { DataTable } from '@/components/shared/data-table'
+import { PaginatedDataTable } from '@/components/shared/table-pagination'
 import { AnimatedNumber } from '@/components/shared/animated-number'
 import { formatDate, formatMoney } from '@/lib/format'
 import { chargeRoom } from '@/domain/calculations/room-finance'
@@ -42,7 +42,7 @@ export function ElectricityPreview({ data, periodId, asOf }: { data: PrototypeAp
       </section>}
     </CardContent></Card>
     <Card className="shadow-none"><CardHeader><CardTitle>Electricity prices</CardTitle><CardDescription>Each price has its own starting date.</CardDescription></CardHeader><CardContent><dl className="space-y-4 text-base">{data.electricityRates.map(rate => <div key={rate.id} className="rounded-lg bg-muted p-4"><dt className="font-semibold"><AnimatedNumber value={formatMoney(rate.rateCentsPerKwh)} /> per kWh</dt><dd className="mt-2 text-sm text-muted-foreground">Starting {formatDate(rate.effectiveFrom)}</dd></div>)}</dl><p className="mt-5 text-sm text-muted-foreground">Who uses each meter and how shared electricity is divided still need to be agreed.</p></CardContent></Card></div>
-    <h2 className="mt-6 mb-4 text-xl font-semibold">Past meter readings</h2><DataTable rows={data.meterReadings} caption="Past meter readings" columns={[
+    <h2 className="mt-6 mb-4 text-xl font-semibold">Past meter readings</h2><PaginatedDataTable rows={data.meterReadings} resetKey={data.meterReadings.length} recordLabel="readings" caption="Past meter readings" columns={[
       { key: 'meter', label: 'Meter', render: r => data.electricityMeters.find(m => m.id === r.meterId)?.label },
       { key: 'date', label: 'Date', render: r => formatDate(r.readOn) },
       { key: 'reading', label: 'Reading', render: r => `${r.readingMilliKwh / 1000} kWh` },

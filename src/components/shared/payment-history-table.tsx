@@ -2,6 +2,8 @@ import { useRef, useState } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
 import type { ChargeCategory, Payment, PrototypeAppState } from '@/domain/types/models'
 import { DataTable, type Column } from './data-table'
+import { TablePagination } from './table-pagination'
+import { useTablePagination } from './use-table-pagination'
 import { formatDate, formatMoney } from '@/lib/format'
 import { StatusBadge } from './status-badge'
 import { paymentRooms } from '@/domain/calculations/room-finance'
@@ -42,11 +44,13 @@ function PaymentCategoryBoxes({ data, payment, asOf }: { data: PrototypeAppState
   </details>
 }
 
-export function PaymentHistoryTable({ data, payments, caption = 'Payment history', compact = false, asOf = DEMO_DATE, transactionDisplay = 'button', onEditPayment }: { data: PrototypeAppState; payments: Payment[]; caption?: string; compact?: boolean; asOf?: string; transactionDisplay?: 'button' | 'categories'; onEditPayment?: (payment: Payment, trigger: HTMLButtonElement) => void }) {
+export function PaymentHistoryTable({ data, payments, caption = 'Payment history', compact = false, asOf = DEMO_DATE, transactionDisplay = 'button', onEditPayment, paginated = false, recordLabel = 'transactions' }: { data: PrototypeAppState; payments: Payment[]; caption?: string; compact?: boolean; asOf?: string; transactionDisplay?: 'button' | 'categories'; onEditPayment?: (payment: Payment, trigger: HTMLButtonElement) => void; paginated?: boolean; recordLabel?: string }) {
   const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null)
   const [transactionSession, setTransactionSession] = useState(0)
   const transactionTrigger = useRef<HTMLButtonElement | null>(null)
+  const pagination = useTablePagination(payments)
   const selectedPayment = payments.find(payment => payment.id === selectedPaymentId)
+  const visiblePayments = paginated ? pagination.visibleRows : payments
   const columns: Column<Payment>[] = [
     { key: 'room', label: 'Room', render: p => { const context = paymentRooms(data, p, asOf); return <div className="max-w-xs whitespace-normal"><p className="font-semibold">{context.label}</p>{(context.unallocated > 0 || context.allocations.some(item => item.context.roomId === null)) && <p className="mt-1 text-xs text-muted-foreground">{context.note}</p>}</div> } },
     { key: 'date', label: 'Date paid', render: p => formatDate(p.paidOn) },
@@ -60,7 +64,8 @@ export function PaymentHistoryTable({ data, payments, caption = 'Payment history
     ? <PaymentCategoryBoxes data={data} payment={p} asOf={asOf} />
     : <Button variant="outline" aria-label={`See Transaction for ${paymentRooms(data, p, asOf).label}, ${formatDate(p.paidOn)}, ${formatMoney(p.amountCents)}`} onClick={event => { transactionTrigger.current = event.currentTarget; setSelectedPaymentId(p.id); setTransactionSession(session => session + 1) }}>See Transaction</Button> })
   return <>
-    <DataTable rows={payments} caption={caption} columns={columns} />
+    <DataTable rows={visiblePayments} caption={caption} columns={columns} />
+    {paginated && payments.length > 0 && <TablePagination page={pagination.page} totalRecords={pagination.totalRecords} pageSize={pagination.pageSize} onPageChange={pagination.setPage} onPageSizeChange={pagination.setPageSize} recordLabel={recordLabel} />}
     {selectedPayment && <TransactionDialog key={`${selectedPayment.id}:${transactionSession}`} data={data} payment={selectedPayment} asOf={asOf} onClose={() => setSelectedPaymentId(null)} onReturnFocus={() => transactionTrigger.current?.focus()} onEditPayment={onEditPayment ? (payment) => { if (transactionTrigger.current) onEditPayment(payment, transactionTrigger.current); setSelectedPaymentId(null) } : undefined} />}
   </>
 }

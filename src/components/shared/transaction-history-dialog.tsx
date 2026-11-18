@@ -21,7 +21,7 @@ export function TransactionHistoryDialog({ data, payments, asOf, onClose, onRetu
         <DialogTitle>Transaction History</DialogTitle>
         <DialogDescription>All recorded payments. Choose See Transaction to inspect one; this list is read-only.</DialogDescription>
       </DialogHeader>
-      <PaymentHistoryTable data={data} payments={payments} asOf={asOf} caption="All transactions" />
+      <PaymentHistoryTable data={data} payments={payments} asOf={asOf} caption="All transactions" paginated recordLabel="transactions" />
       <DialogFooter><Button aria-label="Close transaction history" onClick={requestClose}>Close</Button></DialogFooter>
     </DialogContent>
   </Dialog>

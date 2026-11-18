@@ -9,7 +9,7 @@ import { PendingPaymentsDialog } from '@/features/dashboard/pending-payments-dia
 import { PageHeader, PreviewNotice, StatCard } from '@/components/shared/page'
 import { AnimatedNumber } from '@/components/shared/animated-number'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { DataTable } from '@/components/shared/data-table'
+import { PaginatedDataTable } from '@/components/shared/table-pagination'
 import { WorkflowPlaceholders } from '@/components/shared/workflow-placeholders'
 import { ResetDemoButton } from '@/components/shared/reset-demo-button'
 import { usePrototype } from '@/hooks/use-prototype'
@@ -60,7 +60,7 @@ export default function Reports() {
       <StatCard label="Already paid" value={formatMoney(summary.applied)} detail="Paid toward November’s bills." icon={ReceiptText} />
       <StatCard label={summary.unresolved > 0 ? 'Known outstanding' : 'Still to pay'} value={formatMoney(summary.outstanding)} detail={summary.unresolved > 0 ? `Known November amounts only; ${summary.unresolved} electricity ${summary.unresolved === 1 ? 'bill' : 'bills'} awaiting a meter reading.` : 'What tenants still owe for November.'} icon={CircleAlert} />
     </section>
-    <section className="mt-8" aria-labelledby="monthly-reports"><h2 id="monthly-reports" className="mb-2 text-xl font-semibold">Monthly summary</h2><p className="mb-5 text-base text-muted-foreground">Money received may include payments for older bills or money paid in advance.</p><DataTable rows={periods} caption="Monthly summary" columns={[
+    <section className="mt-8" aria-labelledby="monthly-reports"><h2 id="monthly-reports" className="mb-2 text-xl font-semibold">Monthly summary</h2><p className="mb-5 text-base text-muted-foreground">Money received may include payments for older bills or money paid in advance.</p><PaginatedDataTable rows={periods} resetKey={periods.length} recordLabel="months" caption="Monthly summary" columns={[
       { key: 'period', label: 'Month', render: p => p.label },
       { key: 'billed', label: 'Total bills', align: 'right', render: p => formatMoney(p.summary.billed) },
       { key: 'applied', label: 'Paid for these bills', align: 'right', render: p => formatMoney(p.summary.applied) },
@@ -72,7 +72,7 @@ export default function Reports() {
       <h2 id="room-report-title" className="text-xl font-semibold">Room financial summary</h2>
       <p className="mt-2 text-sm text-muted-foreground">Individual charges grouped by historical room context, not joint liability. Total billed, total paid, and payment status describe the selected report month. Electricity without a current reading is unresolved and has no peso amount. Pending Payment checks every unpaid or unresolved billing period for the room. Unallocated advances are not counted as bill payments.</p>
       <div className="my-5 flex flex-wrap items-end justify-between gap-4"><div><label htmlFor="room-report-period" className="mb-2 block text-sm font-semibold">Report month</label><select id="room-report-period" value={roomPeriod} onChange={event => setRoomPeriod(event.target.value)} className="min-h-12 max-w-full rounded-lg border bg-card px-3">{data.billingPeriods.map(period => <option key={period.id} value={period.id}>{period.label}</option>)}</select></div><Button variant="outline" onClick={downloadRoomReport}><Download aria-hidden="true" />Download room CSV</Button></div>
-      <DataTable rows={roomRows} caption="Room financial summary" columns={[
+      <PaginatedDataTable rows={roomRows} resetKey={roomPeriod} recordLabel="rooms" caption="Room financial summary" columns={[
         { key: 'room', label: 'Room', render: row => <span className="font-semibold">{row.context.label}</span> },
         { key: 'billed', label: 'Total billed', align: 'right', render: row => formatMoney(row.billed) },
         { key: 'paid', label: 'Total paid', align: 'right', render: row => formatMoney(row.paid) },
@@ -97,7 +97,7 @@ export default function Reports() {
     ] as const).map(([label, value]) => <div key={label} className="rounded-lg border bg-muted/40 p-4"><dt className="text-xs font-semibold text-muted-foreground">{label}</dt><dd className="mt-2 text-sm leading-relaxed font-medium">{value}</dd></div>)}</dl></CardContent></Card>
     <details open={Boolean(storageWarning)} className="mt-7 rounded-xl border bg-card p-5 sm:p-6"><summary className="min-h-12 cursor-pointer py-2 text-lg font-semibold">More settings and sample records</summary>
       <section className="mt-5" aria-labelledby="sample-records"><h2 id="sample-records" className="mb-3 text-xl font-semibold">Start again with sample records</h2><p className="mb-5 max-w-2xl text-base text-muted-foreground">Restore the original sample records and remove your saved notes and room changes. This is only for trying the app.</p><ResetDemoButton /></section>
-      <section className="mt-7" aria-labelledby="audit-log"><h2 id="audit-log" className="mb-3 text-xl font-semibold">Record of changes</h2><DataTable rows={data.auditEvents} caption="Record of changes" columns={[
+      <section className="mt-7" aria-labelledby="audit-log"><h2 id="audit-log" className="mb-3 text-xl font-semibold">Record of changes</h2><PaginatedDataTable rows={data.auditEvents} resetKey={data.auditEvents.length} recordLabel="changes" caption="Record of changes" columns={[
         { key: 'date', label: 'Date', render: a => formatDate(a.occurredOn) },
         { key: 'action', label: 'What changed', render: a => changeLabels[a.action] },
         { key: 'reason', label: 'Note', render: a => <span className="inline-block max-w-sm whitespace-normal leading-relaxed">{a.action === 'DEMO_SEEDED' ? 'Sample records were added so you can try the screens.' : a.reason}</span> },

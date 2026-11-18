@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { Search } from 'lucide-react'
 import { PageHeader, PreviewNotice } from '@/components/shared/page'
 import { AnimatedNumber } from '@/components/shared/animated-number'
-import { DataTable } from '@/components/shared/data-table'
+import { PaginatedDataTable } from '@/components/shared/table-pagination'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -31,7 +31,7 @@ export default function Tenants() {
     <PreviewNotice>Add or edit tenants, record a safe room transfer, or move a tenant out while preserving historical bills and receipts.</PreviewNotice>
     {notice ? <p role="status" className="tenant-management-notice">{notice}</p> : <p role="status" className="sr-only" />}
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4"><div className="w-full sm:max-w-md"><label htmlFor="tenant-search" className="mb-2 block text-base font-semibold">Find a tenant</label><div className="relative"><Search className="pointer-events-none absolute top-4 left-4 size-5 text-muted-foreground" aria-hidden="true" /><Input id="tenant-search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Type a name or room number" className="h-14 bg-card pl-12 text-base" type="search" /></div></div><p className="text-sm text-muted-foreground" role="status">Showing <AnimatedNumber value={tenants.length} /> of <AnimatedNumber value={activeTenants.length} /> tenants</p></div>
-    <DataTable rows={tenants} caption="Tenant list" columns={[
+    <PaginatedDataTable rows={tenants} resetKey={query} recordLabel="tenants" caption="Tenant list" columns={[
       { key: 'name', label: 'Tenant', render: tenant => <div><p className="font-semibold">{tenant.name}</p>{tenant.notes && <p className="mt-2 text-sm text-muted-foreground">Note saved</p>}</div> },
       { key: 'room', label: 'Room', render: tenant => roomName(tenant.id) ? <span className="inline-flex rounded-md border bg-muted px-2 py-1 text-xs font-semibold">Room {roomName(tenant.id)}</span> : <span className="text-muted-foreground">No room rented now</span> },
       { key: 'status', label: 'Tenant status', render: tenant => <StatusBadge status={TENANT_STATUS_LABELS[tenant.status]} /> },

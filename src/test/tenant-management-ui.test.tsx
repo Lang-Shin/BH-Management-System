@@ -48,7 +48,8 @@ describe('tenant management UI', { timeout: 15000 }, () => {
     await user.click(within(success).getByRole('button', { name: 'Got it' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(screen.getByText('Test Tenant')).toBeInTheDocument()
-    expect(screen.getByText(/Showing/)).toHaveTextContent('8 of 8 tenants')
+    expect(screen.getByText(/Showing/, { selector: 'p[role="status"]' })).toHaveTextContent('8 of 8 tenants')
+    expect(screen.getByText('Showing 1–8 of 8 tenants')).toBeInTheDocument()
     await waitFor(() => {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null').data
       expect(saved.tenants).toHaveLength(11)

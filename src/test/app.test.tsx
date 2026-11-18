@@ -295,7 +295,9 @@ describe('admin workspace integration', () => {
     const historyDialog = screen.getByRole('dialog', { name: 'Transaction History' })
     expect(screen.queryByRole('dialog', { name: 'Transaction Details' })).not.toBeInTheDocument()
     expect(within(historyDialog).getByRole('table', { name: 'All transactions' })).toBeInTheDocument()
-    expect(within(historyDialog).getAllByRole('button', { name: /See Transaction/ })).toHaveLength(14)
+    expect(within(historyDialog).getAllByRole('button', { name: /See Transaction/ })).toHaveLength(10)
+    expect(within(historyDialog).getByText('Showing 1–10 of 14 transactions')).toBeInTheDocument()
+    expect(within(historyDialog).getByText('Page 1 of 2')).toBeInTheDocument()
     const history = within(historyDialog).getByRole('table', { name: 'All transactions' })
     const electricityRow = within(history).getByText('Nov 11, 2026').closest('tr')!
     await user.click(within(electricityRow).getByRole('button', { name: /See Transaction/ }))
@@ -461,6 +463,7 @@ describe('admin workspace integration', () => {
     expect(transaction).toHaveTextContent('300 → 325 kWh')
     await user.click(within(transaction).getByRole('button', { name: 'Done' }))
     await user.click(screen.getByText('View receipt list'))
+    await user.selectOptions(screen.getByLabelText('Rows per page for receipts'), '20')
     await user.click(screen.getByRole('button', { name: 'View receipt DEMO-RCT-015' }))
     const receipt = screen.getByRole('dialog', { name: 'Sample receipt · DEMO-RCT-015' })
     expect(receipt).toHaveTextContent('₱3,925.00')
@@ -482,17 +485,18 @@ describe('admin workspace integration', () => {
     const user = userEvent.setup()
     renderApp('/payments')
     const table = await screen.findByRole('table', { name: 'Transactions' })
+    const workspace = table.closest('section')!
     expect(within(table).getAllByRole('columnheader').map(cell => cell.textContent)).toEqual(['Receipt Number', 'Room', 'Date Paid', 'Amount Paid', 'Status', 'Transaction'])
     expect(within(table).getAllByRole('row')).toHaveLength(11)
-    expect(screen.getByText('Showing 1–10 of 14 transactions')).toBeInTheDocument()
-    expect(screen.getByText('Page 1 of 2')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /Next/ }))
-    expect(screen.getByText('Showing 11–14 of 14 transactions')).toBeInTheDocument()
-    expect(screen.getByText('Page 2 of 2')).toBeInTheDocument()
+    expect(within(workspace).getByText('Showing 1–10 of 14 transactions')).toBeInTheDocument()
+    expect(within(workspace).getByText('Page 1 of 2')).toBeInTheDocument()
+    await user.click(within(workspace).getByRole('button', { name: 'Next page of transactions' }))
+    expect(within(workspace).getByText('Showing 11–14 of 14 transactions')).toBeInTheDocument()
+    expect(within(workspace).getByText('Page 2 of 2')).toBeInTheDocument()
     expect(within(table).getAllByRole('row')).toHaveLength(5)
-    await user.selectOptions(screen.getByLabelText('Rows per page'), '20')
-    expect(screen.getByText('Page 1 of 1')).toBeInTheDocument()
-    expect(screen.getByText('Showing 1–14 of 14 transactions')).toBeInTheDocument()
+    await user.selectOptions(within(workspace).getByLabelText('Rows per page for transactions'), '20')
+    expect(within(workspace).getByText('Page 1 of 1')).toBeInTheDocument()
+    expect(within(workspace).getByText('Showing 1–14 of 14 transactions')).toBeInTheDocument()
     expect(within(table).getAllByRole('row')).toHaveLength(15)
 
     const search = screen.getByRole('searchbox', { name: 'Search by room or receipt number' })
@@ -516,6 +520,41 @@ describe('admin workspace integration', () => {
     expect(within(screen.getByLabelText('Status')).getAllByRole('option').map(option => option.textContent)).toEqual([
       'All statuses', 'Corrected', 'Refunded', 'Additional payment received',
     ])
+  })
+
+  it('shows record-specific pagination labels and safe states across applicable tables', async () => {
+    const user = userEvent.setup()
+    renderApp('/tenants')
+    await screen.findByRole('table', { name: 'Tenant list' })
+    expect(screen.getByText('Showing 1–7 of 7 tenants')).toBeInTheDocument()
+    expect(screen.getByText('Page 1 of 1')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Previous page of tenants' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Next page of tenants' })).toBeDisabled()
+    await user.type(screen.getByRole('searchbox', { name: 'Find a tenant' }), 'not-a-tenant')
+    expect(await screen.findByText('No results found')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Rows per page for tenants')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Page 1 of 0/)).not.toBeInTheDocument()
+
+    const nav = screen.getByRole('navigation', { name: 'Main navigation' })
+    await user.click(within(nav).getByRole('link', { name: 'Billing' }))
+    await screen.findByRole('table', { name: 'Who has paid' })
+    expect(screen.getByText('Showing 1–4 of 4 bills')).toBeInTheDocument()
+    expect(screen.getByText('Showing 1–10 of 10 readings')).toBeInTheDocument()
+
+    await user.click(within(nav).getByRole('link', { name: 'Payments & Receipts' }))
+    await screen.findByRole('table', { name: 'Transactions' })
+    expect(screen.getByText('Showing 1–1 of 1 advance payments')).toBeInTheDocument()
+    await user.click(screen.getByText('View receipt list'))
+    expect(screen.getByText('Showing 1–10 of 14 receipts')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Next page of receipts' }))
+    expect(screen.getByText('Showing 11–14 of 14 receipts')).toBeInTheDocument()
+    expect(screen.getByText('Page 2 of 2')).toBeInTheDocument()
+
+    await user.click(within(nav).getByRole('link', { name: 'Reports & Settings' }))
+    await screen.findByRole('table', { name: 'Room financial summary' })
+    expect(screen.getByText('Showing 1–2 of 2 months')).toBeInTheDocument()
+    expect(screen.getByText('Showing 1–4 of 4 rooms')).toBeInTheDocument()
+    expect(screen.getByText('Showing 1–1 of 1 changes')).toBeInTheDocument()
   })
 
   it('explains why an advance transaction is not eligible for Edit Payment', async () => {
@@ -584,6 +623,9 @@ describe('admin workspace integration', () => {
 
     await user.click(screen.getByRole('tab', { name: /Correction History/ }))
     const correctionHistory = await screen.findByRole('table', { name: 'Correction history' })
+    const correctionWorkspace = correctionHistory.closest('section')!
+    expect(within(correctionWorkspace).getByText('Showing 1–1 of 1 corrections')).toBeInTheDocument()
+    expect(within(correctionWorkspace).getByText('Page 1 of 1')).toBeInTheDocument()
     const correctionRow = within(correctionHistory).getByRole('row', { name: /DEMO-RCT-006-R2/ })
     expect(correctionRow).toHaveTextContent('Room 101')
     expect(correctionRow).toHaveTextContent('₱3,700.00')
@@ -746,6 +788,7 @@ describe('admin workspace integration', () => {
     const user = userEvent.setup()
     renderApp('/payments')
     await user.click(await screen.findByText('View receipt list'))
+    await user.selectOptions(screen.getByLabelText('Rows per page for receipts'), '20')
     const savedData = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}').data
     const trigger = within(screen.getByRole('region', { name: 'Sample receipts' })).getByRole('button', { name: 'View receipt DEMO-RCT-001' })
     await user.click(trigger)

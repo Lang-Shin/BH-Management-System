@@ -2,7 +2,7 @@ import { Check, CircleDashed, Clock3 } from 'lucide-react'
 import type { PrototypeAppState } from '@/domain/types/models'
 import { financialTotals } from '@/domain/calculations/room-finance'
 import { unresolvedElectricity } from '@/domain/calculations/summary'
-import { DataTable } from '@/components/shared/data-table'
+import { PaginatedDataTable } from '@/components/shared/table-pagination'
 import { CATEGORY_LABELS } from '@/lib/labels'
 import { formatMoney } from '@/lib/format'
 import { billingCategories, selectBillingRooms, type BillingRoomStatus } from './billing-room-status'
@@ -35,7 +35,7 @@ function RoomStatus({ status }: { status: BillingRoomStatus }) {
 
 export function BillingStatusMatrix({ data, periodId, asOf, outstandingOnly, statusFilter = null }: { data: PrototypeAppState; periodId: string; asOf: string; outstandingOnly: boolean; statusFilter?: BillingRoomStatus | null }) {
   const rooms = selectBillingRooms(data, periodId, asOf, outstandingOnly).filter(room => !statusFilter || room.billingStatus === statusFilter)
-  return <DataTable rows={rooms} caption="Who has paid" columns={[
+  return <PaginatedDataTable rows={rooms} resetKey={`${periodId}:${outstandingOnly}:${statusFilter ?? 'ALL'}`} recordLabel="bills" caption="Who has paid" columns={[
     { key: 'room', label: 'Room', render: room => <div className="max-w-xs whitespace-normal"><p className="font-semibold">{room.context.label}</p><p className="mt-1 text-xs text-muted-foreground">{room.charges.length} individual charges</p></div> },
     ...billingCategories.map(category => ({ key: category, label: CATEGORY_LABELS[category], render: (room: typeof rooms[number]) => {
       const items = room.charges.filter(charge => charge.category === category)

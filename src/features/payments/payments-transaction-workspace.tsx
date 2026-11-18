@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, History, ReceiptText, Search } from 'lucide-react'
+import { History, ReceiptText, Search } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DataTable, type Column } from '@/components/shared/data-table'
 import { EmptyState } from '@/components/shared/states'
+import { TablePagination } from '@/components/shared/table-pagination'
+import { useTablePagination } from '@/components/shared/use-table-pagination'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { TransactionDialog } from '@/components/shared/transaction-dialog'
 import { usePrototype } from '@/hooks/use-prototype'
@@ -50,8 +52,6 @@ export function PaymentsTransactionWorkspace() {
   const [search, setSearch] = useState('')
   const [month, setMonth] = useState('ALL')
   const [status, setStatus] = useState<TransactionStatus | CorrectionStatusFilter>('ALL')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
   const [notice, setNotice] = useState('')
   const [selectedDialog, setSelectedDialog] = useState<{ paymentId: string; title: string; description: string } | null>(null)
   const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null)
@@ -92,10 +92,8 @@ export function PaymentsTransactionWorkspace() {
   }).sort((a, b) => b.correctedAt.localeCompare(a.correctedAt))
 
   const activeRows = tab === 'transactions' ? transactionRows : correctionRows
-  const pageCount = Math.max(1, Math.ceil(activeRows.length / pageSize))
-  const currentPage = Math.min(page, pageCount)
-  const startIndex = (currentPage - 1) * pageSize
-  const visibleRows = activeRows.slice(startIndex, startIndex + pageSize)
+  const pagination = useTablePagination<Payment | PaymentCorrection>(activeRows)
+  const visibleRows = pagination.visibleRows
   const hasFilters = normalizedSearch.length > 0 || month !== 'ALL' || status !== 'ALL'
 
   function switchTab(next: WorkspaceTab) {
@@ -103,7 +101,7 @@ export function PaymentsTransactionWorkspace() {
     setSearch('')
     setMonth('ALL')
     setStatus('ALL')
-    setPage(1)
+    pagination.resetPage()
     setNotice('')
   }
 
@@ -111,7 +109,7 @@ export function PaymentsTransactionWorkspace() {
     setSearch('')
     setMonth('ALL')
     setStatus('ALL')
-    setPage(1)
+    pagination.resetPage()
   }
 
   function openTransaction(payment: Payment, trigger: HTMLButtonElement) {
@@ -166,9 +164,9 @@ export function PaymentsTransactionWorkspace() {
     {notice && <p role="status" className="transaction-workspace-notice">{notice}</p>}
 
     <div className="transaction-toolbar">
-      <label className="transaction-search" htmlFor="transaction-search"><Search className="size-4" aria-hidden="true" /><span className="sr-only">Search by room or receipt number</span><input id="transaction-search" type="search" value={search} onChange={event => { setSearch(event.target.value); setPage(1) }} placeholder="Search room or receipt number" autoComplete="off" /></label>
-      <label className="transaction-filter"><span>Billing month or date</span><select value={month} onChange={event => { setMonth(event.target.value); setPage(1) }}><option value="ALL">All dates</option>{data.billingPeriods.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
-      <label className="transaction-filter"><span>Status</span><select value={status} onChange={event => { setStatus(event.target.value as TransactionStatus | CorrectionStatusFilter); setPage(1) }}><option value="ALL">All statuses</option>{tab === 'transactions' ? <><option value="RECORDED">Recorded</option><option value="CORRECTED">Corrected</option></> : availableCorrectionStatuses.map(item => <option key={item} value={item}>{correctionStatusLabels[item]}</option>)}</select></label>
+      <label className="transaction-search" htmlFor="transaction-search"><Search className="size-4" aria-hidden="true" /><span className="sr-only">Search by room or receipt number</span><input id="transaction-search" type="search" value={search} onChange={event => { setSearch(event.target.value); pagination.resetPage() }} placeholder="Search room or receipt number" autoComplete="off" /></label>
+      <label className="transaction-filter"><span>Billing month or date</span><select value={month} onChange={event => { setMonth(event.target.value); pagination.resetPage() }}><option value="ALL">All dates</option>{data.billingPeriods.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+      <label className="transaction-filter"><span>Status</span><select value={status} onChange={event => { setStatus(event.target.value as TransactionStatus | CorrectionStatusFilter); pagination.resetPage() }}><option value="ALL">All statuses</option>{tab === 'transactions' ? <><option value="RECORDED">Recorded</option><option value="CORRECTED">Corrected</option></> : availableCorrectionStatuses.map(item => <option key={item} value={item}>{correctionStatusLabels[item]}</option>)}</select></label>
     </div>
 
     <div id="transactions-panel" role="tabpanel" aria-labelledby="transactions-tab" hidden={tab !== 'transactions'}>
@@ -184,13 +182,7 @@ export function PaymentsTransactionWorkspace() {
         : <EmptyState title={correctionsEmpty ? 'No corrections recorded yet' : 'No corrections match'} description={correctionsEmpty ? 'Corrections saved from an eligible transaction will appear here with the original and revised receipt totals.' : 'Try another room or receipt number, or clear the filters to see all corrections.'} action={!correctionsEmpty && hasFilters ? <Button variant="outline" onClick={resetFilters}>Clear search and filters</Button> : undefined} />)}
     </div>
 
-    <div className="transaction-pagination">
-      <p aria-live="polite">Showing {activeRows.length === 0 ? 0 : startIndex + 1}–{Math.min(startIndex + pageSize, activeRows.length)} of {activeRows.length} {tab === 'transactions' ? 'transactions' : 'corrections'}</p>
-      <div className="flex flex-wrap items-center gap-3">
-        <label className="transaction-page-size"><span>Rows per page</span><select value={pageSize} onChange={event => { setPageSize(Number(event.target.value)); setPage(1) }}>{[5, 10, 20].map(size => <option key={size} value={size}>{size}</option>)}</select></label>
-        <div className="flex items-center gap-2"><Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage(current => Math.max(1, current - 1))}><ChevronLeft className="size-4" aria-hidden="true" />Previous</Button><span className="min-w-20 text-center text-sm text-muted-foreground">Page {currentPage} of {pageCount}</span><Button variant="outline" size="sm" disabled={currentPage >= pageCount} onClick={() => setPage(current => Math.min(pageCount, current + 1))}>Next<ChevronRight className="size-4" aria-hidden="true" /></Button></div>
-      </div>
-    </div>
+    {activeRows.length > 0 && <TablePagination page={pagination.page} totalRecords={pagination.totalRecords} pageSize={pagination.pageSize} onPageChange={pagination.setPage} onPageSizeChange={pagination.setPageSize} recordLabel={tab === 'transactions' ? 'transactions' : 'corrections'} />}
 
     {selectedPayment && <TransactionDialog key={`${selectedPayment.id}:${selectedDialog?.title}`} data={data} payment={selectedPayment} asOf={DEMO_DATE} title={selectedDialog?.title} description={selectedDialog?.description} onClose={() => setSelectedDialog(null)} onReturnFocus={() => transactionTrigger.current?.focus()} onEditPayment={selectedDialog?.title === 'Transaction Details' ? payment => { setSelectedDialog(null); setEditingPaymentId(payment.id) } : undefined} />}
     {editingPaymentId && <EditPaymentDialog paymentId={editingPaymentId} onClose={() => setEditingPaymentId(null)} onReturnFocus={() => { if (transactionTrigger.current?.isConnected) transactionTrigger.current.focus(); else transactionsTab.current?.focus() }} onSaved={setNotice} />}
