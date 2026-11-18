@@ -20,6 +20,12 @@ const unitLabels: Record<ChargeCategory, string> = {
   WASHING_MACHINE: 'per subscribed room per billing period',
 }
 
+const currentRentRateLabels: Record<RoomCategoryId, string> = {
+  RATE_3500: 'Rate Category 1 · Public CR',
+  RATE_4000: 'Rate Category 2 · Private CR',
+  RATE_5000: 'Rate Category 3 · Private CR + Aircon',
+}
+
 function centsToInput(cents: number): string {
   return (cents / 100).toFixed(2)
 }
@@ -125,7 +131,7 @@ export function BillingRateDialog({ kind, title, onSaved }: { kind: ChargeCatego
       <section className="billing-rate-dialog-section" aria-labelledby="current-rate-title">
         <h2 id="current-rate-title">Current rate</h2>
         {kind === 'RENT'
-          ? <dl className="billing-rate-current-list">{activeRentRates.map(({ categoryId, rate }) => <div key={categoryId}><dt>{roomCategoryLabel(categoryId)} · {data.rooms.filter(room => room.categoryId === categoryId).length} {data.rooms.filter(room => room.categoryId === categoryId).length === 1 ? 'room' : 'rooms'}</dt><dd>{rate ? `${formatMoney(rate.monthlyRentCents)}/month` : 'Rate needs review'}</dd></div>)}</dl>
+          ? <dl className="billing-rate-current-list">{activeRentRates.map(({ categoryId, rate }) => <div key={categoryId}><dt>{currentRentRateLabels[categoryId]}</dt><dd>{rate ? `${formatMoney(rate.monthlyRentCents)}/month` : 'Rate needs review'}</dd></div>)}</dl>
           : <p className="billing-rate-current-value">{activeUtilityCents != null ? formatMoney(activeUtilityCents) : 'Rate needs review'}<span>{unitLabels[kind]}</span></p>}
       </section>
 
