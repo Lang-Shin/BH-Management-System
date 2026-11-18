@@ -21,13 +21,13 @@ export function BillingFiltersMenu({ value, onChange }: { value: BillingRoomStat
       <DropdownMenuCheckboxItem checked={value === null} indicator={false} onCheckedChange={() => onChange(null)}>
         <span className="billing-filter-status-icon" data-status="all"><ListFilter aria-hidden="true" /></span>
         <span>SHOW ALL</span>
-        {value === null && <Check className="ml-auto size-4 text-primary" aria-hidden="true" />}
+        {value === null && <Check className="ml-auto size-4 text-[var(--tint)]" aria-hidden="true" />}
       </DropdownMenuCheckboxItem>
       <DropdownMenuSeparator />
       {statuses.map(status => <DropdownMenuCheckboxItem key={status} checked={value === status} indicator={false} onCheckedChange={() => onChange(value === status ? null : status)}>
         <StatusIcon status={status} />
         <span>{status}</span>
-        {value === status && <Check className="ml-auto size-4 text-primary" aria-hidden="true" />}
+        {value === status && <Check className="ml-auto size-4 text-[var(--tint)]" aria-hidden="true" />}
       </DropdownMenuCheckboxItem>)}
     </DropdownMenuContent>
   </DropdownMenu>

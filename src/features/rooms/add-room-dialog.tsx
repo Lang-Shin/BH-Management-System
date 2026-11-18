@@ -1,4 +1,4 @@
-﻿import { useRef, useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { Check, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -109,7 +109,7 @@ export function AddRoomDialog({ onSaved }: { onSaved?: (message: string) => void
           </>
         : <>
             <DialogHeader className="items-start">
-              <span className="mb-1 flex size-12 items-center justify-center rounded-full bg-accent text-primary"><Check className="size-6" aria-hidden="true" /></span>
+              <span className="mb-1 flex size-12 items-center justify-center rounded-full bg-accent text-[var(--tint)]"><Check className="size-6" aria-hidden="true" /></span>
               <DialogTitle>Room added successfully</DialogTitle>
               <DialogDescription className="text-base leading-relaxed" role="status">Room {savedName} was added and saved to the room list. Assign tenants separately when the room is ready.</DialogDescription>
             </DialogHeader>

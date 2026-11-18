@@ -32,7 +32,7 @@ export function ReceiptDialog({ data, receipt, onClose, onReturnFocus }: {
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="gap-4 sm:max-w-lg" onAnimationEnd={onAnimationEnd} onCloseAutoFocus={event => { event.preventDefault(); onReturnFocus() }}>
       <DialogHeader className="pr-6">
-        <span className="mb-1 flex size-12 items-center justify-center rounded-2xl bg-accent text-primary"><ReceiptText className="size-6" aria-hidden="true" /></span>
+        <span className="mb-1 flex size-12 items-center justify-center rounded-2xl bg-accent text-[var(--tint)]"><ReceiptText className="size-6" aria-hidden="true" /></span>
         <DialogTitle>{receipt.state === 'SUPERSEDED' ? 'Superseded receipt' : receipt.revision > 1 ? 'Revised receipt' : 'Sample receipt'} · {receipt.receiptNumber}</DialogTitle>
         <DialogDescription>Halili BH · Receipt details from the sample records.</DialogDescription>
       </DialogHeader>

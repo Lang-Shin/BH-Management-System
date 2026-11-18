@@ -49,7 +49,7 @@ export function NotificationCenter() {
       </div>
       {notifications.length === 0
         ? <div className="flex flex-col items-center gap-2 px-6 py-10 text-center" role="status">
-            <span className="rounded-full bg-accent p-3"><CheckCheck className="size-6 text-primary" aria-hidden="true" /></span>
+            <span className="rounded-full bg-accent p-3"><CheckCheck className="size-6 text-[var(--tint)]" aria-hidden="true" /></span>
             <p className="font-semibold">You’re all caught up</p>
             <p className="text-sm text-muted-foreground">No bills, rooms, or advance payments need attention.</p>
           </div>
