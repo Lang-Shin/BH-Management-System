@@ -79,7 +79,7 @@ export default function Reports() {
         { key: 'pending', label: 'Pending payment', render: row => {
           const allPeriodRoom = allRoomRows.find(item => item.id === row.id)
           return allPeriodRoom && roomHasPending(allPeriodRoom)
-            ? <Button variant="outline" aria-label={`View pending payments for ${row.context.label}`} onClick={event => { pendingTrigger.current = event.currentTarget; setPendingRoomId(row.id) }}>View Details</Button>
+            ? <Button variant="outline" aria-label={`View Details for ${row.context.label}`} onClick={event => { pendingTrigger.current = event.currentTarget; setPendingRoomId(row.id) }}>View Details</Button>
             : <span className="text-sm text-muted-foreground">NONE</span>
         } },
         { key: 'status', label: 'Payment status', render: row => <StatusBadge status={ROOM_PAYMENT_STATUS_LABELS[row.paymentStatus]} /> },

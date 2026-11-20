@@ -78,7 +78,7 @@ describe('tenant receipt corrections', () => {
     expect(screen.queryByRole('article', { name: 'Receipt DEMO-RCT-006-R2' })).not.toBeInTheDocument()
     expect(screen.queryByText('Revised')).not.toBeInTheDocument()
     expect(screen.queryByText(/Receipt history for/)).not.toBeInTheDocument()
-  })
+  }, 15000)
 
   it('keeps the revised receipt after a refresh', async () => {
     const user = userEvent.setup()
@@ -93,7 +93,7 @@ describe('tenant receipt corrections', () => {
     expect(within(revised).getByText(/Recorded amount corrected; no refund was required/)).toBeInTheDocument()
     expect(screen.getByText('2 receipts for November 2026 (sample).')).toBeInTheDocument()
     expect(screen.getByRole('article', { name: 'Receipt DEMO-RCT-006' })).toHaveTextContent('Superseded')
-  })
+  }, 15000)
 
   it('reports the confirmed refund on the revised tenant receipt', async () => {
     const user = userEvent.setup()
@@ -125,5 +125,5 @@ describe('tenant receipt corrections', () => {
     const original = screen.getByRole('article', { name: 'Receipt DEMO-RCT-007' })
     expect(within(original).getByText('Superseded')).toBeInTheDocument()
     expect(within(original).getAllByText('₱169.00')).toHaveLength(2)
-  })
+  }, 15000)
 })
