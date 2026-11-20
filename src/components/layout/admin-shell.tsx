@@ -1,30 +1,14 @@
-import { useEffect, useRef, useState, type MouseEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Building2, Menu, CircleAlert, ArrowUp, LogOut, Moon, Sun } from 'lucide-react'
+import { Menu, CircleAlert, ArrowUp, Moon, Sun } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { usePrototype } from '@/hooks/use-prototype'
 import { navigation } from '@/app/router/navigation'
 import { AnimatedPageTitle } from '@/components/shared/animated-page-title'
 import { NotificationCenter } from '@/components/layout/notification-center'
 import { useAppearance } from '@/app/providers/appearance'
-
-function Brand() {
-  return <div className="flex items-center gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-[12px] bg-tomato shadow-[inset_0_1px_0_#ffffff40]"><Building2 className="size-5" aria-hidden="true" /></div><div className="min-w-0"><p className="brand-name text-2xl tracking-tight">Halili BH</p><p className="brand-acronym text-[1rem] tracking-widest text-muted-foreground">BHMS</p></div></div>
-}
-
-function SidebarContent({ onNavigate, onLogout }: { onNavigate?: () => void; onLogout: (event: MouseEvent<HTMLButtonElement>) => void }) {
-  return <div className="sidebar-surface flex h-full min-h-full flex-col px-3 py-5">
-    <Brand />
-    <p className="mt-8 mb-2 px-3 text-xs font-semibold text-muted-foreground">Workspace</p>
-    <nav aria-label="Main navigation" className="space-y-0.5">{navigation.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} onClick={onNavigate} className="sidebar-link flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-medium"><Icon className="size-[18px] shrink-0" aria-hidden="true" /><span>{label}</span></NavLink>)}</nav>
-    <div className="mt-auto pt-12">
-      <button type="button" className="sidebar-link sidebar-logout flex min-h-11 w-full items-center gap-3 px-3 py-2.5 text-sm font-medium" onClick={onLogout}><LogOut className="size-[18px] shrink-0" aria-hidden="true" /><span>Log out</span></button>
-      <p className="mt-3 border-t px-3 pt-4 text-xs text-muted-foreground">Boarding house management</p>
-    </div>
-  </div>
-}
+import { LogoutDialog, SidebarContent } from './sidebar'
 
 export function AdminShell() {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -48,11 +32,11 @@ export function AdminShell() {
 
   return <div className="min-h-dvh">
     <a href="#main-content" className="sr-only fixed top-3 left-3 z-50 rounded-md bg-primary p-3 text-white focus:not-sr-only">Skip to content</a>
-    <aside className="shell-sidebar fixed inset-y-3 left-3 z-30 hidden w-60 overflow-y-auto lg:block"><SidebarContent onLogout={event => { logoutTrigger.current = event.currentTarget; setLogoutOpen(true) }} /></aside>
+    <aside className="shell-sidebar fixed inset-y-3 left-3 z-30 hidden w-60 overflow-y-auto lg:block"><SidebarContent navItems={navigation} onLogout={event => { logoutTrigger.current = event.currentTarget; setLogoutOpen(true) }} /></aside>
     <div className="min-w-0 lg:pl-[16.5rem]">
       <header className="workspace-glass-header sticky top-2 z-20 mx-2 mt-2 flex min-h-16 items-center justify-between gap-3 rounded-[22px] px-3 sm:mx-4 sm:px-5 lg:top-3 lg:mt-3">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <Sheet open={menuOpen} onOpenChange={setMenuOpen}><SheetTrigger asChild><Button variant="outline" size="icon" className="lg:hidden" aria-label="Open menu"><Menu /></Button></SheetTrigger><SheetContent side="left" className="sidebar-surface inset-y-2 left-2 h-auto w-72 max-w-[calc(100vw-1rem)] gap-0 overflow-y-auto rounded-[26px] p-0"><SheetHeader className="sr-only"><SheetTitle>Main menu</SheetTitle><SheetDescription>Choose Dashboard, Tenants, Rooms, Billing, Payments, or Reports and Settings.</SheetDescription></SheetHeader><SidebarContent onNavigate={() => setMenuOpen(false)} onLogout={event => { logoutTrigger.current = event.currentTarget; setMenuOpen(false); setLogoutOpen(true) }} /></SheetContent></Sheet>
+          <Sheet open={menuOpen} onOpenChange={setMenuOpen}><SheetTrigger asChild><Button variant="outline" size="icon" className="lg:hidden" aria-label="Open menu"><Menu /></Button></SheetTrigger><SheetContent side="left" className="sidebar-surface inset-y-2 left-2 h-auto w-72 max-w-[calc(100vw-1rem)] gap-0 overflow-y-auto rounded-[26px] p-0"><SheetHeader className="sr-only"><SheetTitle>Main menu</SheetTitle><SheetDescription>Choose Dashboard, Tenants, Rooms, Billing, Payments, or Reports and Settings.</SheetDescription></SheetHeader><SidebarContent navItems={navigation} onNavigate={() => setMenuOpen(false)} onLogout={event => { logoutTrigger.current = event.currentTarget; setMenuOpen(false); setLogoutOpen(true) }} /></SheetContent></Sheet>
           <div className="min-w-0"><p className="brand-name text-[1rem] text-muted-foreground lg:hidden">Halili BH</p><AnimatedPageTitle key={location.pathname} text={active?.label ?? 'Page not found'} /></div>
         </div>
         <div className="flex items-center gap-1">
@@ -73,19 +57,6 @@ export function AdminShell() {
       </main>
       </div>
     </div>
-    <Dialog open={logoutOpen} onOpenChange={setLogoutOpen}>
-      <DialogContent className="max-w-md text-center" onCloseAutoFocus={event => {
-        event.preventDefault()
-        const trigger = logoutTrigger.current?.isConnected ? logoutTrigger.current : document.querySelector<HTMLButtonElement>('[aria-label="Open menu"]')
-        trigger?.focus()
-      }}>
-        <DialogHeader className="items-center">
-          <span className="mb-1 flex size-12 items-center justify-center rounded-full bg-primary/15 text-[var(--tint)]"><LogOut className="size-6" aria-hidden="true" /></span>
-          <DialogTitle>Log out of BHMS?</DialogTitle>
-          <DialogDescription className="text-base leading-relaxed">Signing out is not available in this sample yet. Your saved sample records will stay in this browser.</DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="sm:justify-center"><Button onClick={() => setLogoutOpen(false)}>Got it</Button></DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <LogoutDialog open={logoutOpen} onOpenChange={setLogoutOpen} triggerRef={logoutTrigger} />
   </div>
 }
