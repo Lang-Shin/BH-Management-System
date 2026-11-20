@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import type { Receipt } from '@/domain/types/models'
+import { correctionSettlementText } from '@/domain/calculations/payment-correction'
 import { PageHeader } from '@/components/shared/page'
 import { EmptyState } from '@/components/shared/states'
 import { StatusBadge } from '@/components/shared/status-badge'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { usePrototype } from '@/hooks/use-prototype'
 import { useTenantDemo } from '@/app/providers/tenant-demo'
@@ -15,20 +17,25 @@ const receiptStatusLabels: Record<Receipt['state'], string> = {
   SUPERSEDED: 'Superseded',
 }
 
-function ReceiptCard({ view }: { view: TenantReceiptView }) {
+function ReceiptCard({ view, historical = false }: { view: TenantReceiptView; historical?: boolean }) {
   const { receipt, payment, tenant, periods, rooms, categories, unallocatedCents, otherTenantNames } = view
   const periodLabel = periods.map(period => period.label).join(' · ')
   const ambiguousRoom = rooms.label === 'Multiple rooms / contexts' || rooms.label === 'Room needs review'
+  const revised = receipt.revision > 1
+  const corrected = view.correction?.correctedReceiptId === receipt.id ? view.correction : null
 
   return <article aria-label={`Receipt ${receipt.receiptNumber}`}>
-    <Card className="h-full">
+    <Card className={historical ? 'h-full border-dashed' : 'h-full'}>
       <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <CardTitle className="text-base">{receipt.receiptNumber}</CardTitle>
             <CardDescription>{periodLabel}</CardDescription>
           </div>
-          <StatusBadge status={receiptStatusLabels[receipt.state]} />
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {revised && !historical && <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-900">Revised</Badge>}
+            <StatusBadge status={receiptStatusLabels[receipt.state]} />
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -39,6 +46,10 @@ function ReceiptCard({ view }: { view: TenantReceiptView }) {
           <div><dt>Total recorded amount</dt><dd>{formatMoney(receipt.amountCents)}</dd></div>
         </dl>
         {ambiguousRoom && <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{rooms.note}</p>}
+        <p className="mt-2 text-xs text-muted-foreground">
+          Revision {receipt.revision}
+          {view.supersedesReceipt ? ` · Supersedes ${view.supersedesReceipt.receiptNumber} (revision ${view.supersedesReceipt.revision})` : ''}
+        </p>
         <fieldset className="mt-5 min-w-0">
           <legend className="text-sm font-semibold">Bills included in this receipt</legend>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -54,6 +65,15 @@ function ReceiptCard({ view }: { view: TenantReceiptView }) {
         </fieldset>
         {unallocatedCents > 0 && <p role="note" className="mt-4 rounded-xl border border-dashed px-3 py-2 text-sm"><strong className="font-semibold">Unallocated advance:</strong> {formatMoney(unallocatedCents)} is held as credit and not tied to a bill.</p>}
         {otherTenantNames.length > 0 && <p className="mt-3 text-xs text-muted-foreground">This receipt also covers charges recorded for {otherTenantNames.join(', ')}.</p>}
+        {corrected && <div role="note" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+          <p><strong className="font-semibold">Corrected {formatDate(corrected.correctedAt)}.</strong> {corrected.reason}</p>
+          <p className="mt-1">{correctionSettlementText(corrected)}</p>
+        </div>}
+        {historical && <p role="note" className="mt-4 rounded-xl border border-dashed px-3 py-2 text-sm text-muted-foreground">
+          {view.supersededBy
+            ? `Replaced by ${view.supersededBy.receiptNumber} (revision ${view.supersededBy.revision}). Kept for history.`
+            : 'This receipt is voided and kept for history.'}
+        </p>}
       </CardContent>
     </Card>
   </article>
@@ -68,6 +88,8 @@ export default function TenantPayments() {
   const [periodId, setPeriodId] = useState(currentPeriod?.id ?? '')
   const period = data.billingPeriods.find(item => item.id === periodId) ?? currentPeriod
   const visible = period ? receiptsForPeriod(receipts, period.id) : []
+  const effective = visible.filter(item => item.effective)
+  const history = visible.filter(item => !item.effective)
 
   return <>
     <PageHeader title="My Payments & Receipts" description="Receipts issued for your recorded payments at Halili BH." />
@@ -81,15 +103,20 @@ export default function TenantPayments() {
           {data.billingPeriods.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
         </select>
       </div>
-      {period && <p role="status" className="text-sm text-muted-foreground">{visible.length} {visible.length === 1 ? 'receipt' : 'receipts'} for {period.label}.</p>}
+      {period && <p role="status" className="text-sm text-muted-foreground">{effective.length} {effective.length === 1 ? 'receipt' : 'receipts'} for {period.label}.</p>}
     </div>
-    {visible.length > 0
-      ? <section aria-label="Tenant receipts" className="grid gap-5 xl:grid-cols-2">{visible.map(view => <ReceiptCard key={view.receipt.id} view={view} />)}</section>
+    {effective.length > 0
+      ? <section aria-label="Tenant receipts" className="grid gap-5 xl:grid-cols-2">{effective.map(view => <ReceiptCard key={view.receipt.id} view={view} />)}</section>
       : <EmptyState
         title={receipts.length === 0 ? 'No receipts yet' : `No receipts for ${period?.label ?? 'this billing month'}`}
         description={receipts.length === 0
           ? 'This demo tenant has no receipts in the sample records yet.'
           : 'This tenant has receipts in other billing months. Choose a different month to view them.'}
       />}
+    {history.length > 0 && <details className="mt-6">
+      <summary className="cursor-pointer text-sm font-semibold">Receipt history for {period?.label} ({history.length})</summary>
+      <p className="mt-2 text-xs text-muted-foreground">Superseded receipts are kept unchanged for reference; they are not counted as current receipts.</p>
+      <div className="mt-4 grid gap-5 xl:grid-cols-2">{history.map(view => <ReceiptCard key={view.receipt.id} view={view} historical />)}</div>
+    </details>}
   </>
 }

@@ -1,4 +1,4 @@
-import type { BillingPeriod, ChargeCategory, Payment, PrototypeAppState, Receipt, Tenant } from '@/domain/types/models'
+import type { BillingPeriod, ChargeCategory, Payment, PaymentCorrection, PrototypeAppState, Receipt, Tenant } from '@/domain/types/models'
 import { paymentRooms, type PaymentRoomPresentation } from '@/domain/calculations/room-finance'
 
 export const RECEIPT_CATEGORIES: { category: ChargeCategory; label: string }[] = [
@@ -24,6 +24,11 @@ export interface TenantReceiptView {
   categories: ReceiptCategoryLine[]
   unallocatedCents: number
   otherTenantNames: string[]
+  /** ISSUED receipts are effective; superseded/voided receipts are retained history only. */
+  effective: boolean
+  correction: PaymentCorrection | null
+  supersedesReceipt: Receipt | null
+  supersededBy: Receipt | null
 }
 
 /**
@@ -69,8 +74,20 @@ export function selectTenantReceipts(data: PrototypeAppState, tenantId: string):
       .filter((id): id is string => Boolean(id) && id !== payment.tenantId)
       .map(id => tenantsById.get(id)?.name)
       .filter((name): name is string => Boolean(name)))]
+    const correction = data.paymentCorrections.find(item => item.correctedReceiptId === receipt.id)
+      ?? data.paymentCorrections.find(item => item.originalReceiptId === receipt.id)
+      ?? null
+    const supersedesReceipt = receipt.supersedesReceiptId
+      ? data.receipts.find(item => item.id === receipt.supersedesReceiptId) ?? null
+      : null
+    const supersededBy = receipt.state === 'SUPERSEDED'
+      ? data.receipts.find(item => item.supersedesReceiptId === receipt.id) ?? null
+      : null
 
-    receipts.push({ receipt, payment, tenant, periods, rooms, categories, unallocatedCents: rooms.unallocated, otherTenantNames })
+    receipts.push({
+      receipt, payment, tenant, periods, rooms, categories, unallocatedCents: rooms.unallocated, otherTenantNames,
+      effective: receipt.state === 'ISSUED', correction, supersedesReceipt, supersededBy,
+    })
   }
 
   receipts.sort((a, b) => b.receipt.issuedOn.localeCompare(a.receipt.issuedOn) || b.receipt.receiptNumber.localeCompare(a.receipt.receiptNumber))

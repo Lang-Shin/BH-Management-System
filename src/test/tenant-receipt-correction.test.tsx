@@ -1,0 +1,129 @@
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
+import { describe, expect, it } from 'vitest'
+import { AppRouter } from '@/app/router/app-router'
+import { PrototypeProvider } from '@/app/providers/prototype-provider'
+import { localStorageRepository, STORAGE_KEY } from '@/data/repositories/local-storage-repository'
+
+function renderApp(route = '/payments') {
+  return render(<PrototypeProvider repository={localStorageRepository}><MemoryRouter initialEntries={[route]}><AppRouter /></MemoryRouter></PrototypeProvider>)
+}
+
+async function openTenantReceipts(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Switch to Tenant UI' }))
+  expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument()
+  await user.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('link', { name: 'My Payments & Receipts' }))
+  expect(await screen.findByRole('heading', { level: 1, name: 'My Payments & Receipts' })).toBeInTheDocument()
+}
+
+async function correctWaterRemoved(user: ReturnType<typeof userEvent.setup>) {
+  const transactions = await screen.findByRole('table', { name: 'Transactions' })
+  const row = within(transactions).getByRole('row', { name: /DEMO-RCT-006/ })
+  await user.click(within(row).getByRole('button', { name: /See Transaction/ }))
+  await user.click(within(screen.getByRole('dialog', { name: 'Transaction Details' })).getByRole('button', { name: 'Edit Payment' }))
+  let dialog = await screen.findByRole('dialog', { name: 'Correct this transaction.' })
+  await user.click(within(dialog).getByRole('checkbox', { name: 'Water' }))
+  expect(within(dialog).getByLabelText('Corrected total')).toHaveTextContent('₱3,600.00')
+  await user.type(within(dialog).getByLabelText('Reason for correction'), 'Incorrect bill selected')
+  await user.click(within(dialog).getByRole('button', { name: /Review Correction/ }))
+  dialog = screen.getByRole('dialog', { name: 'Confirm correction' })
+  expect(dialog).toHaveTextContent('Lower corrected amount')
+  await user.click(within(dialog).getByRole('radio', { name: /Recorded amount was wrong/ }))
+  await user.click(within(dialog).getByRole('button', { name: 'Confirm correction' }))
+  dialog = screen.getByRole('dialog', { name: 'Payment corrected' })
+  expect(dialog).toHaveTextContent('DEMO-RCT-006-R2')
+  expect(dialog).toHaveTextContent('Recorded amount corrected; no refund was required.')
+  await user.click(within(dialog).getByRole('button', { name: 'Got it' }))
+  await waitFor(() => {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null')
+    expect(saved?.data.receipts.find((receipt: { id: string }) => receipt.id === 'receipt-6').state).toBe('SUPERSEDED')
+    expect(saved?.data.receipts.some((receipt: { receiptNumber: string }) => receipt.receiptNumber === 'DEMO-RCT-006-R2')).toBe(true)
+  })
+}
+
+describe('tenant receipt corrections', () => {
+  it('shows the latest revised receipt after the landlord corrects a payment', async () => {
+    const user = userEvent.setup()
+    renderApp('/payments')
+    await correctWaterRemoved(user)
+    await openTenantReceipts(user)
+
+    expect(screen.getByText('2 receipts for November 2026 (sample).')).toBeInTheDocument()
+    const revised = screen.getByRole('article', { name: 'Receipt DEMO-RCT-006-R2' })
+    expect(within(revised).getByText('Revised')).toBeInTheDocument()
+    expect(within(revised).getByText(/Supersedes DEMO-RCT-006 \(revision 1\)/)).toBeInTheDocument()
+    expect(within(revised).getByText('Total recorded amount')).toBeInTheDocument()
+    expect(within(revised).getByText('₱3,600.00')).toBeInTheDocument()
+    expect(within(revised).getByText('₱3,500.00')).toBeInTheDocument()
+    expect(within(revised).getByText('₱100.00')).toBeInTheDocument()
+    expect(within(revised).getByRole('checkbox', { name: 'Rent' })).toBeChecked()
+    expect(within(revised).getByRole('checkbox', { name: 'Water' })).not.toBeChecked()
+    expect(within(revised).getByRole('checkbox', { name: 'Washing' })).toBeChecked()
+    expect(within(revised).getByRole('checkbox', { name: 'Electricity' })).not.toBeChecked()
+    expect(within(revised).getByText('Corrected Nov 13, 2026.')).toBeInTheDocument()
+    expect(within(revised).getByText(/Recorded amount corrected; no refund was required/)).toBeInTheDocument()
+    expect(screen.getAllByRole('article', { name: 'Receipt DEMO-RCT-006-R2' })).toHaveLength(1)
+
+    const original = screen.getByRole('article', { name: 'Receipt DEMO-RCT-006' })
+    expect(within(original).getByText('Superseded')).toBeInTheDocument()
+    expect(within(original).getByText(/Replaced by DEMO-RCT-006-R2 \(revision 2\)/)).toBeInTheDocument()
+    expect(within(original).getByText('₱3,700.00')).toBeInTheDocument()
+    expect(within(original).getByRole('checkbox', { name: 'Water' })).toBeChecked()
+    expect(within(original).getByRole('checkbox', { name: 'Rent' })).toBeChecked()
+    expect(screen.getByText(/Receipt history for November 2026 \(sample\) \(1\)/)).toBeInTheDocument()
+
+    await user.selectOptions(screen.getByLabelText('Demo tenant'), 'tenant-2')
+    expect(await screen.findByRole('article', { name: 'Receipt DEMO-RCT-008' })).toBeInTheDocument()
+    expect(screen.queryByRole('article', { name: 'Receipt DEMO-RCT-006-R2' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Revised')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Receipt history for/)).not.toBeInTheDocument()
+  })
+
+  it('keeps the revised receipt after a refresh', async () => {
+    const user = userEvent.setup()
+    const first = renderApp('/payments')
+    await correctWaterRemoved(user)
+    first.unmount()
+
+    renderApp('/tenant/payments')
+    const revised = await screen.findByRole('article', { name: 'Receipt DEMO-RCT-006-R2' })
+    expect(within(revised).getByText('₱3,600.00')).toBeInTheDocument()
+    expect(within(revised).getByRole('checkbox', { name: 'Water' })).not.toBeChecked()
+    expect(within(revised).getByText(/Recorded amount corrected; no refund was required/)).toBeInTheDocument()
+    expect(screen.getByText('2 receipts for November 2026 (sample).')).toBeInTheDocument()
+    expect(screen.getByRole('article', { name: 'Receipt DEMO-RCT-006' })).toHaveTextContent('Superseded')
+  })
+
+  it('reports the confirmed refund on the revised tenant receipt', async () => {
+    const user = userEvent.setup()
+    renderApp('/payments')
+    await user.type(await screen.findByRole('searchbox', { name: 'Search by room or receipt number' }), 'DEMO-RCT-007')
+    const transactions = screen.getByRole('table', { name: 'Transactions' })
+    await user.click(within(within(transactions).getByRole('row', { name: /DEMO-RCT-007/ })).getByRole('button', { name: /See Transaction/ }))
+    await user.click(within(screen.getByRole('dialog', { name: 'Transaction Details' })).getByRole('button', { name: 'Edit Payment' }))
+    let dialog = await screen.findByRole('dialog', { name: 'Correct this transaction.' })
+    await user.clear(within(dialog).getByLabelText('Corrected current reading (kWh)'))
+    await user.type(within(dialog).getByLabelText('Corrected current reading (kWh)'), '320')
+    await user.type(within(dialog).getByLabelText('Reason for correction'), 'Incorrect electricity reading')
+    await user.click(within(dialog).getByRole('button', { name: /Review Correction/ }))
+    dialog = screen.getByRole('dialog', { name: 'Confirm correction' })
+    await user.click(within(dialog).getByRole('radio', { name: /Landlord must return ₱65.00/ }))
+    await user.click(within(dialog).getByRole('checkbox', { name: 'I confirm that ₱65.00 has been returned to the tenant.' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Confirm correction' }))
+    dialog = screen.getByRole('dialog', { name: 'Payment corrected' })
+    expect(dialog).toHaveTextContent('Refund of ₱65.00 returned to the tenant.')
+    await user.click(within(dialog).getByRole('button', { name: 'Got it' }))
+
+    await openTenantReceipts(user)
+    const revised = await screen.findByRole('article', { name: 'Receipt DEMO-RCT-007-R2' })
+    expect(within(revised).getByText('Revised')).toBeInTheDocument()
+    expect(within(revised).getAllByText('₱104.00')).toHaveLength(2)
+    expect(within(revised).getByRole('checkbox', { name: 'Electricity' })).toBeChecked()
+    expect(within(revised).getByText(/Refund of ₱65.00 returned to the tenant/)).toBeInTheDocument()
+    expect(screen.getByText('2 receipts for November 2026 (sample).')).toBeInTheDocument()
+    const original = screen.getByRole('article', { name: 'Receipt DEMO-RCT-007' })
+    expect(within(original).getByText('Superseded')).toBeInTheDocument()
+    expect(within(original).getAllByText('₱169.00')).toHaveLength(2)
+  })
+})
