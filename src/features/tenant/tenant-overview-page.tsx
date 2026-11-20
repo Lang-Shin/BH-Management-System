@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, BadgeCheck, CalendarDays, DoorOpen, ReceiptText, User, Wallet } from 'lucide-react'
+import { ArrowRight, BadgeCheck, CalendarDays, DoorOpen, Download, User, Wallet } from 'lucide-react'
 import { EmptyState } from '@/components/shared/states'
 import { PageHeader, PreviewNotice, StatCard } from '@/components/shared/page'
 import { AnimatedNumber } from '@/components/shared/animated-number'
@@ -66,7 +66,7 @@ export default function TenantOverview() {
         </CardHeader>
         <CardContent>
           <ul className="space-y-4 text-sm text-muted-foreground">
-            <li className="flex items-start gap-3"><ReceiptText className="mt-0.5 size-4 shrink-0 text-[var(--tint)]" aria-hidden="true" /><span><strong className="font-semibold text-foreground">Receipt viewing.</strong> Open and review the receipts issued for your payments.</span></li>
+            <li className="flex items-start gap-3"><Download className="mt-0.5 size-4 shrink-0 text-[var(--tint)]" aria-hidden="true" /><span><strong className="font-semibold text-foreground">Receipt downloads.</strong> Save or print a copy of each receipt.</span></li>
             <li className="flex items-start gap-3"><Wallet className="mt-0.5 size-4 shrink-0 text-[var(--tint)]" aria-hidden="true" /><span><strong className="font-semibold text-foreground">Bill details.</strong> See rent, electricity, water, and washing for your room per month.</span></li>
             <li className="flex items-start gap-3"><DoorOpen className="mt-0.5 size-4 shrink-0 text-[var(--tint)]" aria-hidden="true" /><span><strong className="font-semibold text-foreground">Room services.</strong> Request maintenance and manage your stay details.</span></li>
           </ul>

@@ -1,10 +1,95 @@
+import { useState } from 'react'
+import type { Receipt } from '@/domain/types/models'
 import { PageHeader } from '@/components/shared/page'
 import { EmptyState } from '@/components/shared/states'
+import { StatusBadge } from '@/components/shared/status-badge'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { usePrototype } from '@/hooks/use-prototype'
+import { useTenantDemo } from '@/app/providers/tenant-demo'
+import { formatDate, formatMoney } from '@/lib/format'
+import { receiptsForPeriod, selectTenantReceipts, type TenantReceiptView } from './tenant-receipts'
 
-/** Layout-phase placeholder; tenant receipt viewing arrives in a later phase. */
+const receiptStatusLabels: Record<Receipt['state'], string> = {
+  ISSUED: 'Issued',
+  VOIDED: 'Voided',
+  SUPERSEDED: 'Superseded',
+}
+
+function ReceiptCard({ view }: { view: TenantReceiptView }) {
+  const { receipt, payment, tenant, periods, rooms, categories, unallocatedCents, otherTenantNames } = view
+  const periodLabel = periods.map(period => period.label).join(' · ')
+  const ambiguousRoom = rooms.label === 'Multiple rooms / contexts' || rooms.label === 'Room needs review'
+
+  return <article aria-label={`Receipt ${receipt.receiptNumber}`}>
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <CardTitle className="text-base">{receipt.receiptNumber}</CardTitle>
+            <CardDescription>{periodLabel}</CardDescription>
+          </div>
+          <StatusBadge status={receiptStatusLabels[receipt.state]} />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <dl className="room-details-grid">
+          <div><dt>Payment date</dt><dd>{formatDate(payment.paidOn)}</dd></div>
+          <div><dt>Tenant</dt><dd>{tenant.name}</dd></div>
+          <div><dt>Room</dt><dd>{rooms.label}</dd></div>
+          <div><dt>Total recorded amount</dt><dd>{formatMoney(receipt.amountCents)}</dd></div>
+        </dl>
+        {ambiguousRoom && <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{rooms.note}</p>}
+        <fieldset className="mt-5 min-w-0">
+          <legend className="text-sm font-semibold">Bills included in this receipt</legend>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {categories.map(item => <div key={item.category} className="flex min-w-0 items-center gap-2 text-sm">
+              <label className="flex min-w-0 items-center gap-2">
+                <input type="checkbox" checked={item.included} disabled readOnly className="size-4 shrink-0 accent-[var(--tint)]" />
+                <span>{item.label}</span>
+              </label>
+              <span className="ml-auto text-right text-muted-foreground">{item.included ? formatMoney(item.amountCents) : 'Not included'}</span>
+            </div>)}
+          </div>
+          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">Read-only. An unchecked bill means this receipt did not include that category; it does not mean the bill is unpaid.</p>
+        </fieldset>
+        {unallocatedCents > 0 && <p role="note" className="mt-4 rounded-xl border border-dashed px-3 py-2 text-sm"><strong className="font-semibold">Unallocated advance:</strong> {formatMoney(unallocatedCents)} is held as credit and not tied to a bill.</p>}
+        {otherTenantNames.length > 0 && <p className="mt-3 text-xs text-muted-foreground">This receipt also covers charges recorded for {otherTenantNames.join(', ')}.</p>}
+      </CardContent>
+    </Card>
+  </article>
+}
+
+/** Tenant receipts come from the same recorded payments and receipts as the landlord workspace. */
 export default function TenantPayments() {
+  const { data } = usePrototype()
+  const { tenantId } = useTenantDemo()
+  const { receipts, unmatched } = selectTenantReceipts(data, tenantId)
+  const currentPeriod = data.billingPeriods.find(item => item.status === 'OPEN') ?? data.billingPeriods.at(-1)
+  const [periodId, setPeriodId] = useState(currentPeriod?.id ?? '')
+  const period = data.billingPeriods.find(item => item.id === periodId) ?? currentPeriod
+  const visible = period ? receiptsForPeriod(receipts, period.id) : []
+
   return <>
-    <PageHeader title="My Payments & Receipts" description="Recorded payments and receipts for your stay will appear here." />
-    <EmptyState title="Tenant receipts are coming soon" description="This phase builds the tenant workspace layout. Receipt viewing arrives in a later phase, while the landlord workspace continues to manage billing for now." />
+    <PageHeader title="My Payments & Receipts" description="Receipts issued for your recorded payments at Halili BH." />
+    {unmatched > 0 && <div role="alert" className="mb-6 max-w-3xl rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+      {unmatched} receipt {unmatched === 1 ? 'record could' : 'records could'} not be matched to a tenant because the payment link is missing. {unmatched === 1 ? 'It is' : 'They are'} not shown.
+    </div>}
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <label htmlFor="tenant-receipt-period" className="mb-2 block text-sm font-semibold">Billing month</label>
+        <select id="tenant-receipt-period" value={period?.id ?? ''} onChange={event => setPeriodId(event.target.value)} className="min-h-12 max-w-full rounded-lg border bg-card px-3">
+          {data.billingPeriods.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+        </select>
+      </div>
+      {period && <p role="status" className="text-sm text-muted-foreground">{visible.length} {visible.length === 1 ? 'receipt' : 'receipts'} for {period.label}.</p>}
+    </div>
+    {visible.length > 0
+      ? <section aria-label="Tenant receipts" className="grid gap-5 xl:grid-cols-2">{visible.map(view => <ReceiptCard key={view.receipt.id} view={view} />)}</section>
+      : <EmptyState
+        title={receipts.length === 0 ? 'No receipts yet' : `No receipts for ${period?.label ?? 'this billing month'}`}
+        description={receipts.length === 0
+          ? 'This demo tenant has no receipts in the sample records yet.'
+          : 'This tenant has receipts in other billing months. Choose a different month to view them.'}
+      />}
   </>
 }

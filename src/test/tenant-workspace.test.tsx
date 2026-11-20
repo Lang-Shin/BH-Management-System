@@ -56,11 +56,11 @@ describe('tenant workspace layout', () => {
     expect(within(roomNav).getByRole('link', { name: 'Overview' })).not.toHaveAttribute('aria-current')
   })
 
-  it('shows the payments placeholder without building tenant receipts yet', async () => {
+  it('opens My Payments & Receipts with its billing-month filter', async () => {
     renderTenantApp('/tenant/payments')
     expect(await screen.findByRole('heading', { level: 1, name: 'My Payments & Receipts' })).toBeInTheDocument()
-    expect(screen.getByText('Tenant receipts are coming soon')).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent(/Receipt viewing arrives in a later phase/)
+    expect(screen.getByLabelText('Billing month')).toHaveValue('period-nov')
+    expect(screen.getByRole('article', { name: 'Receipt DEMO-RCT-006' })).toBeInTheDocument()
   })
 
   it('shows the sample tenant room details without landlord controls', async () => {
