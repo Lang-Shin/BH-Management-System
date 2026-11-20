@@ -9,7 +9,9 @@ import Rooms from '@/features/rooms/rooms-page'
 import Billing from '@/features/billing/billing-page'
 import Payments from '@/features/payments/payments-page'
 import Reports from '@/features/reports/reports-page'
-import TenantHome from '@/features/tenant/tenant-home-page'
+import TenantOverview from '@/features/tenant/tenant-overview-page'
+import TenantPayments from '@/features/tenant/tenant-payments-page'
+import TenantRoom from '@/features/tenant/tenant-room-page'
 
 export function AppRouter() {
   return <Routes>
@@ -24,7 +26,9 @@ export function AppRouter() {
       <Route path="*" element={<NotFound />} />
     </Route>
     <Route path="tenant" element={<TenantShell />}>
-      <Route index element={<TenantHome />} />
+      <Route index element={<TenantOverview />} />
+      <Route path="payments" element={<TenantPayments />} />
+      <Route path="room" element={<TenantRoom />} />
       <Route path="*" element={<Navigate to="/tenant" replace />} />
     </Route>
   </Routes>

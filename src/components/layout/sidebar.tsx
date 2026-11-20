@@ -5,7 +5,7 @@ import type { LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
-export interface SidebarNavItem { to: string; label: string; icon: LucideIcon }
+export interface SidebarNavItem { to: string; label: string; icon: LucideIcon; end?: boolean }
 
 const TENANT_BASE = '/tenant'
 
@@ -41,7 +41,7 @@ export function SidebarContent({ navItems, onNavigate, onLogout }: { navItems: S
   return <div className="sidebar-surface flex h-full min-h-full flex-col px-3 py-5">
     <Brand />
     <p className="mt-8 mb-2 px-3 text-xs font-semibold text-muted-foreground">Workspace</p>
-    <nav aria-label="Main navigation" className="space-y-0.5">{navItems.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} onClick={onNavigate} className="sidebar-link flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-medium"><Icon className="size-[18px] shrink-0" aria-hidden="true" /><span>{label}</span></NavLink>)}</nav>
+    <nav aria-label="Main navigation" className="space-y-0.5">{navItems.map(({ to, label, icon: Icon, end }) => <NavLink key={to} to={to} end={end} onClick={onNavigate} className="sidebar-link flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-medium"><Icon className="size-[18px] shrink-0" aria-hidden="true" /><span>{label}</span></NavLink>)}</nav>
     <div className="mt-auto pt-12">
       <div className="space-y-0.5">
         <WorkspaceSwitchButton onNavigate={onNavigate} />

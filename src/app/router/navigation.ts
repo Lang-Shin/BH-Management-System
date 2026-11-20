@@ -1,4 +1,4 @@
-import { ChartNoAxesCombined, DoorOpen, Home, LayoutDashboard, ReceiptText, Users, Wallet } from 'lucide-react'
+import { ChartNoAxesCombined, DoorOpen, LayoutDashboard, ReceiptText, Users, Wallet } from 'lucide-react'
 
 export const navigation = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -11,5 +11,7 @@ export const navigation = [
 
 /** Tenant workspace navigation: deliberately separate from the admin screens. */
 export const tenantNavigation = [
-  { to: '/tenant', label: 'Tenant Workspace', icon: Home },
+  { to: '/tenant', label: 'Overview', icon: LayoutDashboard, end: true },
+  { to: '/tenant/payments', label: 'My Payments & Receipts', icon: Wallet },
+  { to: '/tenant/room', label: 'My Room', icon: DoorOpen },
 ]
