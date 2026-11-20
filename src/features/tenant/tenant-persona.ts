@@ -9,11 +9,14 @@ export interface TenantPersona {
 }
 
 /**
- * Sample tenant persona for the prototype tenant workspace. There is no sign-in in this phase;
- * the workspace previews the first active tenant's existing fictional records only.
+ * Resolves the selected demo tenant against the shared repository snapshot. Payments remain scoped
+ * by tenant ID elsewhere; a shared room never decides payment ownership. When no tenant is chosen,
+ * the first active tenant is used as the deterministic sample default.
  */
-export function selectTenantPersona(data: PrototypeAppState): TenantPersona | null {
-  const tenant = data.tenants.find(item => item.status === 'ACTIVE')
+export function selectTenantPersona(data: PrototypeAppState, tenantId?: string): TenantPersona | null {
+  const tenant = tenantId
+    ? data.tenants.find(item => item.id === tenantId) ?? null
+    : data.tenants.find(item => item.status === 'ACTIVE') ?? null
   if (!tenant) return null
   const assignment = activeAssignments(data, DEMO_DATE).filter(item => item.tenantId === tenant.id).at(0) ?? null
   const room = assignment ? data.rooms.find(item => item.id === assignment.roomId) ?? null : null

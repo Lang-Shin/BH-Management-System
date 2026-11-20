@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AdminShell } from '@/components/layout/admin-shell'
 import { TenantShell } from '@/components/layout/tenant-shell'
+import { TenantDemoProvider } from '@/app/providers/tenant-demo'
 import { NotFound } from './not-found'
 
 import Dashboard from '@/features/dashboard/dashboard-page'
@@ -25,7 +26,7 @@ export function AppRouter() {
       <Route path="reports" element={<Reports />} />
       <Route path="*" element={<NotFound />} />
     </Route>
-    <Route path="tenant" element={<TenantShell />}>
+    <Route path="tenant" element={<TenantDemoProvider><TenantShell /></TenantDemoProvider>}>
       <Route index element={<TenantOverview />} />
       <Route path="payments" element={<TenantPayments />} />
       <Route path="room" element={<TenantRoom />} />

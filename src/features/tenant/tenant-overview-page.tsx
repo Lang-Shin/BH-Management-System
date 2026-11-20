@@ -7,6 +7,7 @@ import { StatusBadge } from '@/components/shared/status-badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { usePrototype } from '@/hooks/use-prototype'
+import { useTenantDemo } from '@/app/providers/tenant-demo'
 import { tenantAccount } from '@/domain/calculations/summary'
 import { DEMO_DATE } from '@/data/fixtures/demo'
 import { formatDate, formatMoney, formatMonthYear } from '@/lib/format'
@@ -14,7 +15,8 @@ import { selectTenantPersona } from './tenant-persona'
 
 export default function TenantOverview() {
   const { data } = usePrototype()
-  const persona = selectTenantPersona(data)
+  const { tenantId } = useTenantDemo()
+  const persona = selectTenantPersona(data, tenantId)
   const period = data.billingPeriods.find(item => item.status === 'OPEN') ?? data.billingPeriods.at(-1)
   const monthLabel = period ? formatMonthYear(period.startDate) : 'Not available'
   const account = persona ? tenantAccount(data, persona.tenant.id, DEMO_DATE) : null
@@ -32,6 +34,7 @@ export default function TenantOverview() {
   return <>
     <PageHeader title="Overview" description={`${monthLabel} · Your stay at Halili BH at a glance.`} />
     <PreviewNotice>This tenant workspace previews one fictional tenant’s existing records. Tenant sign-in is not part of this phase.</PreviewNotice>
+    {persona.tenant.status === 'MOVED_OUT' && <p className="mb-6 max-w-3xl text-sm leading-relaxed text-muted-foreground">This sample tenant has moved out. The payments and tenancy details below are retained historical records.</p>}
     <section aria-label="Tenant summary" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <StatCard label="Tenant" value={persona.tenant.name} detail="Sample tenant record for this preview." icon={User} />
       <StatCard label="Room" value={persona.room ? `Room ${persona.room.name}` : 'Not assigned'} detail={persona.room ? `Floor ${persona.room.floor} · staying since ${formatDate(persona.assignment!.startDate)}.` : persona.assignment ? `Staying since ${formatDate(persona.assignment.startDate)}.` : 'No active room assignment.'} icon={DoorOpen} />

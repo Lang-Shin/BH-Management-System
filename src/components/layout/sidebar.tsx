@@ -1,4 +1,4 @@
-import type { MouseEvent, RefObject } from 'react'
+import type { MouseEvent, ReactNode, RefObject } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeftRight, Building2, LogOut } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -37,9 +37,10 @@ function Brand() {
   return <div className="flex items-center gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-[12px] bg-tomato shadow-[inset_0_1px_0_#ffffff40]"><Building2 className="size-5" aria-hidden="true" /></div><div className="min-w-0"><p className="brand-name text-2xl tracking-tight">Halili BH</p><p className="brand-acronym text-[1rem] tracking-widest text-muted-foreground">BHMS</p></div></div>
 }
 
-export function SidebarContent({ navItems, onNavigate, onLogout }: { navItems: SidebarNavItem[]; onNavigate?: () => void; onLogout: (event: MouseEvent<HTMLButtonElement>) => void }) {
+export function SidebarContent({ navItems, onNavigate, onLogout, topContent }: { navItems: SidebarNavItem[]; onNavigate?: () => void; onLogout: (event: MouseEvent<HTMLButtonElement>) => void; topContent?: ReactNode }) {
   return <div className="sidebar-surface flex h-full min-h-full flex-col px-3 py-5">
     <Brand />
+    {topContent}
     <p className="mt-8 mb-2 px-3 text-xs font-semibold text-muted-foreground">Workspace</p>
     <nav aria-label="Main navigation" className="space-y-0.5">{navItems.map(({ to, label, icon: Icon, end }) => <NavLink key={to} to={to} end={end} onClick={onNavigate} className="sidebar-link flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-medium"><Icon className="size-[18px] shrink-0" aria-hidden="true" /><span>{label}</span></NavLink>)}</nav>
     <div className="mt-auto pt-12">

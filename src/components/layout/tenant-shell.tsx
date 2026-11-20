@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { useAppearance } from '@/app/providers/appearance'
 import { AnimatedPageTitle } from '@/components/shared/animated-page-title'
 import { tenantNavigation } from '@/app/router/navigation'
+import { DemoTenantSelector } from '@/features/tenant/demo-tenant-selector'
 import { LogoutDialog, SidebarContent } from './sidebar'
 
 /** Minimal tenant workspace shell: same layout language as the admin shell, but only tenant routes. */
@@ -32,11 +33,11 @@ export function TenantShell() {
 
   return <div className="min-h-dvh">
     <a href="#main-content" className="sr-only fixed top-3 left-3 z-50 rounded-md bg-primary p-3 text-white focus:not-sr-only">Skip to content</a>
-    <aside className="shell-sidebar fixed inset-y-3 left-3 z-30 hidden w-60 overflow-y-auto lg:block"><SidebarContent navItems={tenantNavigation} onLogout={openLogout} /></aside>
+    <aside className="shell-sidebar fixed inset-y-3 left-3 z-30 hidden w-60 overflow-y-auto lg:block"><SidebarContent navItems={tenantNavigation} topContent={<DemoTenantSelector />} onLogout={openLogout} /></aside>
     <div className="min-w-0 lg:pl-[16.5rem]">
       <header className="workspace-glass-header sticky top-2 z-20 mx-2 mt-2 flex min-h-16 items-center justify-between gap-3 rounded-[22px] px-3 sm:mx-4 sm:px-5 lg:top-3 lg:mt-3">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <Sheet open={menuOpen} onOpenChange={setMenuOpen}><SheetTrigger asChild><Button variant="outline" size="icon" className="lg:hidden" aria-label="Open menu"><Menu /></Button></SheetTrigger><SheetContent side="left" className="sidebar-surface inset-y-2 left-2 h-auto w-72 max-w-[calc(100vw-1rem)] gap-0 overflow-y-auto rounded-[26px] p-0"><SheetHeader className="sr-only"><SheetTitle>Main menu</SheetTitle><SheetDescription>Choose Overview, My Payments &amp; Receipts, or My Room.</SheetDescription></SheetHeader><SidebarContent navItems={tenantNavigation} onNavigate={() => setMenuOpen(false)} onLogout={event => { logoutTrigger.current = event.currentTarget; setMenuOpen(false); setLogoutOpen(true) }} /></SheetContent></Sheet>
+          <Sheet open={menuOpen} onOpenChange={setMenuOpen}><SheetTrigger asChild><Button variant="outline" size="icon" className="lg:hidden" aria-label="Open menu"><Menu /></Button></SheetTrigger><SheetContent side="left" className="sidebar-surface inset-y-2 left-2 h-auto w-72 max-w-[calc(100vw-1rem)] gap-0 overflow-y-auto rounded-[26px] p-0"><SheetHeader className="sr-only"><SheetTitle>Main menu</SheetTitle><SheetDescription>Choose Overview, My Payments &amp; Receipts, or My Room.</SheetDescription></SheetHeader><SidebarContent navItems={tenantNavigation} topContent={<DemoTenantSelector />} onNavigate={() => setMenuOpen(false)} onLogout={event => { logoutTrigger.current = event.currentTarget; setMenuOpen(false); setLogoutOpen(true) }} /></SheetContent></Sheet>
           <div className="min-w-0"><p className="brand-name text-[1rem] text-muted-foreground lg:hidden">Halili BH</p><AnimatedPageTitle key={location.pathname} text={active?.label ?? 'Tenant Workspace'} /></div>
         </div>
         <div className="flex items-center gap-1">
