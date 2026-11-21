@@ -7,6 +7,8 @@ export interface PrototypeContextValue {
   dispatch: (action: PrototypeAction) => void
   /** Saves an already-validated next snapshot through the shared write queue before success is shown. */
   persistSnapshot: (snapshot: PrototypeData) => Promise<string | null>
+  /** Persists and installs the canonical sample dataset as one replace operation. */
+  resetToSample: () => Promise<string | null>
   storageWarning: string | null
 }
 

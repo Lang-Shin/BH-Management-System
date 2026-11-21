@@ -72,6 +72,31 @@ export function PrototypeProvider({ children, repository }: { children: ReactNod
     return operation
   }, [canPersist, repository])
 
+  const resetToSample = useCallback((): Promise<string | null> => {
+    const snapshot = createDemoData()
+    const json = JSON.stringify(snapshot)
+    const operation = saveQueue.current.then(async () => {
+      try {
+        const warning = await repository.save(snapshot)
+        if (warning) {
+          setStorageWarning(warning)
+          return warning
+        }
+        // Only replace in-memory state after the canonical dataset is durable.
+        lastSavedJson.current = json
+        setStorageWarning(null)
+        setCanPersist(true)
+        reduce({ type: 'data/loaded', data: snapshot })
+        return null
+      } catch {
+        setStorageWarning(SAVE_FAILURE)
+        return SAVE_FAILURE
+      }
+    })
+    saveQueue.current = operation.then(() => undefined)
+    return operation
+  }, [repository])
+
   function dispatch(action: PrototypeAction) {
     if (action.type === 'demo/reset') setCanPersist(true)
     reduce(action)
@@ -79,5 +104,5 @@ export function PrototypeProvider({ children, repository }: { children: ReactNod
 
   if (loadFailed) return <div className="p-6"><ErrorState title="Your records could not be opened" onRetry={() => window.location.reload()} /></div>
   if (!ready) return <div className="p-6"><LoadingState /></div>
-  return <PrototypeContext.Provider value={{ data, dispatch, persistSnapshot, storageWarning }}>{children}</PrototypeContext.Provider>
+  return <PrototypeContext.Provider value={{ data, dispatch, persistSnapshot, resetToSample, storageWarning }}>{children}</PrototypeContext.Provider>
 }
