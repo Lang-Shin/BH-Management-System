@@ -21,7 +21,7 @@ export function EditPaymentDialog({ paymentId, onClose, onReturnFocus, onSaved }
   onReturnFocus: () => void
   onSaved: (message: string) => void
 }) {
-  const { data, dispatch } = usePrototype()
+  const { data, dispatch, persistSnapshot } = usePrototype()
   const payment = data.payments.find(item => item.id === paymentId)
   const receipt = payment ? latestPaymentReceipt(data, payment.id) : null
   const originalCategories = payment ? [...new Set(data.paymentAllocations
@@ -42,6 +42,7 @@ export function EditPaymentDialog({ paymentId, onClose, onReturnFocus, onSaved }
   const [settlement, setSettlement] = useState<CorrectionSettlementStatus | ''>('')
   const [settlementConfirmed, setSettlementConfirmed] = useState(false)
   const [step, setStep] = useState<'edit' | 'review' | 'success'>('edit')
+  const [saving, setSaving] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [saved, setSaved] = useState<{ receiptNumber: string; amountCents: number; settlement: string; settlementAmountCents: number } | null>(null)
   const { open, requestClose, onOpenChange, onAnimationEnd } = useAnimatedDialogClose(onClose)
@@ -108,14 +109,22 @@ export function EditPaymentDialog({ paymentId, onClose, onReturnFocus, onSaved }
     setSubmitError('')
   }
 
-  function confirm() {
-    if (!settlementReady) return
+  async function confirm() {
+    if (!settlementReady || saving) return
     const result = preparePaymentCorrection(data, {
       paymentId, selectedCategories: selected, correctedElectricityReadingMilliKwh: selectedElectricity ? parsedReading : null,
       reason, settlementStatus: settlement, moneyExchangeConfirmed: settlementConfirmed, correctedAt: DEMO_DATE,
     })
     if (!result.ok) {
       setSubmitError('The correction could not be saved because the transaction changed or is no longer safe to correct.')
+      return
+    }
+    setSaving(true)
+    setSubmitError('')
+    const warning = await persistSnapshot(result.data)
+    setSaving(false)
+    if (warning) {
+      setSubmitError(`The correction was not saved. ${warning}`)
       return
     }
     dispatch({
@@ -233,7 +242,7 @@ export function EditPaymentDialog({ paymentId, onClose, onReturnFocus, onSaved }
 
         <p className="mt-2 text-sm"><span className="text-muted-foreground">Reason:</span> {reason}</p>
         {submitError && <p role="alert" className="mt-3 text-sm text-destructive">{submitError}</p>}
-        <div className="mt-5 flex gap-3"><Button variant="outline" onClick={() => setStep('edit')}><ArrowLeft aria-hidden="true" />Back</Button><Button className="flex-1" onClick={confirm} disabled={!settlementReady}>Confirm correction</Button></div>
+        <div className="mt-5 flex gap-3"><Button variant="outline" onClick={() => setStep('edit')}><ArrowLeft aria-hidden="true" />Back</Button><Button className="flex-1" onClick={confirm} disabled={!settlementReady || saving}>{saving ? 'Saving correction…' : 'Confirm correction'}</Button></div>
       </div>}
     </DialogContent>
   </Dialog>

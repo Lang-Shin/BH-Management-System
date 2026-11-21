@@ -35,9 +35,10 @@ export function ElectricityPaymentDialog({ obligationId, onClose, onReturnFocus,
   onReturnFocus: () => void
   onConfirmed: (receiptNumber: string) => void
 }) {
-  const { data, dispatch } = usePrototype()
+  const { data, dispatch, persistSnapshot } = usePrototype()
   const [reading, setReading] = useState('')
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
   const { open, requestClose, onOpenChange, onAnimationEnd } = useAnimatedDialogClose(onClose)
   const obligation = data.electricityBillObligations.find(item => item.id === obligationId)
   const room = data.rooms.find(item => item.id === obligation?.roomId)
@@ -56,11 +57,19 @@ export function ElectricityPaymentDialog({ obligationId, onClose, onReturnFocus,
         : null
   const canConfirm = Boolean(calculation?.ok)
 
-  function confirm() {
-    if (!obligation || parsed === null) return
+  async function confirm() {
+    if (!obligation || parsed === null || saving) return
     const result = prepareElectricityPayment(data, obligation.id, parsed, DEMO_DATE)
     if (!result.ok) {
       setSubmitError(reasonMessage(result.reason, previous?.readingMilliKwh ?? 0))
+      return
+    }
+    setSaving(true)
+    setSubmitError(null)
+    const warning = await persistSnapshot(result.data)
+    setSaving(false)
+    if (warning) {
+      setSubmitError(`Payment was not saved. ${warning}`)
       return
     }
     dispatch({ type: 'electricity/paymentConfirmed', obligationId: obligation.id, currentReadingMilliKwh: parsed, paidOn: DEMO_DATE })
@@ -95,7 +104,7 @@ export function ElectricityPaymentDialog({ obligationId, onClose, onReturnFocus,
         </section>}
         {submitError && <p role="alert" className="text-sm text-destructive">{submitError}</p>}
       </>}
-      <DialogFooter className="flex-col-reverse gap-2 sm:flex-row"><Button variant="outline" onClick={requestClose}>Cancel</Button><Button disabled={!canConfirm} onClick={confirm}>Confirm payment received</Button></DialogFooter>
+      <DialogFooter className="flex-col-reverse gap-2 sm:flex-row"><Button variant="outline" onClick={requestClose}>Cancel</Button><Button disabled={!canConfirm || saving} onClick={confirm}>{saving ? 'Saving payment…' : 'Confirm payment received'}</Button></DialogFooter>
     </DialogContent>
   </Dialog>
 }

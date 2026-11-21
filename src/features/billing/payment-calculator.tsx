@@ -27,7 +27,7 @@ function electricityError(code: string | undefined) {
 }
 
 export function PaymentCalculator({ periodId, periodLabel }: { periodId: string; periodLabel: string }) {
-  const { data, dispatch } = usePrototype()
+  const { data, dispatch, persistSnapshot } = usePrototype()
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState<'calculator' | 'confirm' | 'success'>('calculator')
   const [roomId, setRoomId] = useState('')
@@ -35,6 +35,7 @@ export function PaymentCalculator({ periodId, periodLabel }: { periodId: string;
   const [reading, setReading] = useState('')
   const [preview, setPreview] = useState<Extract<RoomPaymentResult, { ok: true }> | null>(null)
   const [submitError, setSubmitError] = useState('')
+  const [saving, setSaving] = useState(false)
   const roomIds = new Set(selectRoomFinance(data, DEMO_DATE, periodId).map(row => row.context.roomId).filter((id): id is string => Boolean(id)))
   const rooms = data.rooms.filter(room => roomIds.has(room.id))
   const parsedReading = reading === '' ? null : parseMeterReadingMilliKwh(reading)
@@ -52,6 +53,7 @@ export function PaymentCalculator({ periodId, periodLabel }: { periodId: string;
     setReading('')
     setPreview(null)
     setSubmitError('')
+    setSaving(false)
   }
 
   function changeOpen(next: boolean) {
@@ -84,11 +86,19 @@ export function PaymentCalculator({ periodId, periodLabel }: { periodId: string;
     setStep('confirm')
   }
 
-  function confirm() {
-    if (!roomId) return
+  async function confirm() {
+    if (!roomId || saving) return
     const result = prepareRoomPayment(data, { roomId, periodId, selected, electricityReadingMilliKwh: parsedReading, asOf: DEMO_DATE })
     if (!result.ok) {
       setSubmitError('This payment could not be recorded because the underlying bills changed. Cancelling has not advanced the meter.')
+      return
+    }
+    setSaving(true)
+    setSubmitError('')
+    const warning = await persistSnapshot(result.data)
+    setSaving(false)
+    if (warning) {
+      setSubmitError(`Payment was not saved. ${warning}`)
       return
     }
     dispatch({ type: 'room/paymentConfirmed', roomId, periodId, selected, electricityReadingMilliKwh: parsedReading, asOf: DEMO_DATE })
@@ -169,7 +179,7 @@ export function PaymentCalculator({ periodId, periodLabel }: { periodId: string;
         </dl>
         {preview.payments.length > 1 && <p className="text-sm text-muted-foreground">This room’s bills belong to {preview.payments.length} tenants, so confirmation records {preview.payments.length} separate tenant payments and receipts.</p>}
         {submitError && <p role="alert" className="text-sm text-destructive">{submitError}</p>}
-        <div className="mt-5 flex gap-3"><Button variant="outline" onClick={() => { setStep('calculator'); setSubmitError('') }}><ArrowLeft aria-hidden="true" />Back</Button><Button className="flex-1" onClick={confirm}>Confirm payment received</Button></div>
+        <div className="mt-5 flex gap-3"><Button variant="outline" onClick={() => { setStep('calculator'); setSubmitError('') }}><ArrowLeft aria-hidden="true" />Back</Button><Button className="flex-1" onClick={confirm} disabled={saving}>{saving ? 'Saving payment…' : 'Confirm payment received'}</Button></div>
       </div>}
 
       {step === 'success' && preview?.ok && <div className="payment-success">
