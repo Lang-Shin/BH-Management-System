@@ -7,7 +7,7 @@ import type { Payment, PrototypeAppState } from '@/domain/types/models'
 import { correctionSettlementText, isLegacyPendingCorrection } from '@/domain/calculations/payment-correction'
 import { paymentRooms } from '@/domain/calculations/room-finance'
 import { formatDate, formatMoney } from '@/lib/format'
-import { CATEGORY_LABELS } from '@/lib/labels'
+import { TransactionPaidLines } from './transaction-paid-lines'
 
 export function TransactionDialog({ data, payment, asOf, onClose, onReturnFocus, onEditPayment, title = 'Transaction Details', description = 'Payment information for the selected room.' }: {
   data: PrototypeAppState
@@ -33,7 +33,6 @@ export function TransactionDialog({ data, payment, asOf, onClose, onReturnFocus,
           : allocatedCents !== payment.amountCents ? 'This transaction includes unallocated money, so it cannot be corrected safely from this dialog.'
             : data.paymentCorrections.some(item => item.originalPaymentId === payment.id) ? 'This transaction has already been corrected.'
               : null
-  const allocationsSpanMultipleRooms = new Set(context.allocations.map(allocation => allocation.context.id)).size > 1
   const { open, requestClose, onOpenChange, onAnimationEnd } = useAnimatedDialogClose(onClose)
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
@@ -71,18 +70,7 @@ export function TransactionDialog({ data, payment, asOf, onClose, onReturnFocus,
 
       <section aria-labelledby="transaction-paid-title">
         <h2 id="transaction-paid-title" className="mb-3 font-semibold">What Was Paid</h2>
-        {context.allocations.length > 0 && <ul className="transaction-lines">{context.allocations.map(allocation => {
-          const charge = data.charges.find(item => item.id === allocation.chargeId)
-          return <li key={allocation.id}>
-            <div className="min-w-0"><p className="font-semibold">{charge ? CATEGORY_LABELS[charge.category] : 'Bill'}</p>{allocationsSpanMultipleRooms && <p className="mt-0.5 break-words text-xs text-muted-foreground">{allocation.context.label}</p>}{charge?.category === 'ELECTRICITY' && <p className="mt-1 text-xs text-muted-foreground">{charge.electricity.previousReadingMilliKwh / 1000} → {charge.electricity.currentReadingMilliKwh / 1000} kWh · {charge.electricity.consumptionMilliKwh / 1000} kWh × {formatMoney(charge.electricity.appliedRateCentsPerKwh)}/kWh</p>}</div>
-            <span className="shrink-0 font-semibold tabular-nums">{formatMoney(allocation.amountCents)}</span>
-          </li>
-        })}</ul>}
-        {context.unallocated > 0 && <div className="transaction-unallocated">
-          <div className="min-w-0"><p className="font-semibold">{context.allocations.length === 0 && advance ? 'Advance payment — Unallocated' : 'Unallocated amount'}</p><p className="mt-1 text-sm text-muted-foreground">This money is being held for future billing and is not yet applied to an issued bill.</p></div>
-          <span className="shrink-0 font-semibold tabular-nums">{formatMoney(context.unallocated)}</span>
-        </div>}
-        {context.allocations.length === 0 && context.unallocated === 0 && <p className="rounded-xl border bg-muted/40 p-4 text-sm text-muted-foreground">No bill categories were allocated to this payment.</p>}
+        <TransactionPaidLines data={data} context={context} advance={advance} />
       </section>
 
       <p className="break-all text-xs text-muted-foreground">Payment ID: {payment.id}</p>

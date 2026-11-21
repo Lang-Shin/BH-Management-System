@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/shared/page'
 import { EmptyState } from '@/components/shared/states'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { Badge } from '@/components/ui/badge'
+import { TransactionPaidLines } from '@/components/shared/transaction-paid-lines'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { usePrototype } from '@/hooks/use-prototype'
 import { useTenantDemo } from '@/app/providers/tenant-demo'
@@ -18,7 +19,8 @@ const receiptStatusLabels: Record<Receipt['state'], string> = {
 }
 
 function ReceiptCard({ view, historical = false }: { view: TenantReceiptView; historical?: boolean }) {
-  const { receipt, payment, tenant, periods, rooms, categories, unallocatedCents, otherTenantNames } = view
+  const { data } = usePrototype()
+  const { receipt, payment, tenant, periods, rooms } = view
   const periodLabel = periods.map(period => period.label).join(' · ')
   const ambiguousRoom = rooms.label === 'Multiple rooms / contexts' || rooms.label === 'Room needs review'
   const revised = receipt.revision > 1
@@ -39,32 +41,26 @@ function ReceiptCard({ view, historical = false }: { view: TenantReceiptView; hi
         </div>
       </CardHeader>
       <CardContent>
-        <dl className="room-details-grid">
-          <div><dt>Payment date</dt><dd>{formatDate(payment.paidOn)}</dd></div>
-          <div><dt>Tenant</dt><dd>{tenant.name}</dd></div>
-          <div><dt>Room</dt><dd>{rooms.label}</dd></div>
-          <div><dt>Total recorded amount</dt><dd>{formatMoney(receipt.amountCents)}</dd></div>
-        </dl>
+        <section className="transaction-summary" aria-label="Receipt payment summary">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Room</p>
+          <p className="mt-1 break-words text-2xl font-bold">{rooms.label}</p>
+          <dl className="transaction-metadata mt-4 grid grid-cols-2 gap-3 text-sm">
+            <div><dt className="text-muted-foreground">Date paid</dt><dd className="mt-1 font-semibold">{formatDate(payment.paidOn)}</dd></div>
+            <div><dt className="text-muted-foreground">Receipt number</dt><dd className="mt-1 break-all font-semibold">{receipt.receiptNumber}</dd></div>
+            <div className="transaction-amount-section"><dt className="text-muted-foreground">Amount paid</dt><dd className="transaction-dialog-amount">{formatMoney(receipt.amountCents)}</dd></div>
+          </dl>
+        </section>
+        <p className="mt-4 text-sm"><span className="text-muted-foreground">Paid by:</span> <strong className="font-semibold">{tenant.name}</strong></p>
         {ambiguousRoom && <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{rooms.note}</p>}
         <p className="mt-2 text-xs text-muted-foreground">
           Revision {receipt.revision}
           {view.supersedesReceipt ? ` · Supersedes ${view.supersedesReceipt.receiptNumber} (revision ${view.supersedesReceipt.revision})` : ''}
         </p>
-        <fieldset className="mt-5 min-w-0">
-          <legend className="text-sm font-semibold">Bills included in this receipt</legend>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            {categories.map(item => <div key={item.category} className="flex min-w-0 items-center gap-2 text-sm">
-              <label className="flex min-w-0 items-center gap-2">
-                <input type="checkbox" checked={item.included} disabled readOnly className="size-4 shrink-0 accent-[var(--tint)]" />
-                <span>{item.label}</span>
-              </label>
-              <span className="ml-auto text-right text-muted-foreground">{item.included ? formatMoney(item.amountCents) : 'Not included'}</span>
-            </div>)}
-          </div>
-          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">Read-only. An unchecked bill means this receipt did not include that category; it does not mean the bill is unpaid.</p>
-        </fieldset>
-        {unallocatedCents > 0 && <p role="note" className="mt-4 rounded-xl border border-dashed px-3 py-2 text-sm"><strong className="font-semibold">Unallocated advance:</strong> {formatMoney(unallocatedCents)} is held as credit and not tied to a bill.</p>}
-        {otherTenantNames.length > 0 && <p className="mt-3 text-xs text-muted-foreground">This receipt also covers charges recorded for {otherTenantNames.join(', ')}.</p>}
+        <section aria-label="What Was Paid" className="mt-5 min-w-0">
+          <h3 className="mb-3 font-semibold">What Was Paid</h3>
+          <TransactionPaidLines data={data} context={rooms} advance={data.tenantCredits.some(item => item.sourcePaymentId === payment.id)} />
+          <p className="mt-3 text-xs text-muted-foreground">Read-only receipt. Only allocations included in this transaction are shown. Other bills may be settled by separate transactions.</p>
+        </section>
         {corrected && <div role="note" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
           <p><strong className="font-semibold">Corrected {formatDate(corrected.correctedAt)}.</strong> {corrected.reason}</p>
           <p className="mt-1">{correctionSettlementText(corrected)}</p>
