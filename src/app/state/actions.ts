@@ -1,4 +1,4 @@
-import type { ChargeCategory, CorrectionSettlementStatus, PrototypeData } from '@/domain/types/models'
+import type { ChargeCategory, CorrectionSettlementStatus, DepositDisposition, PrototypeData } from '@/domain/types/models'
 import type { RatePlan } from '@/domain/calculations/billing-rates'
 import type { RoomDraft } from '@/domain/calculations/room-management'
 import type { TenantDraft } from '@/domain/calculations/tenant-management'
@@ -19,7 +19,7 @@ export type PrototypeAction =
   | { type: 'room/paymentConfirmed'; roomId: string; periodId: string; selected: ChargeCategory[]; electricityReadingMilliKwh: number | null; asOf: string }
   | { type: 'payment/corrected'; paymentId: string; selectedCategories: ChargeCategory[]; correctedElectricityReadingMilliKwh: number | null; reason: string; settlementStatus: CorrectionSettlementStatus | ''; moneyExchangeConfirmed: boolean; correctedAt: string }
   | { type: 'moveIn/paymentRecorded'; obligationId: string; payerTenantId: string; advanceCents: number; depositCents: number; paidOn: string; method: 'cash' | 'bank-transfer' }
-  | { type: 'moveIn/policyUpdated'; advanceApplication: 'FIRST_MONTH' | 'LAST_MONTH' | 'MANUAL' }
+  | { type: 'moveIn/policyUpdated'; advanceApplication?: 'FIRST_MONTH' | 'LAST_MONTH' | 'MANUAL'; depositDisposition?: DepositDisposition }
   | { type: 'demo/reset' }
 
 export type StateAction = PrototypeAction | { type: 'data/loaded'; data: PrototypeData }

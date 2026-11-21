@@ -59,6 +59,11 @@ function ReceiptCard({ view, historical = false }: { view: TenantReceiptView; hi
         <section aria-label="What Was Paid" className="mt-5 min-w-0">
           <h3 className="mb-3 font-semibold">What Was Paid</h3>
           <TransactionPaidLines data={data} context={rooms} advance={data.tenantCredits.some(item => item.sourcePaymentId === payment.id)} />
+          {view.depositDisposition && <p role="note" className="mt-3 text-xs leading-relaxed text-muted-foreground">
+            {view.depositDisposition === 'NON_REFUNDABLE'
+              ? 'Security deposit is non-refundable under the recorded policy. It remains separate from rent and is not recognized as rental income.'
+              : 'Security deposit requires manual review before any refund or deduction. It remains separate from rent.'}
+          </p>}
           <p className="mt-3 text-xs text-muted-foreground">Read-only receipt. Only allocations included in this transaction are shown. Other bills may be settled by separate transactions.</p>
         </section>
         {corrected && <div role="note" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">

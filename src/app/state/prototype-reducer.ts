@@ -95,18 +95,23 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
     }
     case 'moveIn/policyUpdated': {
       const current = activeMoveInPolicy(state)
+      const next = {
+        ...current,
+        version: current.version + 1,
+        advanceApplication: action.advanceApplication ?? current.advanceApplication,
+        depositDisposition: action.depositDisposition ?? current.depositDisposition,
+      }
+      const change = action.depositDisposition
+        ? `Deposit terms set to ${action.depositDisposition === 'NON_REFUNDABLE' ? 'non-refundable' : 'refundable with manual review'}.`
+        : `Advance application policy set to ${next.advanceApplication}.`
       return {
         ...state,
-        moveInPolicy: {
-          ...current,
-          version: current.version + 1,
-          advanceApplication: action.advanceApplication,
-        },
+        moveInPolicy: next,
         auditEvents: [...state.auditEvents, {
-          id: `audit-move-in-policy-${current.version + 1}`, actorId: 'demo-admin', occurredOn: DEMO_DATE,
+          id: `audit-move-in-policy-${next.version}`, actorId: 'demo-admin', occurredOn: DEMO_DATE,
           action: 'MOVE_IN_POLICY_UPDATED' as const, entityType: 'PROTOTYPE' as const, entityId: 'move-in-policy',
-          reason: `Advance application policy set to ${action.advanceApplication}.`,
-          beforeSnapshot: JSON.stringify(current), afterSnapshot: JSON.stringify({ ...current, version: current.version + 1, advanceApplication: action.advanceApplication }),
+          reason: change,
+          beforeSnapshot: JSON.stringify(current), afterSnapshot: JSON.stringify(next),
         }],
       }
     }

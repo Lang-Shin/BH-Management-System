@@ -120,7 +120,7 @@ describe('restore sample records', () => {
     expect(stored.receipts.some((receipt: { receiptNumber: string }) => receipt.receiptNumber === 'DEMO-RCT-015-R2')).toBe(false)
     expect(stored.paymentCorrections).toHaveLength(0)
     expect(localStorage.getItem(TENANT_DEMO_STORAGE_KEY)).toBeNull()
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).version).toBe(10)
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).version).toBe(11)
 
     refreshed.unmount()
     renderApp('/rooms')

@@ -1,4 +1,4 @@
-import type { BillingPeriod, ChargeCategory, Payment, PaymentCorrection, PrototypeAppState, Receipt, Tenant } from '@/domain/types/models'
+import type { BillingPeriod, ChargeCategory, DepositDisposition, Payment, PaymentCorrection, PrototypeAppState, Receipt, Tenant } from '@/domain/types/models'
 import { paymentRooms, type PaymentRoomPresentation } from '@/domain/calculations/room-finance'
 
 export const RECEIPT_CATEGORIES: { category: ChargeCategory; label: string }[] = [
@@ -26,6 +26,7 @@ export interface TenantReceiptView {
   categories: ReceiptCategoryLine[]
   unallocatedCents: number
   otherTenantNames: string[]
+  depositDisposition: DepositDisposition | null
   /** ISSUED receipts are effective; superseded/voided receipts are retained history only. */
   effective: boolean
   correction: PaymentCorrection | null
@@ -63,6 +64,10 @@ export function selectTenantReceipts(data: PrototypeAppState, tenantId: string):
       return { category, label, included: matching.length > 0, amountCents: matching.reduce((sum, item) => sum + item.amountCents, 0) }
     })
     const periodIds = [...new Set(allocations.map(item => chargesById.get(item.chargeId)?.billingPeriodId).filter((id): id is string => Boolean(id)))]
+    const depositCharge = allocations.map(item => chargesById.get(item.chargeId)).find(charge => charge?.category === 'SECURITY_DEPOSIT')
+    const depositDisposition = depositCharge?.category === 'SECURITY_DEPOSIT'
+      ? data.moveInObligations.find(obligation => obligation.id === depositCharge.moveInObligationId)?.depositDisposition ?? null
+      : null
     const allocatedPeriods = periodIds
       .map(id => periodsById.get(id))
       .filter((period): period is BillingPeriod => Boolean(period))
@@ -87,7 +92,7 @@ export function selectTenantReceipts(data: PrototypeAppState, tenantId: string):
       : null
 
     receipts.push({
-      receipt, payment, tenant, periods, rooms, categories, unallocatedCents: rooms.unallocated, otherTenantNames,
+      receipt, payment, tenant, periods, rooms, categories, unallocatedCents: rooms.unallocated, otherTenantNames, depositDisposition,
       effective: receipt.state === 'ISSUED', correction, supersedesReceipt, supersededBy,
     })
   }

@@ -35,6 +35,7 @@ describe('move-in advance and security deposit UI', () => {
 
     const section = await screen.findByRole('region', { name: 'Move-in advance & security deposit' })
     expect(within(section).getByText('Room 01')).toBeInTheDocument()
+    expect(within(section).getAllByText(/Non-refundable/).length).toBeGreaterThan(0)
     await user.click(within(section).getByRole('button', { name: 'Record move-in payment for room 01' }))
     const dialog = await screen.findByRole('dialog', { name: 'Record a move-in payment.' })
     expect(within(dialog).getByLabelText(/^Advance/)).toHaveValue('4000.00')
@@ -88,6 +89,38 @@ describe('move-in advance and security deposit UI', () => {
     const section = await screen.findByRole('region', { name: 'Move-in advance and security deposit' })
     expect(within(section).getByText('₱1,000.00 paid of ₱4,000.00')).toBeVisible()
     expect(within(section).getByText('₱3,000.00 remaining')).toBeVisible()
-    expect(within(section).getByText('The advance is not automatically used to pay a month. Deposit refund or deduction needs manual review. Monthly bills remain separate.')).toBeVisible()
+    expect(within(section).getByText('Security deposit (non-refundable)')).toBeVisible()
+    expect(within(section).getByText(/The advance is not automatically used to pay a month. The security deposit is non-refundable and is not counted as rent income/)).toBeVisible()
+  })
+
+  it('updates and persists the versioned deposit policy for future obligations only', async () => {
+    const user = userEvent.setup()
+    const seeded = prototypeReducer(createDemoData(), { type: 'tenant/created', draft })
+    const obligation = seeded.moveInObligations[0]!
+    await localStorageRepository.save(seeded)
+    renderApp()
+    const section = await screen.findByRole('region', { name: 'Move-in advance & security deposit' })
+    await user.selectOptions(within(section).getByLabelText('Security deposit terms'), 'MANUAL_REVIEW')
+    expect(within(section).getByRole('status')).toHaveTextContent('Deposit policy updated for future obligations.')
+    await waitFor(() => {
+      const data = savedData()
+      expect(data.moveInPolicy).toMatchObject({ version: 3, depositDisposition: 'MANUAL_REVIEW', depositIncomeRecognition: 'NOT_RECOGNIZED' })
+      expect(data.moveInObligations[0]).toEqual(obligation)
+    })
+  })
+
+  it('shows non-refundable deposit terms on tenant payment receipts', async () => {
+    const seeded = prototypeReducer(createDemoData(), { type: 'tenant/created', draft })
+    const tenant = seeded.tenants.find(item => item.name === 'Move-in UI Tenant')!
+    const view = selectMoveInObligations(seeded, '2026-11-13', 'room-9')[0]!
+    const paid = prepareMoveInPayment(seeded, {
+      obligationId: view.obligation.id, payerTenantId: tenant.id,
+      advanceCents: 0, depositCents: 100_000, paidOn: '2026-11-13', method: 'cash',
+    })
+    if (!paid.ok) throw new Error('Seed payment failed')
+    await localStorageRepository.save(paid.data)
+    localStorage.setItem(TENANT_DEMO_STORAGE_KEY, tenant.id)
+    renderApp('/tenant/payments')
+    expect(await screen.findByText('Security deposit is non-refundable under the recorded policy. It remains separate from rent and is not recognized as rental income.')).toBeVisible()
   })
 })

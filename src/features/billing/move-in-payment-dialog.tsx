@@ -79,13 +79,14 @@ export function MoveInPaymentDialog({ view, onClose, onSaved }: {
           <div><dt>Amount received</dt><dd>{formatMoney(success.amountCents)}</dd></div>
           <div><dt>Room</dt><dd>Room {view.room.name}</dd></div>
         </dl>
+        <p className="move-in-policy-note"><ReceiptText aria-hidden="true" />{view.obligation.depositDisposition === 'NON_REFUNDABLE' ? 'The security deposit remains a separate non-refundable record and is not recognized as rental income here.' : 'The security deposit remains a separate record subject to manual review; no automatic refund or income recognition is posted.'}</p>
         <Button onClick={onClose} className="w-full">Done</Button>
       </div> : <form onSubmit={submit}>
         <div className="move-in-dialog-heading">
           <span className="move-in-dialog-icon"><ShieldCheck aria-hidden="true" /></span>
           <div>
             <DialogTitle>Record a move-in payment.</DialogTitle>
-            <DialogDescription id="move-in-payment-description">Advance and security deposit are tracked separately. Partial payments are allowed.</DialogDescription>
+            <DialogDescription id="move-in-payment-description">{view.obligation.depositDisposition === 'NON_REFUNDABLE' ? 'Advance and security deposit are tracked separately. The security deposit is non-refundable and does not become rent income automatically.' : 'Advance and security deposit are tracked separately. The deposit terms require manual review; no refund or income is posted automatically.'}</DialogDescription>
           </div>
         </div>
         <div className="move-in-dialog-body">
@@ -107,9 +108,9 @@ export function MoveInPaymentDialog({ view, onClose, onSaved }: {
               <small>{formatMoney(view.advanceRemainingCents)} still owed</small>
             </label>
             <label className="move-in-field">
-              <span className="move-in-field-label"><ShieldCheck aria-hidden="true" />Security deposit</span>
+              <span className="move-in-field-label"><ShieldCheck aria-hidden="true" />{view.obligation.depositDisposition === 'NON_REFUNDABLE' ? 'Security deposit (non-refundable)' : 'Security deposit'}</span>
               <span className="move-in-money-input"><span>PHP</span><input inputMode="decimal" value={deposit} onChange={event => { setDeposit(event.target.value); setError('') }} aria-invalid={depositCents === null} /></span>
-              <small>{formatMoney(view.depositRemainingCents)} still owed</small>
+              <small>{view.obligation.depositDisposition === 'NON_REFUNDABLE' ? 'Non-refundable · no automatic refund or rent-income recognition · ' : 'Manual review before any refund or deduction · '}{formatMoney(view.depositRemainingCents)} still owed</small>
             </label>
           </div>
           <div className="move-in-amounts">
@@ -117,7 +118,7 @@ export function MoveInPaymentDialog({ view, onClose, onSaved }: {
             <label className="move-in-field"><span>Method</span><select value={method} onChange={event => setMethod(event.target.value as 'cash' | 'bank-transfer')}><option value="cash">Cash</option><option value="bank-transfer">Bank transfer</option></select></label>
           </div>
           <div className="move-in-total"><span>Total received</span><strong>{formatMoney((advanceCents ?? 0) + (depositCents ?? 0))}</strong></div>
-          <p className="move-in-policy-note"><ReceiptText aria-hidden="true" />Only the selected advance and deposit amounts are applied. No future-month bill is paid or modified.</p>
+          <p className="move-in-policy-note"><ReceiptText aria-hidden="true" />Only the selected advance and deposit amounts are applied. No future-month bill is paid or modified, and no deposit refund or rental income is posted.</p>
           {error && <p role="alert" className="move-in-error">{error}</p>}
         </div>
         <div className="move-in-dialog-actions">

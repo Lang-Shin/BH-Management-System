@@ -94,10 +94,10 @@ export default function Reports() {
     </section>
     <section className="mt-8" aria-labelledby="move-in-report-title">
       <h2 id="move-in-report-title" className="text-xl font-semibold">Advance &amp; security deposit</h2>
-      <p className="mb-5 mt-2 text-sm text-muted-foreground">Cash collected for room move-in obligations. Deposits are held, not rental income. These amounts are excluded from monthly billed totals and rent payment status.</p>
+      <p className="mb-5 mt-2 text-sm text-muted-foreground">Cash collected for room move-in obligations. The current policy makes new deposits {data.moveInPolicy.depositDisposition === 'NON_REFUNDABLE' ? 'non-refundable' : 'refundable with manual review'}, but deposits remain separate from rental income and are excluded from monthly billed totals and rent payment status.</p>
       <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Advance collected" value={formatMoney(moveIn.advanceCollectedCents)} detail="Applied only under the recorded policy." icon={Wallet} />
-        <StatCard label="Deposits held" value={formatMoney(moveIn.depositCollectedCents)} detail="No automatic refund, forfeit, or income recognition." icon={ReceiptText} />
+        <StatCard label="Deposits held" value={formatMoney(moveIn.depositCollectedCents)} detail={`${data.moveInPolicy.depositDisposition === 'NON_REFUNDABLE' ? 'Non-refundable' : 'Refundable with manual review'} under current policy; no automatic income recognition.`} icon={ReceiptText} />
         <StatCard label="Move-in outstanding" value={formatMoney(moveIn.outstandingCents)} detail="Still to collect across room obligations." icon={CircleAlert} />
         <StatCard label="Fully settled" value={`${moveIn.paidObligations} of ${moveIn.obligations}`} detail="Room occupancy obligations paid in full." icon={ReceiptText} />
       </div>
@@ -106,11 +106,11 @@ export default function Reports() {
         { key: 'tenant', label: 'Payer', render: view => view.payerName },
         { key: 'started', label: 'Occupancy started', render: view => formatDate(view.cycle.startedAt) },
         { key: 'advance', label: 'Advance paid', align: 'right', render: view => `${formatMoney(view.advancePaidCents)} / ${formatMoney(view.obligation.advanceRequiredCents)}` },
-        { key: 'deposit', label: 'Deposit held', align: 'right', render: view => `${formatMoney(view.depositPaidCents)} / ${formatMoney(view.obligation.depositRequiredCents)}` },
+        { key: 'deposit', label: 'Deposit held', align: 'right', render: view => <div><span>{formatMoney(view.depositPaidCents)} / {formatMoney(view.obligation.depositRequiredCents)}</span><small className="block text-xs text-muted-foreground">{view.obligation.depositDisposition === 'NON_REFUNDABLE' ? 'Non-refundable' : 'Manual review'}</small></div> },
         { key: 'remaining', label: 'Outstanding', align: 'right', render: view => <span className="font-semibold">{formatMoney(view.totalRemainingCents)}</span> },
         { key: 'status', label: 'Status', render: view => <span className="move-in-status" data-status={view.status}>{view.status}</span> },
       ]} />
-      <p className="mt-4 text-sm text-muted-foreground">Policy version {data.moveInPolicy.version}: advance application {data.moveInPolicy.advanceApplication.replace('_', ' ').toLowerCase()}; deposit disposition and all move-out settlement remain manual review. New obligations store the active policy version and existing obligations are not rewritten.</p>
+      <p className="mt-4 text-sm text-muted-foreground">Policy version {data.moveInPolicy.version}: advance application {data.moveInPolicy.advanceApplication.replace('_', ' ').toLowerCase()}; deposit terms {data.moveInPolicy.depositDisposition === 'NON_REFUNDABLE' ? 'non-refundable' : 'refundable with manual review'}; deposit income recognition not automatic. New obligations store the active policy version and existing obligations are not rewritten.</p>
     </section>
     <Card className="mt-8 shadow-none"><CardHeader><CardTitle>House settings</CardTitle><CardDescription>Rates and the advance policy are managed in Billing. Other settings remain view-only.</CardDescription></CardHeader><CardContent><dl className="grid gap-6 text-base sm:grid-cols-2">{([
       ['Currency', 'Philippine peso (₱)'],
@@ -120,7 +120,9 @@ export default function Reports() {
       ['Sharing the electricity bill', 'Who uses each meter and how to share the bill still need to be agreed'],
       ['Water and washing', <><AnimatedNumber value={formatMoney(waterRate?.rateCents ?? 0)} /> per tenant for water. Washing is optional at <AnimatedNumber value={formatMoney(washingRate?.rateCents ?? 0)} /> per room.</>],
       ['Move-in advance', `${data.moveInPolicy.advanceApplication.replace('_', ' ').toLowerCase()} (policy v${data.moveInPolicy.version}); review before applying.`],
-      ['Security deposit', 'Held as a room-level liability; refund, forfeiture, and deductions require manual review.'],
+      ['Security deposit', data.moveInPolicy.depositDisposition === 'NON_REFUNDABLE'
+        ? `Non-refundable (policy v${data.moveInPolicy.version}); held separately with no automatic refund, forfeiture, or rental-income recognition.`
+        : `Refundable with manual review (policy v${data.moveInPolicy.version}); no automatic refund or income recognition.`],
     ] as const).map(([label, value]) => <div key={label} className="rounded-lg border bg-muted/40 p-4"><dt className="text-xs font-semibold text-muted-foreground">{label}</dt><dd className="mt-2 text-sm leading-relaxed font-medium">{value}</dd></div>)}</dl></CardContent></Card>
     <details open={Boolean(storageWarning)} className="mt-7 rounded-xl border bg-card p-5 sm:p-6"><summary className="min-h-12 cursor-pointer py-2 text-lg font-semibold">More settings and sample records</summary>
       <section className="mt-5" aria-labelledby="sample-records"><h2 id="sample-records" className="mb-3 text-xl font-semibold">Start again with sample records</h2><p className="mb-5 max-w-2xl text-base text-muted-foreground">Restore the original sample records and remove your saved notes and room changes. This is only for trying the app.</p><ResetDemoButton /></section>

@@ -47,11 +47,15 @@ export function ensureMoveInObligation(data: PrototypeAppState, cycle: Occupancy
     ...base, id: depositChargeId, amountCents: depositRequiredCents, category: 'SECURITY_DEPOSIT',
     description: 'One-month security deposit — room occupancy cycle', moveInObligationId: obligationId,
   }
+  const policy = activeMoveInPolicy(data)
   const obligation: MoveInObligation = {
     id: obligationId, occupancyCycleId: cycle.id, roomId: room.id,
     agreedMonthlyRentCents: roomPayer.agreedRentCents,
     advanceRequiredCents, depositRequiredCents, advanceChargeId, depositChargeId,
-    policyVersion: activeMoveInPolicy(data).version, createdAt: asOf, status: 'OPEN',
+    policyVersion: policy.version,
+    depositDisposition: policy.depositDisposition,
+    depositIncomeRecognition: policy.depositIncomeRecognition,
+    createdAt: asOf, status: 'OPEN',
   }
   return {
     ...data,

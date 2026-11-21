@@ -40,7 +40,7 @@ export function MoveInSection() {
       <div>
         <span className="move-in-eyebrow"><ShieldCheck aria-hidden="true" />Room-level</span>
         <h2 id="move-in-title">Move-in advance &amp; security deposit</h2>
-        <p>One advance and one deposit per room occupancy. They remain separate from monthly rent bills.</p>
+        <p>One advance and one deposit per room occupancy. The security deposit is {policy.depositDisposition === 'NON_REFUNDABLE' ? 'non-refundable' : 'refundable with manual review'} under the current policy and remains separate from monthly rent.</p>
       </div>
       <div className="move-in-heading-total"><span>Still to collect</span><strong>{formatMoney(summary.outstandingCents)}</strong></div>
     </div>
@@ -60,7 +60,16 @@ export function MoveInSection() {
         <option value="FIRST_MONTH">Apply to first month — review before use</option>
         <option value="MANUAL">Manual review only</option>
       </select></label>
-      <p className="move-in-policy-static"><CircleDollarSign aria-hidden="true" />Security deposits are held and always need manual review before refund, forfeit, or deduction.</p>
+      <div><span className="font-semibold">Security deposit terms</span><p>Current policy is {policy.depositDisposition === 'NON_REFUNDABLE' ? 'non-refundable' : 'refundable with manual review'}. Changing this only affects future obligations.</p></div>
+      <label><span className="sr-only">Security deposit terms</span><select value={policy.depositDisposition} onChange={event => {
+        setNotice('')
+        dispatch({ type: 'moveIn/policyUpdated', depositDisposition: event.target.value as 'NON_REFUNDABLE' | 'MANUAL_REVIEW' })
+        setNotice('Deposit policy updated for future obligations.')
+      }}>
+        <option value="NON_REFUNDABLE">Non-refundable</option>
+        <option value="MANUAL_REVIEW">Refundable — manual review</option>
+      </select></label>
+      <p className="move-in-policy-static"><CircleDollarSign aria-hidden="true" />No deposit refund, forfeiture, or rental-income recognition is automatic. Deposits remain a separate room-level financial record.</p>
     </div>
     {notice && <p role="status" className="move-in-notice">{notice}</p>}
     {proposals.length > 0 && <div className="move-in-proposals" role="note">
@@ -74,10 +83,10 @@ export function MoveInSection() {
       </li>)}</ul>
     </div>}
     {closedReviews.length > 0 && <div className="move-in-proposals" role="note">
-      <strong>Move-out settlement review</strong>
-      <p>Closed occupancies keep their advance and deposit history. No refund, forfeiture, or deduction has been posted.</p>
+      <strong>Move-out deposit records</strong>
+      <p>Closed occupancies keep their deposit history. No refund, forfeiture, or rental-income recognition has been posted.</p>
       <ul>{closedReviews.map(view => <li key={view.obligation.id}>
-        Room {view.room.name}: deposit held {formatMoney(view.depositPaidCents)}; advance outstanding {formatMoney(view.advanceRemainingCents)}; deposit outstanding {formatMoney(view.depositRemainingCents)}.
+        Room {view.room.name}: {view.obligation.depositDisposition === 'NON_REFUNDABLE' ? 'non-refundable deposit' : 'deposit with manual review'} held {formatMoney(view.depositPaidCents)}; advance outstanding {formatMoney(view.advanceRemainingCents)}; deposit outstanding {formatMoney(view.depositRemainingCents)}.
       </li>)}</ul>
     </div>}
     {rows.length === 0
@@ -85,7 +94,7 @@ export function MoveInSection() {
       : <PaginatedDataTable rows={rows} resetKey={`${views.length}:${summary.outstandingCents}`} recordLabel="move-in balances" caption="Move-in advance and security deposit balances" columns={[
         { key: 'room', label: 'Room & payer', render: view => <div className="move-in-room-cell"><span>Room {view.room.name}</span><small>{view.payerName} · since {formatDate(view.cycle.startedAt)}</small></div> },
         { key: 'advance', label: 'Advance', render: (view: MoveInObligationView) => <div className="move-in-balance-cell"><Status value={view.advanceStatus} /><span>{formatMoney(view.advancePaidCents)} of {formatMoney(view.obligation.advanceRequiredCents)}</span><small>{formatMoney(view.advanceRemainingCents)} left</small></div> },
-        { key: 'deposit', label: 'Security deposit', render: (view: MoveInObligationView) => <div className="move-in-balance-cell"><Status value={view.depositStatus} /><span>{formatMoney(view.depositPaidCents)} of {formatMoney(view.obligation.depositRequiredCents)}</span><small>{formatMoney(view.depositRemainingCents)} left</small></div> },
+        { key: 'deposit', label: 'Security deposit', render: (view: MoveInObligationView) => <div className="move-in-balance-cell"><Status value={view.depositStatus} /><span>{formatMoney(view.depositPaidCents)} of {formatMoney(view.obligation.depositRequiredCents)}</span><small>{view.obligation.depositDisposition === 'NON_REFUNDABLE' ? 'Non-refundable' : 'Refundable — manual review'} · {formatMoney(view.depositRemainingCents)} left</small></div> },
         { key: 'status', label: 'Overall', render: (view: MoveInObligationView) => <div className="move-in-balance-cell"><Status value={view.status} /><small>{formatMoney(view.totalRemainingCents)} remaining</small></div> },
         { key: 'action', label: '', align: 'right', render: (view: MoveInObligationView) => <Button variant="outline" size="sm" aria-label={view.cycle.status === 'CLOSED' ? `Review move-out settlement for room ${view.room.name}` : `Record move-in payment for room ${view.room.name}`} disabled={view.status === 'PAID' || view.cycle.status === 'CLOSED'} onClick={event => { setNotice(''); triggerRef.current = event.currentTarget; setSelectedId(view.obligation.id) }}>{view.cycle.status === 'CLOSED' ? 'Settlement review' : 'Record payment'}</Button> },
       ]} />}

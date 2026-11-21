@@ -1,10 +1,11 @@
 import type { MoveInPolicy, PrototypeAppState } from '@/domain/types/models'
 
-/** Versioned provisional policies. Changing this never rewrites existing obligations. */
+/** Policy v2 (Policy B): non-refundable deposits, still held without automatic income recognition. */
 export const DEFAULT_MOVE_IN_POLICY: MoveInPolicy = {
-  version: 1,
+  version: 2,
   advanceApplication: 'LAST_MONTH',
-  depositDisposition: 'MANUAL_REVIEW',
+  depositDisposition: 'NON_REFUNDABLE',
+  depositIncomeRecognition: 'NOT_RECOGNIZED',
   transferIncrease: 'PROPOSE_TOP_UP',
   transferDecrease: 'MANUAL_REVIEW',
   moveOutSettlement: 'MANUAL_REVIEW',

@@ -43,7 +43,9 @@ describe('room-level move-in advance and security deposit', () => {
     expect(view!.obligation.agreedMonthlyRentCents).toBe(400_000)
     expect(view!.obligation.advanceRequiredCents).toBe(400_000)
     expect(view!.obligation.depositRequiredCents).toBe(400_000)
-    expect(view!.obligation.policyVersion).toBe(1)
+    expect(view!.obligation.policyVersion).toBe(2)
+    expect(view!.obligation.depositDisposition).toBe('NON_REFUNDABLE')
+    expect(view!.obligation.depositIncomeRecognition).toBe('NOT_RECOGNIZED')
     expect(data.charges.filter(charge => charge.category === 'ADVANCE' || charge.category === 'SECURITY_DEPOSIT')).toHaveLength(2)
     expect(data.charges.find(charge => charge.category === 'ADVANCE')?.tenantId).toBe(tenant.id)
     expect(selectSummary(data, DEMO_DATE, DEMO_PERIOD)).toMatchObject({
@@ -133,6 +135,7 @@ describe('room-level move-in advance and security deposit', () => {
     expect(active!.id).not.toBe(closed!.id)
     expect(active!.startedAt).toBe('2026-11-14')
     expect(next.data.moveInObligations.filter(item => item.roomId === 'room-9')).toHaveLength(2)
+    expect(next.data.moveInObligations.filter(item => item.roomId === 'room-9').every(item => item.depositDisposition === 'NON_REFUNDABLE')).toBe(true)
   })
 
   it('does not create another obligation when all occupants are replaced on the same day', () => {
@@ -189,10 +192,88 @@ describe('room-level move-in advance and security deposit', () => {
     const created = createInRoom(createDemoData())
     const before = created.data.moveInObligations[0]!
     const updated = prototypeReducer(created.data, { type: 'moveIn/policyUpdated', advanceApplication: 'MANUAL' })
-    expect(updated.moveInPolicy).toMatchObject({ version: 2, advanceApplication: 'MANUAL' })
+    expect(updated.moveInPolicy).toMatchObject({ version: 3, advanceApplication: 'MANUAL', depositDisposition: 'NON_REFUNDABLE' })
     expect(updated.moveInObligations[0]).toEqual(before)
     expect(updated.charges.filter(charge => charge.category === 'ADVANCE' || charge.category === 'SECURITY_DEPOSIT'))
       .toEqual(created.data.charges.filter(charge => charge.category === 'ADVANCE' || charge.category === 'SECURITY_DEPOSIT'))
+  })
+
+  it('applies deposit policy changes only to future obligations', () => {
+    const created = createInRoom(createDemoData())
+    const existing = created.data.moveInObligations[0]!
+    const changed = prototypeReducer(created.data, { type: 'moveIn/policyUpdated', depositDisposition: 'MANUAL_REVIEW' })
+    expect(changed.moveInPolicy).toMatchObject({ version: 3, depositDisposition: 'MANUAL_REVIEW', depositIncomeRecognition: 'NOT_RECOGNIZED' })
+    expect(changed.moveInObligations[0]).toEqual(existing)
+    expect(changed.moveInObligations[0]!.depositDisposition).toBe('NON_REFUNDABLE')
+    const next = createInRoom(changed, { roomId: 'room-10', name: 'Future Deposit', email: 'future-deposit@example.com' })
+    const future = next.data.moveInObligations.find(obligation => obligation.roomId === 'room-10')!
+    expect(future).toMatchObject({ policyVersion: 3, depositDisposition: 'MANUAL_REVIEW', depositIncomeRecognition: 'NOT_RECOGNIZED' })
+  })
+
+  it('keeps non-refundable deposits as separate records without refunds or rental income on move-out', () => {
+    const baseSummary = selectSummary(createDemoData(), DEMO_DATE, DEMO_PERIOD)
+    const created = createInRoom(createDemoData())
+    const tenant = created.tenant
+    const view = viewFor(created.data, tenant)
+    const paid = prepareMoveInPayment(created.data, {
+      obligationId: view!.obligation.id, payerTenantId: tenant.id,
+      advanceCents: 400_000, depositCents: 400_000, paidOn: DEMO_DATE, method: 'cash',
+    })
+    expect(paid.ok).toBe(true)
+    if (!paid.ok) return
+    const beforeMoveOutPayments = paid.data.payments.length
+    const beforeMoveOutCredits = paid.data.tenantCredits.length
+    const beforeSummary = selectSummary(paid.data, DEMO_DATE, DEMO_PERIOD)
+    expect(beforeSummary.billed).toBe(baseSummary.billed)
+    expect(beforeSummary.applied).toBe(baseSummary.applied)
+    expect(beforeSummary.received - baseSummary.received).toBe(800_000)
+    const movedOut = prototypeReducer(paid.data, { type: 'tenant/movedOut', tenantId: tenant.id })
+    const closed = movedOut.occupancyCycles.find(cycle => cycle.roomId === 'room-9' && cycle.status === 'CLOSED')
+    expect(closed).toBeDefined()
+    expect(movedOut.moveInObligations[0]).toEqual(paid.data.moveInObligations[0])
+    expect(movedOut.payments).toHaveLength(beforeMoveOutPayments)
+    expect(movedOut.receipts).toEqual(paid.data.receipts)
+    expect(movedOut.paymentAllocations).toEqual(paid.data.paymentAllocations)
+    expect(movedOut.tenantCredits).toHaveLength(beforeMoveOutCredits)
+    expect(movedOut.charges.filter(charge => charge.category === 'SECURITY_DEPOSIT')).toHaveLength(1)
+    expect(selectSummary(movedOut, DEMO_DATE, DEMO_PERIOD)).toMatchObject({
+      billed: beforeSummary.billed, applied: beforeSummary.applied, outstanding: beforeSummary.outstanding,
+      received: beforeSummary.received,
+    })
+    expect(moveInSummary(movedOut, DEMO_DATE).depositCollectedCents).toBe(400_000)
+    expect(movedOut.auditEvents.filter(event => event.action === 'MOVE_IN_PAYMENT_RECORDED')).toHaveLength(1)
+  })
+
+  it('migrates version 10 provisional deposits without rewriting their recorded terms', () => {
+    const created = createInRoom(createDemoData())
+    const seededView = viewFor(created.data, created.tenant)
+    const paid = prepareMoveInPayment(created.data, {
+      obligationId: seededView!.obligation.id, payerTenantId: created.tenant.id,
+      advanceCents: 100_000, depositCents: 100_000, paidOn: DEMO_DATE, method: 'cash',
+    })
+    if (!paid.ok) throw new Error('Seed payment failed')
+    const obligation = paid.data.moveInObligations[0]!
+    const { depositDisposition, depositIncomeRecognition, ...legacyObligation } = obligation
+    void depositDisposition
+    void depositIncomeRecognition
+    const legacyPolicy = {
+      version: 1, advanceApplication: 'LAST_MONTH' as const, depositDisposition: 'MANUAL_REVIEW' as const,
+      transferIncrease: 'PROPOSE_TOP_UP' as const, transferDecrease: 'MANUAL_REVIEW' as const, moveOutSettlement: 'MANUAL_REVIEW' as const,
+    }
+    const result = parsePrototypeSnapshot(JSON.stringify({
+      version: 10,
+      data: { ...paid.data, moveInObligations: [legacyObligation], moveInPolicy: legacyPolicy },
+    }))
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.data.moveInPolicy).toMatchObject({ version: 2, depositDisposition: 'NON_REFUNDABLE', depositIncomeRecognition: 'NOT_RECOGNIZED' })
+    expect(result.data.moveInObligations[0]).toMatchObject({
+      id: obligation.id, advanceRequiredCents: obligation.advanceRequiredCents,
+      depositDisposition: 'MANUAL_REVIEW', depositIncomeRecognition: 'NOT_RECOGNIZED',
+    })
+    expect(result.data.payments).toEqual(paid.data.payments)
+    expect(result.data.receipts).toEqual(paid.data.receipts)
+    expect(result.data.paymentAllocations).toEqual(paid.data.paymentAllocations)
   })
 
   it('supports receipt corrections while keeping the room obligation intact', () => {
@@ -234,7 +315,8 @@ describe('room-level move-in advance and security deposit', () => {
     expect(result.data.occupancyCycles).toHaveLength(4)
     expect(result.data.occupancyCycles.every(cycle => cycle.status === 'ACTIVE')).toBe(true)
     expect(result.data.moveInObligations).toEqual([])
-    expect(result.data.moveInPolicy.version).toBe(1)
+    expect(result.data.moveInPolicy.version).toBe(2)
+    expect(result.data.moveInPolicy).toMatchObject({ depositDisposition: 'NON_REFUNDABLE', depositIncomeRecognition: 'NOT_RECOGNIZED' })
     expect(result.data.rooms.map(room => room.name)).toEqual(current.rooms.map(room => room.name))
   })
 })

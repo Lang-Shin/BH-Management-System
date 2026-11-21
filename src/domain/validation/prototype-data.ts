@@ -73,11 +73,13 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
   if (!rows(value, 'moveInObligations', r => id(r.occupancyCycleId) && id(r.roomId)
     && positive(r.agreedMonthlyRentCents) && positive(r.advanceRequiredCents) && positive(r.depositRequiredCents)
     && id(r.advanceChargeId) && id(r.depositChargeId) && Number.isSafeInteger(r.policyVersion) && (r.policyVersion as number) > 0
+    && oneOf(r.depositDisposition, ['NON_REFUNDABLE', 'MANUAL_REVIEW']) && r.depositIncomeRecognition === 'NOT_RECOGNIZED'
     && date(r.createdAt) && r.status === 'OPEN')) return false
   if (!isRecord(value.moveInPolicy)
     || !Number.isSafeInteger(value.moveInPolicy.version) || (value.moveInPolicy.version as number) < 1
     || !oneOf(value.moveInPolicy.advanceApplication, ['FIRST_MONTH', 'LAST_MONTH', 'MANUAL'])
-    || value.moveInPolicy.depositDisposition !== 'MANUAL_REVIEW'
+    || !oneOf(value.moveInPolicy.depositDisposition, ['NON_REFUNDABLE', 'MANUAL_REVIEW'])
+    || value.moveInPolicy.depositIncomeRecognition !== 'NOT_RECOGNIZED'
     || value.moveInPolicy.transferIncrease !== 'PROPOSE_TOP_UP'
     || value.moveInPolicy.transferDecrease !== 'MANUAL_REVIEW'
     || value.moveInPolicy.moveOutSettlement !== 'MANUAL_REVIEW') return false

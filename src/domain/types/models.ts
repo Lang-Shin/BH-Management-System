@@ -168,14 +168,21 @@ export interface MoveInObligation {
   advanceChargeId: string
   depositChargeId: string
   policyVersion: number
+  depositDisposition: DepositDisposition
+  depositIncomeRecognition: DepositIncomeRecognition
   createdAt: string
   status: 'OPEN'
 }
 
+export type DepositDisposition = 'NON_REFUNDABLE' | 'MANUAL_REVIEW'
+/** Non-refundable terms do not authorize automatic income recognition in this prototype. */
+export type DepositIncomeRecognition = 'NOT_RECOGNIZED'
+
 export interface MoveInPolicy {
   version: number
   advanceApplication: 'FIRST_MONTH' | 'LAST_MONTH' | 'MANUAL'
-  depositDisposition: 'MANUAL_REVIEW'
+  depositDisposition: DepositDisposition
+  depositIncomeRecognition: DepositIncomeRecognition
   transferIncrease: 'PROPOSE_TOP_UP'
   transferDecrease: 'MANUAL_REVIEW'
   moveOutSettlement: 'MANUAL_REVIEW'

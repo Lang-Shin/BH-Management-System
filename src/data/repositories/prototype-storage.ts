@@ -3,7 +3,7 @@ import { initialRoomRentRates, initialWashingRates, initialWaterRates } from '@/
 import { DEFAULT_MOVE_IN_POLICY } from '@/domain/calculations/move-in-policy'
 import { isPrototypeData, isRecord } from '@/domain/validation/prototype-data'
 
-export const STORAGE_SCHEMA_VERSION = 10
+export const STORAGE_SCHEMA_VERSION = 11
 
 type ParseResult =
   | { ok: true; data: PrototypeAppState }
@@ -26,11 +26,11 @@ function migrateVersion7(value: unknown): unknown {
 }
 
 /**
- * Version 10 adds occupancy cycles and move-in obligations. Legacy snapshots receive active
- * cycles for already-occupied rooms but no invented deposits or advances. Existing rooms, tenants,
- * bills, payments, receipts, corrections, and room labels are retained unchanged.
+ * Version 10 added occupancy cycles and move-in obligations; version 11 makes the non-refundable
+ * deposit policy explicit without rewriting obligations created under the older provisional policy.
+ * Legacy snapshots receive active cycles for already-occupied rooms but no invented deposits.
  */
-function withVersion10(value: unknown): PrototypeAppState | null {
+function withMoveInState(value: unknown, fromVersion: 7 | 8 | 9 | 10): PrototypeAppState | null {
   if (!isRecord(value)) return null
   const rooms = Array.isArray(value.rooms) ? value.rooms.filter(isRecord) : []
   const assignments = Array.isArray(value.roomAssignments) ? value.roomAssignments as RoomAssignment[] : []
@@ -44,11 +44,29 @@ function withVersion10(value: unknown): PrototypeAppState | null {
       createdAt: startedAt, updatedAt: startedAt,
     }]
   })
+  const existingPolicy = isRecord(value.moveInPolicy) ? value.moveInPolicy : null
+  const oldDisposition = existingPolicy?.depositDisposition === 'NON_REFUNDABLE' ? 'NON_REFUNDABLE' : 'MANUAL_REVIEW'
+  const oldVersion = Number.isSafeInteger(existingPolicy?.version) && (existingPolicy?.version as number) > 0
+    ? existingPolicy!.version as number : 1
+  const moveInPolicy = fromVersion === 10
+    ? {
+        ...DEFAULT_MOVE_IN_POLICY,
+        version: Math.max(DEFAULT_MOVE_IN_POLICY.version, oldVersion + 1),
+        advanceApplication: ['FIRST_MONTH', 'LAST_MONTH', 'MANUAL'].includes(existingPolicy?.advanceApplication as string)
+          ? existingPolicy!.advanceApplication : DEFAULT_MOVE_IN_POLICY.advanceApplication,
+      }
+    : { ...DEFAULT_MOVE_IN_POLICY }
+  const moveInObligations = (Array.isArray(value.moveInObligations) ? value.moveInObligations : []).map(obligation => {
+    if (!isRecord(obligation)) return obligation
+    const disposition = obligation.depositDisposition === 'NON_REFUNDABLE' || obligation.depositDisposition === 'MANUAL_REVIEW'
+      ? obligation.depositDisposition : oldDisposition
+    return { ...obligation, depositDisposition: disposition, depositIncomeRecognition: 'NOT_RECOGNIZED' }
+  })
   const candidate = {
     ...value,
     occupancyCycles,
-    moveInObligations: Array.isArray(value.moveInObligations) ? value.moveInObligations : [],
-    moveInPolicy: isRecord(value.moveInPolicy) ? value.moveInPolicy : DEFAULT_MOVE_IN_POLICY,
+    moveInObligations,
+    moveInPolicy,
   }
   return isPrototypeData(candidate) ? candidate : null
 }
@@ -62,12 +80,16 @@ export function parsePrototypeSnapshot(raw: string): ParseResult {
     return { ok: false, reason: 'MALFORMED_JSON' }
   }
   if (!isRecord(parsed)) return { ok: false, reason: 'INVALID_DATA' }
+  if (parsed.version === 10) {
+    const migrated = withMoveInState(parsed.data, 10)
+    return migrated ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }
+  }
   if (parsed.version === 9 || parsed.version === 8) {
-    const migrated = withVersion10(parsed.data)
+    const migrated = withMoveInState(parsed.data, parsed.version)
     return migrated ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }
   }
   if (parsed.version === 7) {
-    const migrated = withVersion10(migrateVersion7(parsed.data))
+    const migrated = withMoveInState(migrateVersion7(parsed.data), 7)
     return migrated ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }
   }
   if (parsed.version !== STORAGE_SCHEMA_VERSION) return { ok: false, reason: 'UNSUPPORTED_SCHEMA' }
