@@ -88,7 +88,7 @@ describe('shared fictional financial model', () => {
     } },
     { name: 'credit over-consumption', change: d => { d.paymentAllocations.push({ id: 'overspent-credit', paymentId: 'payment-advance', chargeId: 'water-nov-tenant-6', amountCents: 60_000, allocatedOn: DEMO_DATE, creditId: 'credit-6', state: 'ACTIVE', reversalAuditEventId: null }) } },
     { name: 'aggregate overpayment from otherwise valid separate payments', change: d => {
-      d.payments.push({ id: 'extra-payment', tenantId: 'tenant-1', amountCents: 400_000, paidOn: DEMO_DATE, method: 'cash', state: 'RECORDED', correction: null })
+      d.payments.push({ id: 'extra-payment', scope: 'TENANT' as const, roomId: null, occupancyCycleId: null, tenantId: 'tenant-1', amountCents: 400_000, paidOn: DEMO_DATE, method: 'cash', state: 'RECORDED', correction: null })
       d.paymentAllocations.push({ id: 'extra-allocation', paymentId: 'extra-payment', chargeId: 'rent-nov-room-1', amountCents: 400_000, allocatedOn: DEMO_DATE, creditId: null, state: 'ACTIVE', reversalAuditEventId: null })
     } },
     { name: 'cross-tenant allocation', change: d => { d.paymentAllocations[0]!.chargeId = 'rent-oct-room-1' } },
@@ -124,7 +124,7 @@ describe('prototype reducer and persistence', () => {
     expect(changed.tenants[0]?.notes).toBe('Sample reminder')
     expect(await localStorageRepository.save(changed)).toBeNull()
     expect((await localStorageRepository.load()).data).toEqual(changed)
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 11)
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 12)
   })
 
   it('protects occupied rooms and preserves historical assignments during maintenance toggles', () => {

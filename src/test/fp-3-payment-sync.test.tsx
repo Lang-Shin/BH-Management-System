@@ -45,10 +45,10 @@ describe('recorded payment synchronization', () => {
     await user.selectOptions(screen.getByLabelText('Demo tenant'), 'tenant-5')
     const billing = screen.getByRole('region', { name: 'Monthly room billing' })
     expect(within(billing).getByRole('status')).toHaveTextContent('PARTLY PAID')
-    const unpaid = screen.getByRole('region', { name: 'Unpaid bills' })
-    expect(unpaid).toHaveTextContent('Water₱200.00')
-    expect(unpaid).toHaveTextContent('ElectricityPending calculation')
-    expect(unpaid).not.toHaveTextContent('Rent')
+    const unpaid = screen.getByRole('region', { name: 'Bill categories' })
+    expect(unpaid).toHaveTextContent(/Water.*200\.00/)
+    expect(unpaid).toHaveTextContent('ElectricityAWAITING READING')
+    expect(unpaid).toHaveTextContent(/RentPAID/)
 
     await user.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('link', { name: 'My Payments & Receipts' }))
     const receipt = await screen.findByRole('article', { name: 'Receipt DEMO-RCT-015' })
@@ -57,7 +57,9 @@ describe('recorded payment synchronization', () => {
     expect(receipt).toHaveTextContent('₱3,500.00')
     expect(receipt).not.toHaveTextContent('Water')
     await user.selectOptions(screen.getByLabelText('Demo tenant'), 'tenant-8')
-    expect(screen.queryByRole('article', { name: 'Receipt DEMO-RCT-015' })).not.toBeInTheDocument()
+    const sharedReceipt = await screen.findByRole('article', { name: 'Receipt DEMO-RCT-015' })
+    expect(sharedReceipt).toHaveTextContent('Room 4')
+    expect(sharedReceipt).toHaveTextContent(/Room-level payment .* no tenant payer recorded/)
   }, 20000)
 
   it('does not report payment success when persistence fails', async () => {

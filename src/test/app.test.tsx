@@ -156,7 +156,7 @@ describe('admin workspace integration', () => {
     await user.click(screen.getByRole('button', { name: 'Restore sample records' }))
     await user.click(within(screen.getByRole('dialog', { name: 'Restore the sample records?' })).getByRole('button', { name: 'Yes, restore records' }))
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 11)
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 12)
   })
 
   it('shows a log-out button that opens a centered clarification dialog without signing out', async () => {
@@ -434,17 +434,15 @@ describe('admin workspace integration', () => {
     dialog = screen.getByRole('dialog', { name: 'Confirm payment received' })
     expect(dialog).toHaveTextContent('Total to receive')
     expect(dialog).toHaveTextContent('₱4,025.00')
-    expect(dialog).toHaveTextContent('2 separate tenant payments')
     await user.click(within(dialog).getByRole('button', { name: 'Confirm payment received' }))
     dialog = screen.getByRole('dialog', { name: 'Payment recorded' })
     expect(dialog).toHaveTextContent('₱4,025.00')
     expect(dialog).toHaveTextContent('DEMO-RCT-015')
-    expect(dialog).toHaveTextContent('DEMO-RCT-016')
     expect(dialog).toHaveTextContent('Meter baseline advanced to 325 kWh')
     await waitFor(() => {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null')
-      expect(saved?.data.payments).toHaveLength(16)
-      expect(saved?.data.receipts).toHaveLength(16)
+      expect(saved?.data.payments).toHaveLength(15)
+      expect(saved?.data.receipts).toHaveLength(15)
       expect(saved?.data.electricityBillObligations.some((item: { roomId: string }) => item.roomId === 'room-4')).toBe(false)
     })
     await user.click(within(dialog).getByRole('button', { name: 'Got it' }))
@@ -452,9 +450,9 @@ describe('admin workspace integration', () => {
     const nav = screen.getByRole('navigation', { name: 'Main navigation' })
     await user.click(within(nav).getByRole('link', { name: 'Payments & Receipts' }))
     const history = await screen.findByRole('table', { name: 'Transactions' })
-    expect(history).toHaveTextContent('₱3,925.00')
-    expect(history).toHaveTextContent('₱100.00')
-    const rentRow = within(history).getByText('₱3,925.00').closest('tr')!
+    expect(history).toHaveTextContent(/4,025\.00/)
+    expect(history).not.toHaveTextContent(/3,925\.00/)
+    const rentRow = within(history).getByText(/4,025\.00/).closest('tr')!
     await user.click(within(rentRow).getByRole('button', { name: /See Transaction/ }))
     const transaction = screen.getByRole('dialog', { name: 'Transaction Details' })
     expect(transaction).toHaveTextContent('Rent')

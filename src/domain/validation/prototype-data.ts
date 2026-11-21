@@ -1,4 +1,4 @@
-import type { AuthorizedCorrection, PrototypeAppState } from '@/domain/types/models'
+import type { AuthorizedCorrection, Charge, PrototypeAppState } from '@/domain/types/models'
 import { isIsoDate as date } from './date'
 
 type RecordValue = Record<string, unknown>
@@ -51,8 +51,12 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
       && money(e.currentReadingMilliKwh) && money(e.consumptionMilliKwh) && id(e.rateId)
       && positive(e.appliedRateCentsPerKwh) && date(e.appliedRateEffectiveFrom)
   })) return false
-  if (!rows(value, 'payments', r => id(r.tenantId) && positive(r.amountCents) && date(r.paidOn)
-    && oneOf(r.method, ['cash', 'bank-transfer']) && oneOf(r.state, ['RECORDED', 'VOIDED']) && correction(r.correction))) return false
+  if (!rows(value, 'payments', r => oneOf(r.scope, ['TENANT', 'ROOM']) && date(r.paidOn)
+    && (r.scope === 'ROOM'
+      ? r.tenantId === null && r.method === null && id(r.roomId) && id(r.occupancyCycleId)
+      : id(r.tenantId) && (r.method === 'cash' || r.method === 'bank-transfer')
+        && (r.roomId === null || id(r.roomId)) && (r.occupancyCycleId === null || id(r.occupancyCycleId)))
+    && positive(r.amountCents) && oneOf(r.state, ['RECORDED', 'VOIDED']) && correction(r.correction))) return false
   if (!rows(value, 'paymentAllocations', r => id(r.paymentId) && id(r.chargeId) && positive(r.amountCents)
     && date(r.allocatedOn) && (r.creditId === null || id(r.creditId)) && oneOf(r.state, ['ACTIVE', 'REVERSED'])
     && (r.reversalAuditEventId === null || id(r.reversalAuditEventId)))) return false
@@ -90,6 +94,19 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
 
   // Each collection and its discriminated field shapes have been checked above.
   const data = value as unknown as PrototypeAppState
+  const chargeRoomId = (charge: Charge): string | null => {
+    if (charge.category === 'ADVANCE' || charge.category === 'SECURITY_DEPOSIT') {
+      return data.moveInObligations.find(obligation => obligation.id === charge.moveInObligationId)?.roomId ?? null
+    }
+    if (charge.category === 'RENT') {
+      return data.roomAssignments.find(assignment => assignment.id === charge.roomAssignmentId)?.roomId ?? null
+    }
+    const period = data.billingPeriods.find(item => item.id === charge.billingPeriodId)
+    if (!period) return null
+    const roomIds = [...new Set(data.roomAssignments.filter(assignment => assignment.tenantId === charge.tenantId
+      && assignment.startDate <= period.endDate && (assignment.endDate === null || assignment.endDate >= period.startDate)).map(assignment => assignment.roomId))]
+    return roomIds.length === 1 ? roomIds[0]! : null
+  }
   if ([data.tenants, data.rooms, data.roomAssignments, data.electricityMeters, data.meterReadings,
     data.electricityBillObligations, data.electricityRates, data.roomRentRates, data.waterRates, data.washingRates,
     data.billingPeriods, data.charges, data.payments, data.paymentAllocations, data.tenantCredits, data.receipts,
@@ -200,8 +217,15 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     const original = p.correction && data.payments.find(o => o.id === p.correction?.supersedesId)
     const reserved = sum(data.tenantCredits.filter(c => c.sourcePaymentId === p.id).map(c => c.amountCents))
     const direct = sum(activeAllocations.filter(a => a.paymentId === p.id && a.creditId === null).map(a => a.amountCents))
-    return tenant(p.tenantId) && validCorrection(p.correction, p.id, 'PAYMENT')
-      && (!p.correction || (original && original.state === 'VOIDED' && original.tenantId === p.tenantId))
+    const ownerValid = p.scope === 'ROOM'
+      ? data.rooms.some(room => room.id === p.roomId)
+        && data.occupancyCycles.some(cycle => cycle.id === p.occupancyCycleId && cycle.roomId === p.roomId)
+      : Boolean(p.tenantId) && tenant(p.tenantId!)
+    const sameOwner = (other: typeof p) => p.scope === 'ROOM'
+      ? other.scope === 'ROOM' && other.roomId === p.roomId && other.occupancyCycleId === p.occupancyCycleId
+      : other.tenantId === p.tenantId
+    return ownerValid && validCorrection(p.correction, p.id, 'PAYMENT')
+      && (!p.correction || (original && original.state === 'VOIDED' && sameOwner(original)))
       && Number.isSafeInteger(reserved + direct) && reserved + direct <= p.amountCents
   })) return false
   if (!data.paymentAllocations.every(a => {
@@ -209,7 +233,10 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     const charge = data.charges.find(c => c.id === a.chargeId)
     const credit = a.creditId && data.tenantCredits.find(c => c.id === a.creditId)
     const reversal = a.reversalAuditEventId && audit(a.reversalAuditEventId)
-    return payment && charge && payment.tenantId === charge.tenantId && a.allocatedOn >= payment.paidOn && a.allocatedOn >= charge.issuedOn
+    const ownerMatches = payment && charge && (payment.scope === 'ROOM'
+      ? payment.roomId === chargeRoomId(charge)
+      : payment.tenantId === charge.tenantId)
+    return payment && charge && ownerMatches && a.allocatedOn >= payment.paidOn && a.allocatedOn >= charge.issuedOn
       && (a.state !== 'ACTIVE' || (payment.state === 'RECORDED' && charge.state === 'ISSUED' && a.reversalAuditEventId === null))
       && (a.state !== 'REVERSED' || (reversal && reversal.action === 'ALLOCATION_REVERSED' && reversal.entityType === 'PAYMENT_ALLOCATION' && reversal.entityId === a.id))
       && (a.creditId === null || (credit && credit.sourcePaymentId === a.paymentId && credit.createdOn <= a.allocatedOn))

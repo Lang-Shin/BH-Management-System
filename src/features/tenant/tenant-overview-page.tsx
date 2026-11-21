@@ -16,6 +16,7 @@ import { DEMO_DATE } from '@/data/fixtures/demo'
 import { formatDate, formatMoney, formatMonthYear } from '@/lib/format'
 import { selectTenantPersona } from './tenant-persona'
 import { tenantRoomBilling } from './tenant-room-billing'
+import { selectTenantReceipts } from './tenant-receipts'
 import { roomCategoryLabel } from '@/lib/room-rates'
 import { CATEGORY_LABELS } from '@/lib/labels'
 
@@ -28,8 +29,10 @@ export default function TenantOverview() {
   const period = data.billingPeriods.find(item => item.id === periodId) ?? defaultPeriod
   const monthLabel = period ? formatMonthYear(period.startDate) : 'Not available'
   const account = persona ? tenantAccount(data, persona.tenant.id, DEMO_DATE) : null
-  const payments = persona ? data.payments.filter(item => item.tenantId === persona.tenant.id && item.state === 'RECORDED' && item.paidOn <= DEMO_DATE) : []
-  const receipts = persona ? data.receipts.filter(item => item.state === 'ISSUED' && payments.some(payment => payment.id === item.paymentId)) : []
+  const sharedReceipts = persona ? selectTenantReceipts(data, persona.tenant.id).receipts : []
+  const effectiveReceipts = sharedReceipts.filter(item => item.effective)
+  const payments = [...new Map(sharedReceipts.map(item => [item.payment.id, item.payment])).values()]
+    .filter(item => item.state === 'RECORDED' && item.paidOn <= DEMO_DATE)
   const lastPayment = [...payments].sort((a, b) => b.paidOn.localeCompare(a.paidOn)).at(0)
   const occupants = persona?.room ? roomOccupants(data, persona.room.id, DEMO_DATE).filter(tenant => tenant.status === 'ACTIVE') : []
   const occupantTitle = occupants.length === 0 ? 'No current tenants' : occupants.length === 1 ? 'Tenant' : 'Tenants'
@@ -88,7 +91,7 @@ export default function TenantOverview() {
           <select id="tenant-overview-period" value={period?.id ?? ''} onChange={event => setPeriodId(event.target.value)} className="min-h-12 max-w-full rounded-xl border bg-card px-3 text-base">{data.billingPeriods.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
           <p className="mt-3 text-sm text-muted-foreground">{billing.detail}</p>
           {['PAID', 'PARTLY PAID', 'NOT PAID'].includes(billing.status) && <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-3"><div><dt className="text-muted-foreground">Applicable room bills</dt><dd className="mt-1 font-semibold">{formatMoney(billing.billedCents)}</dd></div><div><dt className="text-muted-foreground">Applied to room bills</dt><dd className="mt-1 font-semibold">{formatMoney(billing.appliedCents)}</dd></div><div><dt className="text-muted-foreground">{billing.pendingCalculation ? 'Known outstanding' : 'Room outstanding'}</dt><dd className="mt-1 font-semibold">{formatMoney(billing.outstandingCents)}{billing.pendingCalculation && ' + electricity pending calculation'}</dd></div></dl>}
-          {billing.unsettled.length > 0 && <section aria-label="Unpaid bills" className="mt-5"><h3 className="mb-3 font-semibold">Unpaid bills</h3><ul className="divide-y rounded-2xl border px-4">{billing.unsettled.map(item => <li key={item.category} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"><span className="font-semibold">{item.category === 'WASHING_MACHINE' ? 'Washing' : CATEGORY_LABELS[item.category]}</span><span>{item.outstandingCents > 0 && formatMoney(item.outstandingCents)}{item.outstandingCents > 0 && item.pendingCalculation && ' + '}{item.pendingCalculation && 'Pending calculation'}</span></li>)}</ul><p className="mt-3 text-xs text-muted-foreground">Issued rent keeps its applied rate snapshot. Water reflects the billed tenants; washing appears only when applicable. Electricity is not priced until a valid payment-time meter reading is confirmed in Billing.</p></section>}
+          {billing.categories.length > 0 && <section aria-label="Bill categories" className="mt-5"><h3 className="mb-3 font-semibold">Bill categories</h3><ul className="divide-y rounded-2xl border px-4">{billing.categories.map(item => <li key={item.category} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"><span className="font-semibold">{item.category === 'WASHING_MACHINE' ? 'Washing' : CATEGORY_LABELS[item.category]}</span><span className="flex flex-wrap items-center justify-end gap-3"><span className="move-in-status" data-status={item.status === 'PAID' ? 'PAID' : item.status === 'PARTLY PAID' ? 'PARTLY PAID' : 'NOT PAID'}>{item.status}</span>{item.status !== 'PAID' && item.status !== 'DID NOT AVAIL' && item.status !== 'NO BILL' && item.status !== 'AWAITING READING' && <span className="tabular-nums">{formatMoney(item.outstandingCents)} outstanding</span>}</span></li>)}</ul><p className="mt-3 text-xs text-muted-foreground">Room-level status derived from the same issued charges and allocations as landlord Billing. Electricity is not priced until a valid payment-time meter reading is confirmed. Washing appears as not availed when the room has no subscription.</p></section>}
         </CardContent>
       </Card>
     </section>
@@ -96,15 +99,15 @@ export default function TenantOverview() {
       <Card>
         <CardHeader>
           <CardTitle>Payment summary</CardTitle>
-          <CardDescription>Your own recorded activity across all months. Roommates’ transactions are not included.</CardDescription>
+          <CardDescription>Room-level payment activity is shared with authorized occupants. Private account details of other tenants are not shown.</CardDescription>
         </CardHeader>
         <CardContent>
           <dl className="space-y-3 text-sm">
             <div className="flex flex-wrap items-center justify-between gap-3"><dt className="text-muted-foreground">Payments made</dt><dd className="font-semibold"><AnimatedNumber value={payments.length} /></dd></div>
-            <div className="flex flex-wrap items-center justify-between gap-3"><dt className="text-muted-foreground">Receipts issued</dt><dd className="font-semibold"><AnimatedNumber value={receipts.length} /></dd></div>
-            <div className="flex flex-wrap items-center justify-between gap-3"><dt className="text-muted-foreground">Last payment</dt><dd className="font-semibold">{lastPayment ? formatDate(lastPayment.paidOn) : '—'}</dd></div>
-            <div className="flex flex-wrap items-center justify-between gap-3"><dt className="text-muted-foreground">Outstanding balance (issued personal bills)</dt><dd className="font-semibold">{account ? formatMoney(account.balance) : '—'}</dd></div>
-            <div className="flex flex-wrap items-center justify-between gap-3"><dt className="text-muted-foreground">Advance credit held</dt><dd className="font-semibold">{account ? formatMoney(account.credit) : '—'}</dd></div>
+            <div className="flex flex-wrap items-center justify-between gap-3"><dt className="text-muted-foreground">Receipts issued</dt><dd className="font-semibold"><AnimatedNumber value={effectiveReceipts.length} /></dd></div>
+            <div className="flex flex-wrap items-center justify-between gap-3"><dt className="text-muted-foreground">Last payment</dt><dd className="font-semibold">{lastPayment ? formatDate(lastPayment.paidOn) : '-'}</dd></div>
+            <div className="flex flex-wrap items-center justify-between gap-3"><dt className="text-muted-foreground">Outstanding balance</dt><dd className="font-semibold">{formatMoney(billing.outstandingCents)}</dd></div>
+            <div className="flex flex-wrap items-center justify-between gap-3"><dt className="text-muted-foreground">Advance credit held</dt><dd className="font-semibold">{account ? formatMoney(account.credit) : '-'}</dd></div>
             <div className="flex flex-wrap items-center justify-between gap-3"><dt className="text-muted-foreground">Account status</dt><dd>{account && <StatusBadge status={account.status} />}</dd></div>
           </dl>
           <Button variant="outline" className="mt-6" asChild><Link to="/tenant/payments">View My Payments &amp; Receipts <ArrowRight /></Link></Button>

@@ -6,6 +6,7 @@ import { activeMoveInPolicy } from './move-in-policy'
 import { nextReceiptNumbers } from './receipt-numbering'
 
 export type MoveInSettlementStatus = 'NOT PAID' | 'PARTLY PAID' | 'PAID'
+export type MoveInCategory = 'ADVANCE' | 'SECURITY_DEPOSIT'
 
 export function activeCycleForRoom(data: PrototypeAppState, roomId: string): OccupancyCycle | null {
   return data.occupancyCycles.find(cycle => cycle.roomId === roomId && cycle.status === 'ACTIVE') ?? null
@@ -208,47 +209,69 @@ export function proposedMoveInAdjustment(data: PrototypeAppState, room: Room, cy
     : { previousRentCents: previousObligation.agreedMonthlyRentCents, currentRentCents: currentRent, advanceTopUpCents: 0, depositTopUpCents: 0, kind: 'REVIEW' }
 }
 
-export type MoveInPaymentError = 'OBLIGATION_NOT_FOUND' | 'PAYER_NOT_OCCUPANT' | 'INVALID_AMOUNT' | 'OVERPAYMENT' | 'NO_SELECTION' | 'DUPLICATE_PAYMENT' | 'INVALID_DATE'
+export type MoveInPaymentError = 'OBLIGATION_NOT_FOUND' | 'INVALID_AMOUNT' | 'PARTIAL_CATEGORY' | 'ALREADY_PAID' | 'NO_SELECTION' | 'DUPLICATE_PAYMENT' | 'INVALID_DATE'
 export type MoveInPaymentResult =
   | { ok: true; data: PrototypeAppState; payment: Payment; receipt: Receipt }
   | { ok: false; reason: MoveInPaymentError }
 
+/**
+ * Room-level move-in collection. A selected category is always collected in full; advance and
+ * deposit may be collected separately on different dates. Legacy cents arguments remain readable
+ * for callers, but partial amounts are rejected.
+ */
 export function prepareMoveInPayment(data: PrototypeAppState, input: {
   obligationId: string
-  payerTenantId: string
-  advanceCents: number
-  depositCents: number
   paidOn: string
-  method: 'cash' | 'bank-transfer'
+  categories?: MoveInCategory[]
+  advanceCents?: number
+  depositCents?: number
+  /** Legacy caller metadata; new room-level payments never store a tenant payer or method. */
+  payerTenantId?: string
+  method?: 'cash' | 'bank-transfer'
 }): MoveInPaymentResult {
   const obligation = data.moveInObligations.find(item => item.id === input.obligationId)
   if (!obligation) return { ok: false, reason: 'OBLIGATION_NOT_FOUND' }
   const cycle = data.occupancyCycles.find(item => item.id === obligation.occupancyCycleId)
   if (!cycle) return { ok: false, reason: 'OBLIGATION_NOT_FOUND' }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.paidOn) || input.paidOn < cycle.startedAt) return { ok: false, reason: 'INVALID_DATE' }
-  const occupant = data.roomAssignments.some(assignment => assignment.tenantId === input.payerTenantId
-    && assignment.roomId === obligation.roomId
-    && assignment.startDate <= (cycle.endedAt ?? input.paidOn)
-    && (assignment.endDate === null || assignment.endDate >= cycle.startedAt))
-  if (!occupant) return { ok: false, reason: 'PAYER_NOT_OCCUPANT' }
   const advance = data.charges.find(charge => charge.id === obligation.advanceChargeId)
   const deposit = data.charges.find(charge => charge.id === obligation.depositChargeId)
   if (!advance || !deposit) return { ok: false, reason: 'OBLIGATION_NOT_FOUND' }
-  const advanceRemaining = obligation.advanceRequiredCents - chargePaid(data, advance.id, input.paidOn)
-  const depositRemaining = obligation.depositRequiredCents - chargePaid(data, deposit.id, input.paidOn)
-  if (!Number.isSafeInteger(input.advanceCents) || !Number.isSafeInteger(input.depositCents)
-    || input.advanceCents < 0 || input.depositCents < 0) return { ok: false, reason: 'INVALID_AMOUNT' }
-  if (input.advanceCents === 0 && input.depositCents === 0) return { ok: false, reason: 'NO_SELECTION' }
-  if (input.advanceCents > advanceRemaining || input.depositCents > depositRemaining) return { ok: false, reason: 'OVERPAYMENT' }
-  const amountCents = input.advanceCents + input.depositCents
+  const advanceRemaining = Math.max(0, obligation.advanceRequiredCents - chargePaid(data, advance.id, input.paidOn))
+  const depositRemaining = Math.max(0, obligation.depositRequiredCents - chargePaid(data, deposit.id, input.paidOn))
+
+  let selected: MoveInCategory[]
+  if (input.categories) {
+    selected = [...new Set(input.categories)]
+    if (selected.some(category => category !== 'ADVANCE' && category !== 'SECURITY_DEPOSIT')) return { ok: false, reason: 'INVALID_AMOUNT' }
+  } else {
+    const advanceCents = input.advanceCents ?? 0
+    const depositCents = input.depositCents ?? 0
+    if (!Number.isSafeInteger(advanceCents) || !Number.isSafeInteger(depositCents) || advanceCents < 0 || depositCents < 0) {
+      return { ok: false, reason: 'INVALID_AMOUNT' }
+    }
+    if ((advanceCents > 0 && advanceCents !== advanceRemaining) || (depositCents > 0 && depositCents !== depositRemaining)) {
+      return { ok: false, reason: 'PARTIAL_CATEGORY' }
+    }
+    selected = [
+      ...(advanceCents > 0 ? ['ADVANCE' as const] : []),
+      ...(depositCents > 0 ? ['SECURITY_DEPOSIT' as const] : []),
+    ]
+  }
+  if (selected.length === 0) return { ok: false, reason: 'NO_SELECTION' }
+  if (selected.includes('ADVANCE') && advanceRemaining === 0
+    || selected.includes('SECURITY_DEPOSIT') && depositRemaining === 0) return { ok: false, reason: 'ALREADY_PAID' }
+  const advanceCents = selected.includes('ADVANCE') ? advanceRemaining : 0
+  const depositCents = selected.includes('SECURITY_DEPOSIT') ? depositRemaining : 0
+  const amountCents = advanceCents + depositCents
   if (!Number.isSafeInteger(amountCents) || amountCents <= 0) return { ok: false, reason: 'INVALID_AMOUNT' }
 
   const sequence = data.payments.filter(payment => payment.id.startsWith(`payment-move-in-${obligation.id}-`)).length + 1
   const paymentId = `payment-move-in-${obligation.id}-${sequence}`
   if (data.payments.some(payment => payment.id === paymentId)) return { ok: false, reason: 'DUPLICATE_PAYMENT' }
   const allocations = [
-    ...(input.advanceCents > 0 ? [{ id: `allocation-${paymentId}-${advance.id}`, paymentId, chargeId: advance.id, amountCents: input.advanceCents, allocatedOn: input.paidOn, creditId: null, state: 'ACTIVE' as const, reversalAuditEventId: null }] : []),
-    ...(input.depositCents > 0 ? [{ id: `allocation-${paymentId}-${deposit.id}`, paymentId, chargeId: deposit.id, amountCents: input.depositCents, allocatedOn: input.paidOn, creditId: null, state: 'ACTIVE' as const, reversalAuditEventId: null }] : []),
+    ...(advanceCents > 0 ? [{ id: `allocation-${paymentId}-${advance.id}`, paymentId, chargeId: advance.id, amountCents: advanceCents, allocatedOn: input.paidOn, creditId: null, state: 'ACTIVE' as const, reversalAuditEventId: null }] : []),
+    ...(depositCents > 0 ? [{ id: `allocation-${paymentId}-${deposit.id}`, paymentId, chargeId: deposit.id, amountCents: depositCents, allocatedOn: input.paidOn, creditId: null, state: 'ACTIVE' as const, reversalAuditEventId: null }] : []),
   ]
   const receipt: Receipt = {
     id: `receipt-${paymentId}`, paymentId, receiptNumber: nextReceiptNumbers(data, 1)[0]!,
@@ -256,8 +279,8 @@ export function prepareMoveInPayment(data: PrototypeAppState, input: {
     state: 'ISSUED', revision: 1, supersedesReceiptId: null,
   }
   const payment: Payment = {
-    id: paymentId, tenantId: input.payerTenantId, amountCents, paidOn: input.paidOn,
-    method: input.method, state: 'RECORDED', correction: null,
+    id: paymentId, scope: 'ROOM', tenantId: null, roomId: obligation.roomId, occupancyCycleId: obligation.occupancyCycleId,
+    amountCents, paidOn: input.paidOn, method: null, state: 'RECORDED', correction: null,
   }
   const next: PrototypeAppState = {
     ...data,
@@ -266,9 +289,9 @@ export function prepareMoveInPayment(data: PrototypeAppState, input: {
     receipts: [...data.receipts, receipt],
     auditEvents: [...data.auditEvents, {
       id: `audit-${paymentId}`, actorId: 'demo-admin', occurredOn: input.paidOn, action: 'MOVE_IN_PAYMENT_RECORDED' as const,
-      entityType: 'PAYMENT' as const, entityId: paymentId, reason: 'Move-in advance/security deposit payment recorded.',
+      entityType: 'PAYMENT' as const, entityId: paymentId, reason: `Room-level move-in payment recorded for Room ${data.rooms.find(room => room.id === obligation.roomId)?.name ?? obligation.roomId}.`,
       beforeSnapshot: JSON.stringify({ obligationId: obligation.id, advanceRemaining, depositRemaining }),
-      afterSnapshot: JSON.stringify({ paymentId, advanceCents: input.advanceCents, depositCents: input.depositCents }),
+      afterSnapshot: JSON.stringify({ paymentId, roomId: obligation.roomId, occupancyCycleId: obligation.occupancyCycleId, advanceCents, depositCents }),
     }],
   }
   return { ok: true, data: next, payment, receipt }

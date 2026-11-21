@@ -185,7 +185,7 @@ export function PaymentCalculator({ periodId, periodLabel }: { periodId: string;
         <span className="payment-success-icon"><Check className="size-8" aria-hidden="true" /></span>
         <span className="payment-eyebrow mt-5">PAYMENT RECORDED</span>
         <DialogTitle className="mt-2 text-2xl">Payment recorded</DialogTitle>
-        <DialogDescription className="mt-2">Room {rooms.find(room => room.id === roomId)?.name ?? ''} · {periodLabel}. {preview.payments.length === 1 ? 'One tenant payment was recorded.' : `${preview.payments.length} tenant payments were recorded for this room.`}</DialogDescription>
+        <DialogDescription className="mt-2">Room {rooms.find(room => room.id === roomId)?.name ?? ''} · {periodLabel}. {preview.payments.length === 1 ? 'One room-level payment was recorded and shared with authorized occupants.' : `${preview.payments.length} room payments were recorded.`}</DialogDescription>
         <p className="payment-success-amount">{formatMoney(preview.totalCents)}</p>
         <p className="mt-1 text-sm font-semibold">{preview.receipts.map(receipt => receipt.receiptNumber).join(' · ')}</p>
         {preview.quote.electricity?.charge && <p className="mt-2 text-sm text-muted-foreground">Meter baseline advanced to {preview.quote.electricity.currentReadingMilliKwh! / 1000} kWh.</p>}

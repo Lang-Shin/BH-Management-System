@@ -71,7 +71,7 @@ describe('tenant digital receipts', () => {
     expect(screen.getByText('1 receipt for October 2026 (sample).')).toBeInTheDocument()
   })
 
-  it('keeps receipts tenant-owned when two tenants share a room', async () => {
+  it('shares room receipts with every authorized occupant', async () => {
     const user = userEvent.setup()
     renderReceipts()
     await waitForPage()
@@ -80,16 +80,20 @@ describe('tenant digital receipts', () => {
     expect(within(samWater).getByText('Room 2')).toBeInTheDocument()
     expect(within(samWater).getByText('Sam Navarro')).toBeInTheDocument()
     expect(screen.getByRole('article', { name: 'Receipt DEMO-RCT-009' })).toBeInTheDocument()
+    expect(screen.getByRole('article', { name: 'Receipt DEMO-RCT-012' })).toBeInTheDocument()
+    expect(screen.getByRole('article', { name: 'Receipt DEMO-RCT-013' })).toBeInTheDocument()
+    expect(within(screen.getByRole('article', { name: 'Receipt DEMO-RCT-012' })).getByText('Shared room payment')).toBeInTheDocument()
+    expect(within(screen.getByRole('article', { name: 'Receipt DEMO-RCT-012' })).queryByText('Morgan Cruz')).not.toBeInTheDocument()
     expect(screen.queryByRole('article', { name: 'Receipt DEMO-RCT-006' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('article', { name: 'Receipt DEMO-RCT-007' })).not.toBeInTheDocument()
 
     await user.selectOptions(screen.getByLabelText('Demo tenant'), 'tenant-4')
     const morganRent = await screen.findByRole('article', { name: 'Receipt DEMO-RCT-012' })
     expect(within(morganRent).getByText('Room 2')).toBeInTheDocument()
     expect(within(morganRent).getByText('Morgan Cruz')).toBeInTheDocument()
     expect(screen.getByRole('article', { name: 'Receipt DEMO-RCT-013' })).toBeInTheDocument()
-    expect(screen.queryByRole('article', { name: 'Receipt DEMO-RCT-008' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('article', { name: 'Receipt DEMO-RCT-009' })).not.toBeInTheDocument()
+    expect(screen.getByRole('article', { name: 'Receipt DEMO-RCT-008' })).toBeInTheDocument()
+    expect(screen.getByRole('article', { name: 'Receipt DEMO-RCT-009' })).toBeInTheDocument()
+    expect(within(screen.getByRole('article', { name: 'Receipt DEMO-RCT-008' })).getByText('Shared room payment')).toBeInTheDocument()
   })
 
   it('shows an advance receipt with no bill categories and an unallocated amount', async () => {

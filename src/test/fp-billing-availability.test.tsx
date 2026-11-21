@@ -79,8 +79,8 @@ describe('dynamic Billing room availability', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.totalCents).toBe(420_000)
-    expect(result.payments).toHaveLength(2)
-    expect(result.receipts).toHaveLength(2)
+    expect(result.payments).toHaveLength(1)
+    expect(result.receipts).toHaveLength(1)
     expect(result.data.charges.filter(charge => charge.id === `rent-${DEMO_PERIOD}-${room.room.id}`)).toHaveLength(1)
     expect(result.data.charges.filter(charge => charge.category === 'WATER' && [first.tenant.id, second.tenant.id].includes(charge.tenantId))).toHaveLength(2)
   })

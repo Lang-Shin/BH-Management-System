@@ -3,7 +3,7 @@ import { initialRoomRentRates, initialWashingRates, initialWaterRates } from '@/
 import { DEFAULT_MOVE_IN_POLICY } from '@/domain/calculations/move-in-policy'
 import { isPrototypeData, isRecord } from '@/domain/validation/prototype-data'
 
-export const STORAGE_SCHEMA_VERSION = 11
+export const STORAGE_SCHEMA_VERSION = 12
 
 type ParseResult =
   | { ok: true; data: PrototypeAppState }
@@ -23,6 +23,20 @@ function migrateVersion7(value: unknown): unknown {
     waterRates: initialWaterRates(),
     washingRates: initialWashingRates(),
   }
+}
+
+/**
+ * Version 12 makes payment ownership explicit. Existing transactions stay tenant-owned and keep
+ * their payer/method history; room-level payments use a room and occupancy-cycle reference.
+ */
+function withPaymentScope(value: unknown): unknown {
+  if (!isRecord(value)) return value
+  const payments = Array.isArray(value.payments)
+    ? value.payments.map(payment => isRecord(payment)
+      ? { ...payment, scope: payment.scope === 'ROOM' ? 'ROOM' : 'TENANT', roomId: payment.roomId ?? null, occupancyCycleId: payment.occupancyCycleId ?? null }
+      : payment)
+    : value.payments
+  return { ...value, payments }
 }
 
 /**
@@ -68,7 +82,8 @@ function withMoveInState(value: unknown, fromVersion: 7 | 8 | 9 | 10): Prototype
     moveInObligations,
     moveInPolicy,
   }
-  return isPrototypeData(candidate) ? candidate : null
+  const withPayments = withPaymentScope(candidate)
+  return isPrototypeData(withPayments) ? withPayments : null
 }
 
 /** Pure, non-throwing decoding. Storage access and recovery decisions stay in the adapter. */
@@ -80,6 +95,10 @@ export function parsePrototypeSnapshot(raw: string): ParseResult {
     return { ok: false, reason: 'MALFORMED_JSON' }
   }
   if (!isRecord(parsed)) return { ok: false, reason: 'INVALID_DATA' }
+  if (parsed.version === 11) {
+    const migrated = withPaymentScope(parsed.data)
+    return isPrototypeData(migrated) ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }
+  }
   if (parsed.version === 10) {
     const migrated = withMoveInState(parsed.data, 10)
     return migrated ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }

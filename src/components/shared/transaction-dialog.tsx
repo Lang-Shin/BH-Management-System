@@ -20,7 +20,7 @@ export function TransactionDialog({ data, payment, asOf, onClose, onReturnFocus,
   description?: string
 }) {
   const context = paymentRooms(data, payment, asOf)
-  const payer = data.tenants.find(tenant => tenant.id === payment.tenantId)?.name
+  const payer = payment.scope === 'ROOM' ? 'Room-level payment' : data.tenants.find(tenant => tenant.id === payment.tenantId)?.name
   const receipt = [...data.receipts].filter(item => item.paymentId === payment.id).sort((a, b) => b.revision - a.revision)[0]?.receiptNumber
   const advance = data.tenantCredits.some(credit => credit.sourcePaymentId === payment.id)
   const correction = data.paymentCorrections.find(item => item.correctedPaymentId === payment.id || item.originalPaymentId === payment.id)

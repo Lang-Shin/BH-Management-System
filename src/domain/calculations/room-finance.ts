@@ -165,8 +165,10 @@ export function paymentRooms(data: PrototypeAppState, payment: Payment, asOf: st
       allocations, unallocated,
     }
   }
-  const roomIds = [...new Set(data.roomAssignments.filter(item => item.tenantId === payment.tenantId
-    && item.startDate <= payment.paidOn && (item.endDate === null || item.endDate >= payment.paidOn)).map(item => item.roomId))]
+  const explicitRoom = payment.roomId ? roomContext(data, payment.roomId, 'payment-date', 'Room-level payment reference') : null
+  if (explicitRoom) return { label: explicitRoom.label, note: 'Room-level payment · unallocated money', allocations, unallocated }
+  const roomIds = payment.tenantId ? [...new Set(data.roomAssignments.filter(item => item.tenantId === payment.tenantId
+    && item.startDate <= payment.paidOn && (item.endDate === null || item.endDate >= payment.paidOn)).map(item => item.roomId))] : []
   const room = roomIds.length === 1 && roomIds[0] ? roomContext(data, roomIds[0], 'payment-date', '') : null
   return { label: room?.label ?? 'Room needs review', note: room ? 'Payment-date room context only · unallocated money' : 'No allocated charge or unambiguous payment-date room.', allocations, unallocated }
 }

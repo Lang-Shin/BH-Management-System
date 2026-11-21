@@ -186,10 +186,10 @@ export function createDemoData(): PrototypeAppState {
     { id: 'payment-2-water-2', tenantId: 'tenant-4', paidOn: '2026-11-12', items: [['water-nov-tenant-4', 10_000]] },
   ] satisfies { id: string; tenantId: string; paidOn: string; items: [string, number][] }[]
   examples.forEach((example, index) => {
-    payments.push({ id: example.id, tenantId: example.tenantId, paidOn: example.paidOn, amountCents: example.items.reduce((sum, [, amount]) => sum + amount, 0), method: index % 2 ? 'cash' : 'bank-transfer', state: 'RECORDED', correction: null })
+    payments.push({ id: example.id, scope: 'TENANT', tenantId: example.tenantId, roomId: null, occupancyCycleId: null, paidOn: example.paidOn, amountCents: example.items.reduce((sum, [, amount]) => sum + amount, 0), method: index % 2 ? 'cash' : 'bank-transfer', state: 'RECORDED', correction: null })
     example.items.forEach(([chargeId, amountCents]) => paymentAllocations.push({ id: `allocation-${example.id}-${chargeId}`, paymentId: example.id, chargeId, amountCents, allocatedOn: example.paidOn, creditId: null, state: 'ACTIVE', reversalAuditEventId: null }))
   })
-  payments.push({ id: 'payment-advance', tenantId: 'tenant-6', amountCents: 50_000, paidOn: '2026-11-12', method: 'cash', state: 'RECORDED', correction: null })
+  payments.push({ id: 'payment-advance', scope: 'TENANT', tenantId: 'tenant-6', roomId: null, occupancyCycleId: null, amountCents: 50_000, paidOn: '2026-11-12', method: 'cash', state: 'RECORDED', correction: null })
   const tenantCredits = [{ id: 'credit-6', tenantId: 'tenant-6', sourcePaymentId: 'payment-advance', amountCents: 50_000, createdOn: '2026-11-12' }]
   const receipts = payments.map((payment, index) => ({ id: `receipt-${index + 1}`, paymentId: payment.id, receiptNumber: `DEMO-RCT-${String(index + 1).padStart(3, '0')}`, issuedOn: payment.paidOn, amountCents: payment.amountCents, allocationIds: paymentAllocations.filter(a => a.paymentId === payment.id).map(a => a.id), state: 'ISSUED' as const, revision: 1, supersedesReceiptId: null }))
   const paymentCorrections: PaymentCorrection[] = []

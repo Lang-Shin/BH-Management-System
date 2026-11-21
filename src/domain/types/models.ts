@@ -188,12 +188,19 @@ export interface MoveInPolicy {
   moveOutSettlement: 'MANUAL_REVIEW'
 }
 
+export type PaymentScope = 'TENANT' | 'ROOM'
+
 export interface Payment {
   id: string
-  tenantId: string
+  /** Room-level payments have no tenant payer; historical tenant payments keep their payer. */
+  scope: PaymentScope
+  tenantId: string | null
+  roomId: string | null
+  occupancyCycleId: string | null
   amountCents: number
   paidOn: string
-  method: 'cash' | 'bank-transfer'
+  /** Room-level payments do not require an invented payment method. */
+  method: 'cash' | 'bank-transfer' | null
   state: 'RECORDED' | 'VOIDED'
   correction: AuthorizedCorrection | null
 }

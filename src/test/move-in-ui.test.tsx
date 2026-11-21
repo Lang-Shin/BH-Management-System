@@ -107,17 +107,18 @@ describe('move-in advance and security deposit UI', () => {
         draft: { ...draft, name: seed.name, email: `${seed.roomId}@example.com`, roomId: seed.roomId, moveInDate: '2026-11-01' },
       })
     }
-    const payFor = (roomId: string, advanceCents: number, depositCents: number) => {
-      const view = selectMoveInObligations(data, '2026-11-13', roomId)[0]!
-      const result = prepareMoveInPayment(data, {
-        obligationId: view.obligation.id, payerTenantId: data.tenants.find(tenant => tenant.name.includes(roomId === 'room-9' ? 'Unpaid' : roomId === 'room-10' ? 'Settled' : 'Legacy'))!.id,
-        advanceCents, depositCents, paidOn: '2026-11-13', method: 'cash',
-      })
-      if (!result.ok) throw new Error(result.reason)
-      data = result.data
+    const settledView = selectMoveInObligations(data, '2026-11-13', 'room-10')[0]!
+    const settledPayment = prepareMoveInPayment(data, { obligationId: settledView.obligation.id, categories: ['ADVANCE', 'SECURITY_DEPOSIT'], paidOn: '2026-11-13' })
+    if (!settledPayment.ok) throw new Error(settledPayment.reason)
+    data = settledPayment.data
+    const legacyView = selectMoveInObligations(data, '2026-11-13', 'room-13')[0]!
+    const legacyTenant = data.tenants.find(tenant => tenant.name === 'Legacy Partial Resident')!
+    const legacyPaymentId = 'legacy-partial-payment'
+    data = {
+      ...data,
+      payments: [...data.payments, { id: legacyPaymentId, scope: 'TENANT', tenantId: legacyTenant.id, roomId: null, occupancyCycleId: null, amountCents: 100_000, paidOn: '2026-11-13', method: 'cash', state: 'RECORDED', correction: null }],
+      paymentAllocations: [...data.paymentAllocations, { id: 'legacy-partial-allocation', paymentId: legacyPaymentId, chargeId: legacyView.obligation.advanceChargeId, amountCents: 100_000, allocatedOn: '2026-11-13', creditId: null, state: 'ACTIVE', reversalAuditEventId: null }],
     }
-    payFor('room-10', 400_000, 400_000)
-    payFor('room-13', 100_000, 0)
     await localStorageRepository.save(data)
     renderApp()
     const section = await screen.findByRole('region', { name: 'Move-in advance & security deposit' })
@@ -130,11 +131,11 @@ describe('move-in advance and security deposit UI', () => {
     expect(within(unpaid).queryByText('PAID')).not.toBeInTheDocument()
     expect(within(unpaid).queryByText('NOT PAID')).not.toBeInTheDocument()
     expect(unpaid).not.toHaveTextContent('Unpaid Resident')
-    const settled = within(table).getByText('Room 03').closest('tr')!
-    expect(within(settled).getAllByText('PAID')).toHaveLength(2)
-    expect(within(settled).queryByText('₱4,000.00')).not.toBeInTheDocument()
-    expect(within(settled).getByText('Settled')).toBeInTheDocument()
-    expect(within(settled).queryByRole('button')).not.toBeInTheDocument()
+    const settledRow = within(table).getByText('Room 03').closest('tr')!
+    expect(within(settledRow).getAllByText('PAID')).toHaveLength(2)
+    expect(within(settledRow).queryByText(/4,000\.00/)).not.toBeInTheDocument()
+    expect(within(settledRow).getByText('Settled')).toBeInTheDocument()
+    expect(within(settledRow).queryByRole('button')).not.toBeInTheDocument()
     const partial = within(table).getByText('Room 06').closest('tr')!
     expect(within(partial).getByText('₱3,000.00')).toBeInTheDocument()
     expect(within(partial).getByText('₱4,000.00')).toBeInTheDocument()
@@ -147,7 +148,6 @@ describe('move-in advance and security deposit UI', () => {
   it('records a room-level move-in payment and persists its receipt', async () => {
     const user = userEvent.setup()
     const seeded = prototypeReducer(createDemoData(), { type: 'tenant/created', draft })
-    const tenant = seeded.tenants.find(item => item.name === 'Move-in UI Tenant')!
     await localStorageRepository.save(seeded)
     renderApp()
 
@@ -156,8 +156,10 @@ describe('move-in advance and security deposit UI', () => {
     expect(within(section).getAllByText(/Non-refundable/).length).toBeGreaterThan(0)
     await user.click(within(section).getByRole('button', { name: 'Record move-in payment for room 01' }))
     const dialog = await screen.findByRole('dialog', { name: 'Record a move-in payment.' })
-    expect(within(dialog).getByLabelText(/^Advance/)).toHaveValue('4000.00')
-    expect(within(dialog).getByLabelText(/^Security deposit/)).toHaveValue('4000.00')
+    expect(within(dialog).getByLabelText('Advance', { selector: 'input' })).toBeChecked()
+    expect(within(dialog).getByLabelText('Security deposit', { selector: 'input' })).toBeChecked()
+    expect(within(dialog).queryByLabelText(/Who is paying/)).not.toBeInTheDocument()
+    expect(within(dialog).queryByLabelText('Method')).not.toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Record payment' }))
 
     expect(await within(dialog).findByText('Move-in payment saved.')).toBeInTheDocument()
@@ -171,9 +173,10 @@ describe('move-in advance and security deposit UI', () => {
       expect(view.status).toBe('PAID')
       expect(view.advancePaidCents).toBe(400_000)
       expect(view.depositPaidCents).toBe(400_000)
-      expect(data.payments.filter(payment => payment.tenantId === tenant.id)).toHaveLength(1)
-      expect(data.paymentAllocations.filter(allocation => allocation.paymentId === data.payments.at(-1)!.id)).toHaveLength(2)
-      expect(data.receipts.filter(receipt => receipt.paymentId === data.payments.at(-1)!.id)).toHaveLength(1)
+      const payment = data.payments.find(item => item.id.startsWith('payment-move-in-'))!
+      expect(payment).toMatchObject({ scope: 'ROOM', tenantId: null, roomId: 'room-9', occupancyCycleId: view.cycle.id, method: null })
+      expect(data.paymentAllocations.filter(allocation => allocation.paymentId === payment.id)).toHaveLength(2)
+      expect(data.receipts.filter(receipt => receipt.paymentId === payment.id)).toHaveLength(1)
     })
     expect(within(section).getAllByText('PAID', { selector: '.move-in-status' })).toHaveLength(2)
     expect(within(section).getByText('Settled')).toBeInTheDocument()
@@ -198,16 +201,15 @@ describe('move-in advance and security deposit UI', () => {
     const tenant = seeded.tenants.find(item => item.name === 'Move-in UI Tenant')!
     const view = selectMoveInObligations(seeded, '2026-11-13', 'room-9')[0]!
     const paid = prepareMoveInPayment(seeded, {
-      obligationId: view.obligation.id, payerTenantId: tenant.id,
-      advanceCents: 100_000, depositCents: 0, paidOn: '2026-11-13', method: 'cash',
+      obligationId: view.obligation.id, categories: ['ADVANCE'], paidOn: '2026-11-13',
     })
     if (!paid.ok) throw new Error('Seed payment failed')
     await localStorageRepository.save(paid.data)
     localStorage.setItem(TENANT_DEMO_STORAGE_KEY, tenant.id)
     renderApp('/tenant')
     const section = await screen.findByRole('region', { name: 'Move-in advance and security deposit' })
-    expect(within(section).getByText('₱1,000.00 paid of ₱4,000.00')).toBeVisible()
-    expect(within(section).getByText('₱3,000.00 remaining')).toBeVisible()
+    expect(within(section).getByText('₱4,000.00 paid of ₱4,000.00')).toBeVisible()
+    expect(within(section).getByText('₱0.00 remaining')).toBeVisible()
     expect(within(section).getByText('Security deposit (non-refundable)')).toBeVisible()
     expect(within(section).getByText(/The advance is not automatically used to pay a month. The security deposit is non-refundable and is not counted as rent income/)).toBeVisible()
   })
@@ -233,8 +235,7 @@ describe('move-in advance and security deposit UI', () => {
     const tenant = seeded.tenants.find(item => item.name === 'Move-in UI Tenant')!
     const view = selectMoveInObligations(seeded, '2026-11-13', 'room-9')[0]!
     const paid = prepareMoveInPayment(seeded, {
-      obligationId: view.obligation.id, payerTenantId: tenant.id,
-      advanceCents: 0, depositCents: 100_000, paidOn: '2026-11-13', method: 'cash',
+      obligationId: view.obligation.id, categories: ['SECURITY_DEPOSIT'], paidOn: '2026-11-13',
     })
     if (!paid.ok) throw new Error('Seed payment failed')
     await localStorageRepository.save(paid.data)

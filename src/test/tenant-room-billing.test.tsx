@@ -30,7 +30,7 @@ describe('tenant room billing status and ownership', () => {
 
   it('counts a partial allocation as PARTLY PAID even when no category has been fully settled', () => {
     const data = createDemoData()
-    data.payments = [{ id: 'partial-water', tenantId: 'tenant-5', amountCents: 5_000, paidOn: DEMO_DATE, method: 'cash', state: 'RECORDED', correction: null }]
+    data.payments = [{ id: 'partial-water', scope: 'TENANT' as const, roomId: null, occupancyCycleId: null, tenantId: 'tenant-5', amountCents: 5_000, paidOn: DEMO_DATE, method: 'cash', state: 'RECORDED', correction: null }]
     data.paymentAllocations = [{ id: 'partial-allocation', paymentId: 'partial-water', chargeId: 'water-nov-tenant-5', amountCents: 5_000, allocatedOn: DEMO_DATE, creditId: null, state: 'ACTIVE', reversalAuditEventId: null }]
     const view = tenantRoomBilling(data, 'tenant-5', 'room-4', DEMO_PERIOD, DEMO_DATE)
     expect(view.status).toBe('PARTLY PAID')
@@ -83,10 +83,10 @@ describe('room-first tenant overview', () => {
     expect(within(room).getByText('Morgan Cruz')).toBeInTheDocument()
     const bills = screen.getByRole('region', { name: 'Monthly room billing' })
     expect(within(bills).getByRole('status')).toHaveTextContent('PARTLY PAID')
-    expect(screen.getByRole('region', { name: 'Unpaid bills' })).toHaveTextContent('ElectricityPending calculation')
+    expect(screen.getByRole('region', { name: 'Bill categories' })).toHaveTextContent('ElectricityAWAITING READING')
     expect(within(bills).queryByText('₱13.00')).not.toBeInTheDocument()
     await user.selectOptions(screen.getByLabelText('Billing month'), 'period-oct')
-    expect(screen.getByRole('region', { name: 'Unpaid bills' })).toHaveTextContent('Rent₱3,500.00')
+    expect(screen.getByRole('region', { name: 'Bill categories' })).toHaveTextContent(/Rent.*3,500\.00/)
     expect(within(bills).queryByText('Sam Navarro')).not.toBeInTheDocument()
     expect(within(bills).queryByText('Morgan Cruz')).not.toBeInTheDocument()
     await user.selectOptions(screen.getByLabelText('Demo tenant'), 'tenant-7')

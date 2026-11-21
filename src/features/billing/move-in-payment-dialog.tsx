@@ -4,16 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { usePrototype } from '@/hooks/use-prototype'
 import { DEMO_DATE } from '@/data/fixtures/demo'
-import { parseRateInput } from '@/domain/calculations/billing-rates'
-import { prepareMoveInPayment, type MoveInObligationView } from '@/domain/calculations/move-in'
-import { activeAssignments } from '@/domain/calculations/summary'
+import { prepareMoveInPayment, type MoveInCategory, type MoveInObligationView } from '@/domain/calculations/move-in'
 import { formatMoney } from '@/lib/format'
-
-function parseOptionalMoney(value: string): number | null {
-  if (value.trim() === '') return 0
-  const parsed = parseRateInput(value)
-  return parsed.ok ? parsed.cents : null
-}
 
 export function MoveInPaymentDialog({ view, onClose, onSaved }: {
   view: MoveInObligationView
@@ -21,35 +13,33 @@ export function MoveInPaymentDialog({ view, onClose, onSaved }: {
   onSaved: (message: string) => void
 }) {
   const { data, dispatch, persistSnapshot } = usePrototype()
-  const [advance, setAdvance] = useState((view.advanceRemainingCents / 100).toFixed(2))
-  const [deposit, setDeposit] = useState((view.depositRemainingCents / 100).toFixed(2))
+  const initialSelection: MoveInCategory[] = [
+    ...(view.advanceRemainingCents > 0 ? ['ADVANCE' as const] : []),
+    ...(view.depositRemainingCents > 0 ? ['SECURITY_DEPOSIT' as const] : []),
+  ]
+  const [selected, setSelected] = useState<MoveInCategory[]>(initialSelection)
   const [paidOn, setPaidOn] = useState(DEMO_DATE)
-  const [method, setMethod] = useState<'cash' | 'bank-transfer'>('cash')
-  const occupants = activeAssignments(data, paidOn).filter(assignment => assignment.roomId === view.room.id)
-  const [payerTenantId, setPayerTenantId] = useState(occupants[0]?.tenantId ?? '')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState<{ receiptNumber: string; amountCents: number } | null>(null)
-  const advanceCents = parseOptionalMoney(advance)
-  const depositCents = parseOptionalMoney(deposit)
   const entryDateError = !paidOn ? 'Choose the date the money was received.'
     : paidOn < view.cycle.startedAt ? 'Payment date cannot be before the occupancy started.' : ''
-  const canSubmit = Boolean(payerTenantId) && advanceCents !== null && depositCents !== null && !entryDateError && !saving
+  const totalCents = (selected.includes('ADVANCE') ? view.advanceRemainingCents : 0)
+    + (selected.includes('SECURITY_DEPOSIT') ? view.depositRemainingCents : 0)
+  const canSubmit = selected.length > 0 && !entryDateError && !saving
+
+  function toggle(category: MoveInCategory) {
+    setSelected(current => current.includes(category) ? current.filter(item => item !== category) : [...current, category])
+    setError('')
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (advanceCents === null || depositCents === null) {
-      setError('Enter valid peso amounts with up to two decimal places.')
-      return
-    }
-    const result = prepareMoveInPayment(data, {
-      obligationId: view.obligation.id, payerTenantId, advanceCents, depositCents, paidOn, method,
-    })
+    const result = prepareMoveInPayment(data, { obligationId: view.obligation.id, paidOn, categories: selected })
     if (!result.ok) {
-      setError(result.reason === 'OVERPAYMENT' ? 'The selected amount is more than what is still owed for this category.'
-        : result.reason === 'NO_SELECTION' ? 'Enter an advance amount, a deposit amount, or both.'
-        : result.reason === 'PAYER_NOT_OCCUPANT' ? 'Choose a tenant assigned to this room for the selected date.'
-        : 'This move-in payment could not be recorded. Review the amounts and try again.')
+      setError(result.reason === 'NO_SELECTION' ? 'Select the advance, the security deposit, or both.'
+        : result.reason === 'ALREADY_PAID' ? 'A selected category is already fully paid. Refresh the section and try again.'
+        : 'This move-in payment could not be recorded. Review the selection and try again.')
       return
     }
     setSaving(true)
@@ -60,12 +50,9 @@ export function MoveInPaymentDialog({ view, onClose, onSaved }: {
       setError(`Payment was not saved. ${warning}`)
       return
     }
-    dispatch({
-      type: 'moveIn/paymentRecorded', obligationId: view.obligation.id, payerTenantId,
-      advanceCents, depositCents, paidOn, method,
-    })
+    dispatch({ type: 'moveIn/paymentRecorded', obligationId: view.obligation.id, categories: selected, paidOn })
     setSuccess({ receiptNumber: result.receipt.receiptNumber, amountCents: result.payment.amountCents })
-    onSaved(`Move-in payment recorded. Receipt ${result.receipt.receiptNumber}.`)
+    onSaved(`Room-level move-in payment recorded. Receipt ${result.receipt.receiptNumber}.`)
   }
 
   return <Dialog open onOpenChange={next => { if (!next) onClose() }}>
@@ -73,7 +60,7 @@ export function MoveInPaymentDialog({ view, onClose, onSaved }: {
       {success ? <div className="move-in-success">
         <span className="move-in-success-icon"><Check aria-hidden="true" /></span>
         <DialogTitle>Move-in payment saved.</DialogTitle>
-        <DialogDescription id="move-in-payment-description">The room-level advance and deposit balances were updated.</DialogDescription>
+        <DialogDescription id="move-in-payment-description">The room-level advance and deposit balances were updated for every authorized occupant.</DialogDescription>
         <dl className="move-in-success-details">
           <div><dt>Receipt</dt><dd>{success.receiptNumber}</dd></div>
           <div><dt>Amount received</dt><dd>{formatMoney(success.amountCents)}</dd></div>
@@ -86,7 +73,7 @@ export function MoveInPaymentDialog({ view, onClose, onSaved }: {
           <span className="move-in-dialog-icon"><ShieldCheck aria-hidden="true" /></span>
           <div>
             <DialogTitle>Record a move-in payment.</DialogTitle>
-            <DialogDescription id="move-in-payment-description">{view.obligation.depositDisposition === 'NON_REFUNDABLE' ? 'Advance and security deposit are tracked separately. The security deposit is non-refundable and does not become rent income automatically.' : 'Advance and security deposit are tracked separately. The deposit terms require manual review; no refund or income is posted automatically.'}</DialogDescription>
+            <DialogDescription id="move-in-payment-description">Select the room-level categories received. Each category is collected in full; advance and deposit may be recorded on different dates.</DialogDescription>
           </div>
         </div>
         <div className="move-in-dialog-body">
@@ -95,30 +82,28 @@ export function MoveInPaymentDialog({ view, onClose, onSaved }: {
             <div><span>Monthly rent snapshot</span><strong>{formatMoney(view.obligation.agreedMonthlyRentCents)}</strong></div>
             <div><span>Move-in date</span><strong>{view.cycle.startedAt}</strong></div>
           </div>
-          {occupants.length > 1 && <label className="move-in-field"><span>Who is paying?</span>
-            <select value={payerTenantId} onChange={event => setPayerTenantId(event.target.value)}>
-              {occupants.map(assignment => <option key={assignment.id} value={assignment.tenantId}>{data.tenants.find(tenant => tenant.id === assignment.tenantId)?.name ?? assignment.tenantId}</option>)}
-            </select>
-            <small>The room obligation is owed once regardless of who pays.</small>
-          </label>}
-          <div className="move-in-amounts">
-            <label className="move-in-field">
-              <span className="move-in-field-label"><Wallet aria-hidden="true" />Advance</span>
-              <span className="move-in-money-input"><span>PHP</span><input inputMode="decimal" value={advance} onChange={event => { setAdvance(event.target.value); setError('') }} aria-invalid={advanceCents === null} /></span>
-              <small>{formatMoney(view.advanceRemainingCents)} still owed</small>
-            </label>
-            <label className="move-in-field">
-              <span className="move-in-field-label"><ShieldCheck aria-hidden="true" />{view.obligation.depositDisposition === 'NON_REFUNDABLE' ? 'Security deposit (non-refundable)' : 'Security deposit'}</span>
-              <span className="move-in-money-input"><span>PHP</span><input inputMode="decimal" value={deposit} onChange={event => { setDeposit(event.target.value); setError('') }} aria-invalid={depositCents === null} /></span>
-              <small>{view.obligation.depositDisposition === 'NON_REFUNDABLE' ? 'Non-refundable · no automatic refund or rent-income recognition · ' : 'Manual review before any refund or deduction · '}{formatMoney(view.depositRemainingCents)} still owed</small>
-            </label>
-          </div>
-          <div className="move-in-amounts">
-            <label className="move-in-field"><span>Payment date</span><input type="date" value={paidOn} onChange={event => { setPaidOn(event.target.value); setError('') }} aria-invalid={Boolean(entryDateError)} /><small>{entryDateError || 'Date the money was received.'}</small></label>
-            <label className="move-in-field"><span>Method</span><select value={method} onChange={event => setMethod(event.target.value as 'cash' | 'bank-transfer')}><option value="cash">Cash</option><option value="bank-transfer">Bank transfer</option></select></label>
-          </div>
-          <div className="move-in-total"><span>Total received</span><strong>{formatMoney((advanceCents ?? 0) + (depositCents ?? 0))}</strong></div>
-          <p className="move-in-policy-note"><ReceiptText aria-hidden="true" />Only the selected advance and deposit amounts are applied. No future-month bill is paid or modified, and no deposit refund or rental income is posted.</p>
+          <fieldset className="room-payment-options" aria-label="Move-in categories received">
+            <legend className="sr-only">Move-in categories received</legend>
+            <div className="room-payment-option">
+              <label className="room-payment-option-label">
+                <input type="checkbox" checked={selected.includes('ADVANCE')} disabled={view.advanceRemainingCents === 0} onChange={() => toggle('ADVANCE')} aria-label="Advance" />
+                <span className="payment-category-icon"><Wallet className="size-[18px]" aria-hidden="true" /></span>
+                <span className="min-w-0 flex-1"><span className="block font-semibold">Advance</span><span className="mt-0.5 block text-xs text-muted-foreground">{view.advanceRemainingCents === 0 ? 'Already paid in full' : 'Full category payment'}</span></span>
+                <span className="shrink-0 text-right font-semibold tabular-nums">{view.advanceRemainingCents === 0 ? 'PAID' : formatMoney(view.advanceRemainingCents)}</span>
+              </label>
+            </div>
+            <div className="room-payment-option">
+              <label className="room-payment-option-label">
+                <input type="checkbox" checked={selected.includes('SECURITY_DEPOSIT')} disabled={view.depositRemainingCents === 0} onChange={() => toggle('SECURITY_DEPOSIT')} aria-label="Security deposit" />
+                <span className="payment-category-icon"><ShieldCheck className="size-[18px]" aria-hidden="true" /></span>
+                <span className="min-w-0 flex-1"><span className="block font-semibold">{view.obligation.depositDisposition === 'NON_REFUNDABLE' ? 'Security deposit (non-refundable)' : 'Security deposit'}</span><span className="mt-0.5 block text-xs text-muted-foreground">{view.depositRemainingCents === 0 ? 'Already paid in full' : view.obligation.depositDisposition === 'NON_REFUNDABLE' ? 'Non-refundable under the boarding house’s stated policy' : 'Full category payment · manual review terms'}</span></span>
+                <span className="shrink-0 text-right font-semibold tabular-nums">{view.depositRemainingCents === 0 ? 'PAID' : formatMoney(view.depositRemainingCents)}</span>
+              </label>
+            </div>
+          </fieldset>
+          <label className="move-in-field"><span>Payment date</span><input type="date" value={paidOn} onChange={event => { setPaidOn(event.target.value); setError('') }} aria-invalid={Boolean(entryDateError)} /><small>{entryDateError || 'Date the money was received.'}</small></label>
+          <div className="move-in-total"><span>Total received</span><strong>{formatMoney(totalCents)}</strong></div>
+          <p className="move-in-policy-note"><ReceiptText aria-hidden="true" />No partial category payments are accepted. No future-month bill is paid or modified, and no deposit refund or rental income is posted.</p>
           {error && <p role="alert" className="move-in-error">{error}</p>}
         </div>
         <div className="move-in-dialog-actions">

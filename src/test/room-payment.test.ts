@@ -60,7 +60,7 @@ describe('room-based checkbox payment calculator', () => {
     expect(quote.totalCents).toBe(10_000)
   })
 
-  it('records a combined room payment once, groups tenant-owned bills, and advances electricity', () => {
+  it('records a combined room payment once as a room-level transaction and advances electricity', () => {
     const data = createDemoData()
     const before = JSON.stringify(data)
     const result = prepareRoomPayment(data, { ...base, roomId: 'room-4', selected: ['RENT', 'WATER', 'ELECTRICITY'], electricityReadingMilliKwh: 325_000 })
@@ -68,11 +68,9 @@ describe('room-based checkbox payment calculator', () => {
     if (!result.ok) return
     expect(JSON.stringify(data)).toBe(before)
     expect(result.totalCents).toBe(402_500)
-    expect(result.payments).toHaveLength(2)
-    expect(result.payments.map(payment => [payment.tenantId, payment.amountCents])).toEqual([
-      ['tenant-5', 392_500], ['tenant-8', 10_000],
-    ])
-    expect(result.receipts.map(receipt => receipt.receiptNumber)).toEqual(['DEMO-RCT-015', 'DEMO-RCT-016'])
+    expect(result.payments).toHaveLength(1)
+    expect(result.payments[0]).toMatchObject({ scope: 'ROOM', tenantId: null, roomId: 'room-4', method: null, amountCents: 402_500 })
+    expect(result.receipts.map(receipt => receipt.receiptNumber)).toEqual(['DEMO-RCT-015'])
     expect(isPrototypeData(result.data)).toBe(true)
     expect(latestSettledReading(result.data, 'meter-room-4')).toMatchObject({ readingMilliKwh: 325_000 })
     expect(result.data.electricityBillObligations.some(item => item.roomId === 'room-4')).toBe(false)
@@ -80,7 +78,7 @@ describe('room-based checkbox payment calculator', () => {
     expect(prepareRoomPayment(result.data, { ...base, roomId: 'room-4', selected: ['RENT', 'WATER', 'ELECTRICITY'], electricityReadingMilliKwh: 325_000 })).toEqual({ ok: false, reason: 'NO_SELECTION' })
   })
 
-  it('records electricity alone as one tenant payment', () => {
+  it('records electricity alone as one room-level payment', () => {
     const data = createDemoData()
     const result = prepareRoomPayment(data, { ...base, roomId: 'room-4', selected: ['ELECTRICITY'], electricityReadingMilliKwh: 325_000 })
     expect(result.ok).toBe(true)

@@ -76,7 +76,7 @@ describe('tenant receipt corrections', () => {
     await user.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('link', { name: 'Overview' }))
     const monthlyBilling = screen.getByRole('region', { name: 'Monthly room billing' })
     expect(within(monthlyBilling).getByRole('status')).toHaveTextContent('PARTLY PAID')
-    expect(screen.getByRole('region', { name: 'Unpaid bills' })).toHaveTextContent('Water₱100.00')
+    expect(screen.getByRole('region', { name: 'Bill categories' })).toHaveTextContent(/Water.*100\.00/)
     await user.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('link', { name: 'My Payments & Receipts' }))
 
     await user.selectOptions(screen.getByLabelText('Demo tenant'), 'tenant-2')

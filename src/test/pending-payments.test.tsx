@@ -19,7 +19,7 @@ function historicalPendingFixture() {
   const oldElectricity = data.charges.find(charge => charge.id === 'electricity-oct-room-1')!
   data.charges = [rent, water, electricity, oldWater, oldRent, oldElectricity]
   data.electricityBillObligations = []
-  data.payments = [{ id: 'partial-nov', tenantId: 'tenant-1', amountCents: 110000, paidOn: DEMO_DATE, method: 'cash', state: 'RECORDED', correction: null }]
+  data.payments = [{ id: 'partial-nov', scope: 'TENANT' as const, roomId: null, occupancyCycleId: null, tenantId: 'tenant-1', amountCents: 110000, paidOn: DEMO_DATE, method: 'cash', state: 'RECORDED', correction: null }]
   data.paymentAllocations = [
     { id: 'partial-water', paymentId: 'partial-nov', chargeId: oldWater.id, amountCents: 100000, allocatedOn: DEMO_DATE, state: 'ACTIVE', creditId: null, reversalAuditEventId: null },
     { id: 'paid-water', paymentId: 'partial-nov', chargeId: water.id, amountCents: 10000, allocatedOn: DEMO_DATE, state: 'ACTIVE', creditId: null, reversalAuditEventId: null },

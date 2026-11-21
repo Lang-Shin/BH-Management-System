@@ -274,7 +274,9 @@ export function preparePaymentCorrection(data: PrototypeAppState, input: Payment
       beforeSnapshot: JSON.stringify({ state: 'ACTIVE', amountCents: allocation.amountCents }), afterSnapshot: JSON.stringify({ state: 'REVERSED' }),
     }))
   const correctedPayment: Payment = {
-    id: correctedPaymentId, tenantId: original.tenantId, amountCents: amountToRecord, paidOn: original.paidOn,
+    id: correctedPaymentId, scope: original.scope, tenantId: original.tenantId,
+    roomId: original.roomId, occupancyCycleId: original.occupancyCycleId,
+    amountCents: amountToRecord, paidOn: original.paidOn,
     method: original.method, state: 'RECORDED', correction: { supersedesId: original.id, auditEventId, authorizedBy: 'demo-admin' },
   }
   const correctedReceipt: Receipt = {

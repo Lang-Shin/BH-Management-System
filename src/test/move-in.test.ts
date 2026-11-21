@@ -75,21 +75,21 @@ describe('room-level move-in advance and security deposit', () => {
     expect(view!.room.name).toBe('02')
   })
 
-  it('records separate partial advance and deposit payments with unique receipts', () => {
+  it('records full advance and deposit categories separately with unique receipts', () => {
     const { data, tenant } = createInRoom(createDemoData())
     const view = viewFor(data, tenant)
     const first = prepareMoveInPayment(data, {
-      obligationId: view!.obligation.id, payerTenantId: tenant.id,
-      advanceCents: 100_000, depositCents: 0, paidOn: DEMO_DATE, method: 'cash',
+      obligationId: view!.obligation.id,
+      categories: ['ADVANCE'], paidOn: DEMO_DATE,
     })
     expect(first.ok).toBe(true)
     if (!first.ok) return
     expect(selectMoveInObligations(first.data, DEMO_DATE, 'room-9')[0]).toMatchObject({
-      advancePaidCents: 100_000, depositPaidCents: 0, advanceStatus: 'PARTLY PAID', depositStatus: 'NOT PAID', status: 'PARTLY PAID',
+      advancePaidCents: 400_000, depositPaidCents: 0, advanceStatus: 'PAID', depositStatus: 'NOT PAID', status: 'PARTLY PAID',
     })
     const second = prepareMoveInPayment(first.data, {
-      obligationId: view!.obligation.id, payerTenantId: tenant.id,
-      advanceCents: 300_000, depositCents: 400_000, paidOn: DEMO_DATE, method: 'bank-transfer',
+      obligationId: view!.obligation.id,
+      categories: ['SECURITY_DEPOSIT'], paidOn: DEMO_DATE,
     })
     expect(second.ok).toBe(true)
     if (!second.ok) return
@@ -103,15 +103,18 @@ describe('room-level move-in advance and security deposit', () => {
     expect(second.data.receipts.filter(receipt => receipt.paymentId === second.payment.id)).toHaveLength(1)
   })
 
-  it('rejects overpayment, empty selections, and a payer unrelated to the room', () => {
-    const { data, tenant } = createInRoom(createDemoData())
+  it('rejects partial categories, empty selections, duplicates, and invalid dates', () => {
+    const { data } = createInRoom(createDemoData())
     const obligation = data.moveInObligations[0]!
-    const base = { obligationId: obligation.id, payerTenantId: tenant.id, paidOn: DEMO_DATE, method: 'cash' as const }
-    expect(prepareMoveInPayment(data, { ...base, advanceCents: 400_001, depositCents: 0 })).toEqual({ ok: false, reason: 'OVERPAYMENT' })
-    expect(prepareMoveInPayment(data, { ...base, advanceCents: 0, depositCents: 0 })).toEqual({ ok: false, reason: 'NO_SELECTION' })
-    expect(prepareMoveInPayment(data, { ...base, payerTenantId: 'tenant-1', advanceCents: 1, depositCents: 0 })).toEqual({ ok: false, reason: 'PAYER_NOT_OCCUPANT' })
+    const base = { obligationId: obligation.id, paidOn: DEMO_DATE }
+    expect(prepareMoveInPayment(data, { ...base, advanceCents: 200_000, depositCents: 0 })).toEqual({ ok: false, reason: 'PARTIAL_CATEGORY' })
+    expect(prepareMoveInPayment(data, { ...base, categories: [] })).toEqual({ ok: false, reason: 'NO_SELECTION' })
     expect(prepareMoveInPayment(data, { ...base, advanceCents: -1, depositCents: 0 })).toEqual({ ok: false, reason: 'INVALID_AMOUNT' })
-    expect(prepareMoveInPayment(data, { ...base, paidOn: '2026-10-01', advanceCents: 1, depositCents: 0 })).toEqual({ ok: false, reason: 'INVALID_DATE' })
+    expect(prepareMoveInPayment(data, { ...base, paidOn: '2026-10-01', categories: ['ADVANCE'] })).toEqual({ ok: false, reason: 'INVALID_DATE' })
+    const full = prepareMoveInPayment(data, { ...base, categories: ['ADVANCE'] })
+    expect(full.ok).toBe(true)
+    if (!full.ok) return
+    expect(prepareMoveInPayment(full.data, { ...base, categories: ['ADVANCE'] })).toEqual({ ok: false, reason: 'ALREADY_PAID' })
   })
 
   it('closes the room cycle when everyone leaves and creates a fresh obligation for the next occupancy', () => {
@@ -216,8 +219,8 @@ describe('room-level move-in advance and security deposit', () => {
     const tenant = created.tenant
     const view = viewFor(created.data, tenant)
     const paid = prepareMoveInPayment(created.data, {
-      obligationId: view!.obligation.id, payerTenantId: tenant.id,
-      advanceCents: 400_000, depositCents: 400_000, paidOn: DEMO_DATE, method: 'cash',
+      obligationId: view!.obligation.id,
+      categories: ['ADVANCE', 'SECURITY_DEPOSIT'], paidOn: DEMO_DATE,
     })
     expect(paid.ok).toBe(true)
     if (!paid.ok) return
@@ -248,8 +251,8 @@ describe('room-level move-in advance and security deposit', () => {
     const created = createInRoom(createDemoData())
     const seededView = viewFor(created.data, created.tenant)
     const paid = prepareMoveInPayment(created.data, {
-      obligationId: seededView!.obligation.id, payerTenantId: created.tenant.id,
-      advanceCents: 100_000, depositCents: 100_000, paidOn: DEMO_DATE, method: 'cash',
+      obligationId: seededView!.obligation.id,
+      categories: ['ADVANCE', 'SECURITY_DEPOSIT'], paidOn: DEMO_DATE,
     })
     if (!paid.ok) throw new Error('Seed payment failed')
     const obligation = paid.data.moveInObligations[0]!
@@ -280,8 +283,8 @@ describe('room-level move-in advance and security deposit', () => {
     const { data, tenant } = createInRoom(createDemoData())
     const obligation = data.moveInObligations[0]!
     const paid = prepareMoveInPayment(data, {
-      obligationId: obligation.id, payerTenantId: tenant.id,
-      advanceCents: 100_000, depositCents: 100_000, paidOn: DEMO_DATE, method: 'cash',
+      obligationId: obligation.id,
+      categories: ['ADVANCE', 'SECURITY_DEPOSIT'], paidOn: DEMO_DATE,
     })
     expect(paid.ok).toBe(true)
     if (!paid.ok) return
@@ -294,11 +297,11 @@ describe('room-level move-in advance and security deposit', () => {
     })
     expect(corrected.ok).toBe(true)
     if (!corrected.ok) return
-    expect(corrected.correction).toMatchObject({ originalAmountCents: 200_000, correctedAmountCents: 100_000, differenceCents: -100_000, settlementStatus: 'REFUNDED' })
+    expect(corrected.correction).toMatchObject({ originalAmountCents: 800_000, correctedAmountCents: 400_000, differenceCents: -400_000, settlementStatus: 'REFUNDED' })
     expect(corrected.data.moveInObligations).toEqual(paid.data.moveInObligations)
     expect(corrected.data.charges.filter(charge => charge.category === 'ADVANCE' || charge.category === 'SECURITY_DEPOSIT')).toHaveLength(2)
     expect(selectMoveInObligations(corrected.data, DEMO_DATE, 'room-9')[0]).toMatchObject({
-      advancePaidCents: 100_000, depositPaidCents: 0, advanceStatus: 'PARTLY PAID', depositStatus: 'NOT PAID',
+      advancePaidCents: 400_000, depositPaidCents: 0, advanceStatus: 'PAID', depositStatus: 'NOT PAID',
     })
     expect(corrected.receipt.revision).toBe(2)
   })

@@ -48,12 +48,12 @@ describe('demo tenant context', () => {
     expect(localStorage.getItem(TENANT_DEMO_STORAGE_KEY)).toBe('tenant-2')
   })
 
-  it('keeps payment ownership per tenant even when two tenants share a room', async () => {
+  it('shares room payment history with both occupants', async () => {
     const user = userEvent.setup()
     renderTenantApp()
     const select = await screen.findByLabelText('Demo tenant')
     await user.selectOptions(select, 'tenant-2')
-    expect(within(paymentSummary()).getByText('Nov 6, 2026')).toBeInTheDocument()
+    expect(within(paymentSummary()).getByText('Nov 12, 2026')).toBeInTheDocument()
     await user.selectOptions(select, 'tenant-4')
     expect(within(screen.getByRole('main')).getByText('Morgan Cruz')).toBeInTheDocument()
     expect(within(screen.getByRole('main')).getByText('Room 2')).toBeInTheDocument()

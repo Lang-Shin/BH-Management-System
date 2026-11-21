@@ -29,8 +29,8 @@ export function prepareElectricityPayment(
     amountCents: calculation.charge.amountCents, allocationIds: [allocationId], state: 'ISSUED', revision: 1, supersedesReceiptId: null,
   }
   const payment: Payment = {
-    id: paymentId, tenantId: calculation.charge.tenantId, amountCents: calculation.charge.amountCents,
-    paidOn, method: 'cash', state: 'RECORDED', correction: null,
+    id: paymentId, scope: 'TENANT', tenantId: calculation.charge.tenantId, roomId: null, occupancyCycleId: null,
+    amountCents: calculation.charge.amountCents, paidOn, method: 'cash', state: 'RECORDED', correction: null,
   }
   const next: PrototypeAppState = {
     ...data,

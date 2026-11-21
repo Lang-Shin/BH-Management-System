@@ -32,7 +32,7 @@ describe('room financial presentation and reconciliation', () => {
   it('shows only electricity and water from the latest transaction, excluding rent paid earlier', async () => {
     const data = blankLedger()
     data.charges = createDemoData().charges.filter(charge => ['rent-oct-room-1', 'electricity-nov-room-1', 'water-nov-tenant-1'].includes(charge.id))
-    const earlier = { id: 'earlier-rent', tenantId: 'tenant-1', amountCents: 350000, paidOn: '2026-11-03', method: 'cash' as const, state: 'RECORDED' as const, correction: null }
+    const earlier = { id: 'earlier-rent', scope: 'TENANT' as const, roomId: null, occupancyCycleId: null, tenantId: 'tenant-1', amountCents: 350000, paidOn: '2026-11-03', method: 'cash' as const, state: 'RECORDED' as const, correction: null }
     const latest = { ...earlier, id: 'latest-utilities', amountCents: 26900, paidOn: DEMO_DATE }
     data.payments = [earlier, latest]
     data.paymentAllocations = data.charges.map(charge => ({ id: `allocated-${charge.id}`, paymentId: charge.category === 'RENT' ? earlier.id : latest.id, chargeId: charge.id, amountCents: charge.amountCents, allocatedOn: charge.category === 'RENT' ? earlier.paidOn : latest.paidOn, state: 'ACTIVE' as const, creditId: null, reversalAuditEventId: null }))
@@ -89,7 +89,7 @@ describe('room financial presentation and reconciliation', () => {
   it('applies a partial payment only to the room of its referenced charge', () => {
     const data = createDemoData()
     const original = selectRoomFinance(data, DEMO_DATE, DEMO_PERIOD)
-    data.payments.push({ id: 'extra', tenantId: 'tenant-5', amountCents: 5000, paidOn: DEMO_DATE, method: 'cash', state: 'RECORDED', correction: null })
+    data.payments.push({ id: 'extra', scope: 'TENANT' as const, roomId: null, occupancyCycleId: null, tenantId: 'tenant-5', amountCents: 5000, paidOn: DEMO_DATE, method: 'cash', state: 'RECORDED', correction: null })
     data.paymentAllocations.push({ id: 'extra-allocation', paymentId: 'extra', chargeId: 'water-nov-tenant-5', amountCents: 5000, allocatedOn: DEMO_DATE, state: 'ACTIVE', creditId: null, reversalAuditEventId: null })
     expect(isPrototypeData(data)).toBe(true)
     const rows = selectRoomFinance(data, DEMO_DATE, DEMO_PERIOD)
@@ -145,7 +145,7 @@ describe('room financial presentation and reconciliation', () => {
     expect(combined.outstanding).toBe(45000)
     expect(rows).toHaveLength(3)
     expect(rows.map(row => row.dueDate)).toContain('2026-11-21')
-    data.payments.push({ id: 'partial', tenantId: 'tenant-6', amountCents: 5000, paidOn: DEMO_DATE, method: 'cash', state: 'RECORDED', correction: null })
+    data.payments.push({ id: 'partial', scope: 'TENANT' as const, roomId: null, occupancyCycleId: null, tenantId: 'tenant-6', amountCents: 5000, paidOn: DEMO_DATE, method: 'cash', state: 'RECORDED', correction: null })
     data.paymentAllocations.push({ id: 'partial-allocation', paymentId: 'partial', chargeId: 'one', amountCents: 5000, allocatedOn: DEMO_DATE, state: 'ACTIVE', creditId: null, reversalAuditEventId: null })
     expect(selectRoomDues(data, DEMO_DATE)).toHaveLength(3)
     expect(selectRoomDues(data, DEMO_DATE)[0]).toMatchObject({ status: 'PARTIALLY_PAID', outstanding: 40000 })
@@ -175,7 +175,7 @@ describe('room financial presentation and reconciliation', () => {
       { id: 'old-water', tenantId: 'tenant-10', category: 'WATER', amountCents: 15000, billingPeriodId: 'period-oct', issuedOn: '2026-10-31', dueDate: '2026-11-05', description: 'Old obligation', state: 'ISSUED', entryMethod: 'MANUAL', correction: null },
       { id: 'new-water', tenantId: 'tenant-10', category: 'WATER', amountCents: 20000, billingPeriodId: DEMO_PERIOD, issuedOn: '2026-11-01', dueDate: '2026-11-20', description: 'New obligation', state: 'ISSUED', entryMethod: 'MANUAL', correction: null },
     ]
-    const payment = { id: 'multi', tenantId: 'tenant-10', amountCents: 25000, paidOn: DEMO_DATE, method: 'cash' as const, state: 'RECORDED' as const, correction: null }
+    const payment = { id: 'multi', scope: 'TENANT' as const, roomId: null, occupancyCycleId: null, tenantId: 'tenant-10', amountCents: 25000, paidOn: DEMO_DATE, method: 'cash' as const, state: 'RECORDED' as const, correction: null }
     data.payments = [payment]
     data.paymentAllocations = data.charges.map(charge => ({ id: `allocation-${charge.id}`, paymentId: payment.id, chargeId: charge.id, amountCents: 10000, allocatedOn: DEMO_DATE, state: 'ACTIVE' as const, creditId: null, reversalAuditEventId: null }))
     expect(isPrototypeData(data)).toBe(true)
@@ -217,7 +217,7 @@ describe('room financial presentation and reconciliation', () => {
   it('does not attribute an unallocated remainder or future allocation to current bill collections', () => {
     const data = blankLedger()
     data.charges = [water('water')]
-    const payment = { id: 'payment', tenantId: 'tenant-6', amountCents: 20000, paidOn: DEMO_DATE, method: 'cash' as const, state: 'RECORDED' as const, correction: null }
+    const payment = { id: 'payment', scope: 'TENANT' as const, roomId: null, occupancyCycleId: null, tenantId: 'tenant-6', amountCents: 20000, paidOn: DEMO_DATE, method: 'cash' as const, state: 'RECORDED' as const, correction: null }
     data.payments = [payment]
     data.paymentAllocations = [{ id: 'later', paymentId: payment.id, chargeId: 'water', amountCents: 10000, allocatedOn: '2026-11-14', state: 'ACTIVE', creditId: null, reversalAuditEventId: null }]
     expect(isPrototypeData(data)).toBe(true)

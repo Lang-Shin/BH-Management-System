@@ -1,9 +1,10 @@
 import type { Charge, ChargeCategory, MeterReading, Payment, PrototypeAppState, Receipt } from '@/domain/types/models'
-import { chargeBalance, issuedCharges, unresolvedElectricity } from './summary'
+import { activeAssignments, chargeBalance, issuedCharges, unresolvedElectricity } from './summary'
 import { chargeRoom, roomContext } from './room-finance'
 import { calculateElectricityCharge, latestSettledReading, type ElectricityCharge } from './electricity-calculation'
 import { activeElectricityRate } from './billing-rates'
 import { nextReceiptNumbers } from './receipt-numbering'
+import { activeCycleForRoom } from './move-in'
 import { proposedRoomCharges } from './billing-eligibility'
 
 export const roomPaymentCategories: ChargeCategory[] = ['RENT', 'ELECTRICITY', 'WATER', 'WASHING_MACHINE']
@@ -181,38 +182,40 @@ export function prepareRoomPayment(data: PrototypeAppState, input: RoomPaymentIn
   const totalCents = lines.reduce((sum, line) => sum + line.amountCents, 0)
   if (!Number.isSafeInteger(totalCents) || totalCents <= 0) return { ok: false, reason: 'INVALID_TOTAL' }
 
-  const batches = new Map<string, { charge: Charge; amountCents: number }[]>()
-  for (const line of lines) {
-    const items = batches.get(line.charge.tenantId) ?? []
-    items.push(line)
-    batches.set(line.charge.tenantId, items)
+  const existingCycle = activeCycleForRoom(data, input.roomId)
+    ?? [...data.occupancyCycles].filter(cycle => cycle.roomId === input.roomId)
+      .sort((a, b) => (b.endedAt ?? b.startedAt).localeCompare(a.endedAt ?? a.startedAt))[0]
+  const activeRoomAssignments = activeAssignments(data, input.asOf).filter(assignment => assignment.roomId === input.roomId)
+  const roomAssignmentStarts = data.roomAssignments.filter(assignment => assignment.roomId === input.roomId).map(assignment => assignment.startDate).sort()
+  const cycle = existingCycle ?? {
+    id: `cycle-${input.roomId}-${roomAssignmentStarts[0] ?? input.asOf}`,
+    roomId: input.roomId,
+    startedAt: roomAssignmentStarts[0] ?? input.asOf,
+    endedAt: activeRoomAssignments.length > 0 ? null : input.asOf,
+    status: activeRoomAssignments.length > 0 ? 'ACTIVE' as const : 'CLOSED' as const,
+    createdAt: input.asOf, updatedAt: input.asOf,
   }
+  const occupancyCycles = data.occupancyCycles.some(item => item.id === cycle.id) ? data.occupancyCycles : [...data.occupancyCycles, cycle]
   const chargeIds = lines.map(line => line.charge.id).sort()
   const interval = quote.electricity?.charge?.electricity.intervalId ?? ''
   const digest = stableDigest(`${input.roomId}:${input.periodId}:${chargeIds.join('|')}:${interval}`)
-  const receiptNumbers = nextReceiptNumbers(data, batches.size)
-  const payments: Payment[] = []
-  const receipts: Receipt[] = []
-  const allocations = lines.map(line => {
-    const paymentId = `payment-room-${digest}-${line.charge.tenantId}`
-    return {
-      id: `allocation-${paymentId}-${line.charge.id}`, paymentId, chargeId: line.charge.id, amountCents: line.amountCents,
-      allocatedOn: input.asOf, creditId: null, state: 'ACTIVE' as const, reversalAuditEventId: null,
-    }
-  })
-  let receiptIndex = 0
-  for (const [tenantId, tenantLines] of batches) {
-    const paymentId = `payment-room-${digest}-${tenantId}`
-    if (data.payments.some(payment => payment.id === paymentId)) return { ok: false, reason: 'DUPLICATE_PAYMENT' }
-    const amountCents = tenantLines.reduce((sum, line) => sum + line.amountCents, 0)
-    const payment: Payment = { id: paymentId, tenantId, amountCents, paidOn: input.asOf, method: 'cash', state: 'RECORDED', correction: null }
-    const receipt: Receipt = {
-      id: `receipt-${paymentId}`, paymentId, receiptNumber: receiptNumbers[receiptIndex++]!, issuedOn: input.asOf,
-      amountCents, allocationIds: allocations.filter(allocation => allocation.paymentId === paymentId).map(allocation => allocation.id), state: 'ISSUED', revision: 1, supersedesReceiptId: null,
-    }
-    payments.push(payment)
-    receipts.push(receipt)
+  const paymentId = `payment-room-${digest}`
+  if (data.payments.some(payment => payment.id === paymentId)) return { ok: false, reason: 'DUPLICATE_PAYMENT' }
+  const receiptNumber = nextReceiptNumbers(data, 1)[0]!
+  const allocations = lines.map(line => ({
+    id: `allocation-${paymentId}-${line.charge.id}`, paymentId, chargeId: line.charge.id, amountCents: line.amountCents,
+    allocatedOn: input.asOf, creditId: null, state: 'ACTIVE' as const, reversalAuditEventId: null,
+  }))
+  const payment: Payment = {
+    id: paymentId, scope: 'ROOM', tenantId: null, roomId: input.roomId, occupancyCycleId: cycle.id,
+    amountCents: totalCents, paidOn: input.asOf, method: null, state: 'RECORDED', correction: null,
   }
+  const receipt: Receipt = {
+    id: `receipt-${paymentId}`, paymentId, receiptNumber, issuedOn: input.asOf, amountCents: totalCents,
+    allocationIds: allocations.map(allocation => allocation.id), state: 'ISSUED', revision: 1, supersedesReceiptId: null,
+  }
+  const payments: Payment[] = [payment]
+  const receipts: Receipt[] = [receipt]
 
   const extraCharges: Charge[] = [
     ...(quote.electricity?.charge ? [quote.electricity.charge] : []),
@@ -221,6 +224,7 @@ export function prepareRoomPayment(data: PrototypeAppState, input: RoomPaymentIn
   const extraReadings: MeterReading[] = quote.electricity?.currentReading ? [quote.electricity.currentReading] : []
   const next: PrototypeAppState = {
     ...data,
+    occupancyCycles,
     meterReadings: [...data.meterReadings, ...extraReadings],
     charges: [...data.charges, ...extraCharges],
     payments: [...data.payments, ...payments],
@@ -229,17 +233,13 @@ export function prepareRoomPayment(data: PrototypeAppState, input: RoomPaymentIn
     electricityBillObligations: quote.electricity?.charge
       ? data.electricityBillObligations.filter(obligation => obligation.id !== quote.options.find(option => option.category === 'ELECTRICITY')?.obligationId)
       : data.electricityBillObligations,
-    auditEvents: [...data.auditEvents, ...payments.map(payment => ({
+    auditEvents: [...data.auditEvents, {
       id: `audit-room-${payment.id}`, actorId: 'demo-admin', occurredOn: input.asOf, action: 'ROOM_PAYMENT_RECORDED' as const,
       entityType: 'PAYMENT' as const, entityId: payment.id,
-      reason: `Room payment recorded for ${tenantIdToName(data, payment.tenantId)} (${payment.amountCents} centavos).`,
+      reason: `Room-level payment recorded for Room ${data.rooms.find(room => room.id === input.roomId)?.name ?? input.roomId} (${payment.amountCents} centavos).`,
       beforeSnapshot: JSON.stringify({ roomId: input.roomId, periodId: input.periodId, selected: quote.selected }),
-      afterSnapshot: JSON.stringify({ paymentId: payment.id, chargeIds: allocations.filter(allocation => allocation.paymentId === payment.id).map(allocation => allocation.chargeId), amountCents: payment.amountCents }),
-    }))],
+      afterSnapshot: JSON.stringify({ paymentId: payment.id, chargeIds: allocations.map(allocation => allocation.chargeId), amountCents: payment.amountCents }),
+    }],
   }
   return { ok: true, data: next, quote, payments, receipts, totalCents }
-}
-
-function tenantIdToName(data: PrototypeAppState, tenantId: string) {
-  return data.tenants.find(tenant => tenant.id === tenantId)?.name ?? 'Unknown tenant'
 }
