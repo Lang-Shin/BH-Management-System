@@ -31,7 +31,6 @@ export default function Billing() {
       <StatCard label="Already paid" value={formatMoney(summary.applied)} detail="Payments used to pay these bills." icon={Wallet} />
       <StatCard label={summary.unresolved > 0 ? 'Known outstanding' : 'Still to pay'} value={formatMoney(summary.outstanding)} detail={<><AnimatedNumber value={summary.overdue} /> bills are past their due date.{summary.unresolved > 0 && <> Plus <AnimatedNumber value={summary.unresolved} /> electricity {summary.unresolved === 1 ? 'bill' : 'bills'} awaiting a meter reading.</>}</>} icon={CircleAlert} />
     </section>
-    <MoveInSection />
     <BillingStatusChart key={periodId} rooms={billingRooms} periodLabel={data.billingPeriods.find(period => period.id === periodId)?.label ?? 'Selected billing period'} outstandingOnly={false} />
     <div className="billing-table-toolbar">
       <BillingFiltersMenu value={statusFilter} onChange={setStatusFilter} />
@@ -40,6 +39,7 @@ export default function Billing() {
     <div key={statusFilter ?? 'ALL'} className="billing-table-enter">
       <BillingStatusMatrix data={data} periodId={periodId} asOf={DEMO_DATE} outstandingOnly={false} statusFilter={statusFilter} />
     </div>
+    <div className="mt-8"><MoveInSection /></div>
     <BillingRatesSection />
   </>
 }
