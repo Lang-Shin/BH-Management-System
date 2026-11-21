@@ -11,6 +11,7 @@ import { createDemoData } from '@/data/fixtures/demo'
 import { prepareMoveInPayment, selectMoveInObligations } from '@/domain/calculations/move-in'
 import type { TenantDraft } from '@/domain/calculations/tenant-management'
 import type { PrototypeAppState } from '@/domain/types/models'
+import { MOVE_IN_UI_STORAGE_KEY } from '@/features/billing/move-in-section'
 
 function renderApp(route = '/billing') {
   return render(<PrototypeProvider repository={localStorageRepository}><MemoryRouter initialEntries={[route]}><AppRouter /></MemoryRouter></PrototypeProvider>)
@@ -26,6 +27,75 @@ const draft: TenantDraft = {
 }
 
 describe('move-in advance and security deposit UI', () => {
+  it('starts expanded and keeps mounted controls, collapsed metrics, and financial records intact through keyboard toggles', async () => {
+    const user = userEvent.setup()
+    const seeded = prototypeReducer(createDemoData(), { type: 'tenant/created', draft })
+    await localStorageRepository.save(seeded)
+    renderApp()
+    const section = await screen.findByRole('region', { name: 'Move-in advance & security deposit' })
+    const toggle = within(section).getByRole('button', { name: 'Collapse move-in advance and security deposit' })
+    const policy = within(section).getByLabelText('Security deposit terms')
+    const details = document.getElementById(toggle.getAttribute('aria-controls')!)!
+    const before = localStorage.getItem(STORAGE_KEY)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(details).toHaveAttribute('aria-hidden', 'false')
+    expect(within(section).getByRole('heading', { name: 'Room payment records' })).toBeInTheDocument()
+    toggle.focus()
+    await user.keyboard('{Enter}')
+    expect(toggle).toHaveAccessibleName('Expand move-in advance and security deposit')
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(toggle).toHaveFocus()
+    expect(details).toHaveAttribute('aria-hidden', 'true')
+    expect(details).toHaveAttribute('inert')
+    expect(policy).toBeInTheDocument()
+    expect(within(section).queryByRole('combobox', { name: 'Security deposit terms' })).not.toBeInTheDocument()
+    expect(within(section).queryByRole('button', { name: 'Record move-in payment for room 01' })).not.toBeInTheDocument()
+    const header = section.querySelector('.move-in-heading')!
+    expect(header).toHaveTextContent('Still to collect₱8,000.00')
+    expect(header).toHaveTextContent('0 of 1 fully settled')
+    expect(sessionStorage.getItem(MOVE_IN_UI_STORAGE_KEY)).toBe('false')
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(before)
+    await user.keyboard(' ')
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(details).not.toHaveAttribute('inert')
+    expect(within(section).getByLabelText('Security deposit terms')).toBe(policy)
+    expect(within(section).getByRole('button', { name: 'Record move-in payment for room 01' })).toBeEnabled()
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(before)
+  })
+
+  it('remembers the UI-only collapsed preference when navigating back to Billing', async () => {
+    const user = userEvent.setup()
+    renderApp()
+    const toggle = await screen.findByRole('button', { name: 'Collapse move-in advance and security deposit' })
+    await user.click(toggle)
+    const nav = screen.getByRole('navigation', { name: 'Main navigation' })
+    await user.click(within(nav).getByRole('link', { name: 'Payments & Receipts' }))
+    await screen.findByRole('heading', { level: 1, name: 'Payments & Receipts' })
+    await user.click(within(nav).getByRole('link', { name: 'Billing' }))
+    expect(await screen.findByRole('button', { name: 'Expand move-in advance and security deposit' })).toHaveAttribute('aria-expanded', 'false')
+    await user.click(screen.getByRole('button', { name: 'Expand move-in advance and security deposit' }))
+    expect(screen.getByLabelText('Advance application policy')).toBeInTheDocument()
+  })
+
+  it('uses a single responsive row action and preserves fully settled payment eligibility', async () => {
+    const seeded = prototypeReducer(createDemoData(), { type: 'tenant/created', draft })
+    const view = selectMoveInObligations(seeded, '2026-11-13', 'room-9')[0]!
+    const paid = prepareMoveInPayment(seeded, {
+      obligationId: view.obligation.id, payerTenantId: seeded.tenants.at(-1)!.id,
+      advanceCents: 400_000, depositCents: 400_000, paidOn: '2026-11-13', method: 'cash',
+    })
+    if (!paid.ok) throw new Error('Seed payment failed')
+    await localStorageRepository.save(paid.data)
+    renderApp()
+    const section = await screen.findByRole('region', { name: 'Move-in advance & security deposit' })
+    expect(within(section).getAllByRole('table')).toHaveLength(1)
+    const actions = within(section).getAllByRole('button', { name: 'Record move-in payment for room 01' })
+    expect(actions).toHaveLength(1)
+    expect(actions[0]).toBeDisabled()
+    expect(actions[0]).toHaveTextContent('Fully settled')
+    expect(section.querySelector('.move-in-heading')).toHaveTextContent('1 of 1 fully settled')
+  })
+
   it('records a room-level move-in payment and persists its receipt', async () => {
     const user = userEvent.setup()
     const seeded = prototypeReducer(createDemoData(), { type: 'tenant/created', draft })

@@ -1,76 +1,93 @@
-import { useRef, useState } from 'react'
-import { CircleDollarSign, ReceiptText, ShieldCheck, Wallet } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
+import { ChevronDown, CircleDollarSign, ReceiptText, ShieldCheck, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { usePrototype } from '@/hooks/use-prototype'
 import { DEMO_DATE } from '@/data/fixtures/demo'
 import { activeMoveInPolicy } from '@/domain/calculations/move-in-policy'
 import {
-  moveInSummary, proposedMoveInAdjustment, selectMoveInObligations, type MoveInObligationView, type MoveInSettlementStatus,
+  moveInSummary, proposedMoveInAdjustment, selectMoveInObligations,
 } from '@/domain/calculations/move-in'
-import { formatDate, formatMoney } from '@/lib/format'
-import { PaginatedDataTable } from '@/components/shared/table-pagination'
+import { formatMoney } from '@/lib/format'
 import { MoveInPaymentDialog } from './move-in-payment-dialog'
+import { MoveInRecords } from './move-in-records'
 
-function Status({ value }: { value: MoveInSettlementStatus }) {
-  return <span className="move-in-status" data-status={value}>{value}</span>
+export const MOVE_IN_UI_STORAGE_KEY = 'bhms:ui:move-in-expanded:v1'
+
+function initialExpanded() {
+  try { return sessionStorage.getItem(MOVE_IN_UI_STORAGE_KEY) !== 'false' } catch { return true }
 }
 
 export function MoveInSection() {
   const { data, dispatch } = usePrototype()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
+  const [expanded, setExpanded] = useState(initialExpanded)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const headingRef = useRef<HTMLHeadingElement | null>(null)
   const policy = activeMoveInPolicy(data)
-  const views = selectMoveInObligations(data, DEMO_DATE)
-  const summary = moveInSummary(data, DEMO_DATE)
+  const views = useMemo(() => selectMoveInObligations(data, DEMO_DATE), [data])
+  const summary = useMemo(() => moveInSummary(data, DEMO_DATE), [data])
   const selected = selectedId ? views.find(view => view.obligation.id === selectedId) : undefined
-  const proposals = data.occupancyCycles
+  const proposals = useMemo(() => data.occupancyCycles
     .filter(cycle => cycle.status === 'ACTIVE')
     .flatMap(cycle => {
       const room = data.rooms.find(item => item.id === cycle.roomId)
       const proposal = room ? proposedMoveInAdjustment(data, room, cycle) : null
       return room && proposal ? [{ cycle, room, proposal }] : []
-    })
+    }), [data])
   const closedReviews = views.filter(view => view.cycle.status === 'CLOSED'
     && (view.depositPaidCents > 0 || view.totalRemainingCents > 0))
-  const rows = views.map(view => ({ ...view, id: view.obligation.id }))
 
-  return <section className="move-in-section" aria-labelledby="move-in-title">
+  function toggleExpanded() {
+    const next = !expanded
+    setExpanded(next)
+    try { sessionStorage.setItem(MOVE_IN_UI_STORAGE_KEY, String(next)) } catch { /* UI preference is optional. */ }
+  }
+
+  return <section className="move-in-section" aria-labelledby="move-in-title" data-expanded={expanded}>
     <div className="move-in-heading">
       <div>
         <span className="move-in-eyebrow"><ShieldCheck aria-hidden="true" />Room-level</span>
-        <h2 id="move-in-title">Move-in advance &amp; security deposit</h2>
+        <h2 id="move-in-title" ref={headingRef} tabIndex={-1}>Move-in advance &amp; security deposit</h2>
         <p>One advance and one deposit per room occupancy. The security deposit is {policy.depositDisposition === 'NON_REFUNDABLE' ? 'non-refundable' : 'refundable with manual review'} under the current policy and remains separate from monthly rent.</p>
       </div>
-      <div className="move-in-heading-total"><span>Still to collect</span><strong>{formatMoney(summary.outstandingCents)}</strong></div>
+      <div className="move-in-heading-actions">
+        <div className="move-in-heading-total"><span>Still to collect</span><strong>{formatMoney(summary.outstandingCents)}</strong><small>{summary.paidObligations} of {summary.obligations} fully settled</small></div>
+        <Button type="button" variant="outline" className="move-in-toggle" aria-label={`${expanded ? 'Collapse' : 'Expand'} move-in advance and security deposit`} aria-expanded={expanded} aria-controls="move-in-details" onClick={toggleExpanded}><ChevronDown aria-hidden="true" /></Button>
+      </div>
     </div>
+    <div id="move-in-details" className="move-in-disclosure" data-expanded={expanded} aria-hidden={!expanded} inert={!expanded}>
+    <div className="move-in-disclosure-clip"><div className="move-in-details-content">
     <div className="move-in-summary-grid">
       <div><span><Wallet aria-hidden="true" />Advance collected</span><strong>{formatMoney(summary.advanceCollectedCents)}</strong></div>
       <div><span><ShieldCheck aria-hidden="true" />Deposit held</span><strong>{formatMoney(summary.depositCollectedCents)}</strong></div>
       <div><span><ReceiptText aria-hidden="true" />Fully settled</span><strong>{summary.paidObligations} of {summary.obligations}</strong></div>
     </div>
-    <div className="move-in-policy">
-      <div><span className="font-semibold">Advance application policy</span><p>New obligations store policy version {policy.version}. Changing the policy does not rewrite existing charges.</p></div>
-      <label><span className="sr-only">Advance application policy</span><select value={policy.advanceApplication} onChange={event => {
+    <section className="move-in-policy" aria-labelledby="move-in-policy-title">
+      <div className="move-in-subheading"><div><h3 id="move-in-policy-title">Policy configuration</h3><p>Changes apply to future obligations. Existing charges and recorded terms stay intact.</p></div><span className="move-in-policy-version">Policy v{policy.version}</span></div>
+      <div className="move-in-policy-fields">
+      <div className="move-in-policy-field"><label htmlFor="move-in-advance-policy">Advance application policy</label><p id="move-in-advance-help">Choose when an advance may be applied. Application always needs review.</p>
+      <select id="move-in-advance-policy" aria-describedby="move-in-advance-help" value={policy.advanceApplication} onChange={event => {
         setNotice('')
         dispatch({ type: 'moveIn/policyUpdated', advanceApplication: event.target.value as 'FIRST_MONTH' | 'LAST_MONTH' | 'MANUAL' })
         setNotice('Advance policy updated for future obligations.')
       }}>
-        <option value="LAST_MONTH">Apply to last month — review before use</option>
-        <option value="FIRST_MONTH">Apply to first month — review before use</option>
+        <option value="LAST_MONTH">Last month</option>
+        <option value="FIRST_MONTH">First month</option>
         <option value="MANUAL">Manual review only</option>
-      </select></label>
-      <div><span className="font-semibold">Security deposit terms</span><p>Current policy is {policy.depositDisposition === 'NON_REFUNDABLE' ? 'non-refundable' : 'refundable with manual review'}. Changing this only affects future obligations.</p></div>
-      <label><span className="sr-only">Security deposit terms</span><select value={policy.depositDisposition} onChange={event => {
+      </select></div>
+      <div className="move-in-policy-field"><label htmlFor="move-in-deposit-policy">Security deposit terms</label><p id="move-in-deposit-help">Current policy is {policy.depositDisposition === 'NON_REFUNDABLE' ? 'non-refundable' : 'refundable with manual review'}. Existing deposits keep their recorded terms.</p>
+      <select id="move-in-deposit-policy" aria-describedby="move-in-deposit-help" value={policy.depositDisposition} onChange={event => {
         setNotice('')
         dispatch({ type: 'moveIn/policyUpdated', depositDisposition: event.target.value as 'NON_REFUNDABLE' | 'MANUAL_REVIEW' })
         setNotice('Deposit policy updated for future obligations.')
       }}>
         <option value="NON_REFUNDABLE">Non-refundable</option>
-        <option value="MANUAL_REVIEW">Refundable — manual review</option>
-      </select></label>
+        <option value="MANUAL_REVIEW">Refundable — review required</option>
+      </select></div>
+      </div>
       <p className="move-in-policy-static"><CircleDollarSign aria-hidden="true" />No deposit refund, forfeiture, or rental-income recognition is automatic. Deposits remain a separate room-level financial record.</p>
-    </div>
+    </section>
     {notice && <p role="status" className="move-in-notice">{notice}</p>}
     {proposals.length > 0 && <div className="move-in-proposals" role="note">
       <strong>Transfer review proposals</strong>
@@ -89,15 +106,13 @@ export function MoveInSection() {
         Room {view.room.name}: {view.obligation.depositDisposition === 'NON_REFUNDABLE' ? 'non-refundable deposit' : 'deposit with manual review'} held {formatMoney(view.depositPaidCents)}; advance outstanding {formatMoney(view.advanceRemainingCents)}; deposit outstanding {formatMoney(view.depositRemainingCents)}.
       </li>)}</ul>
     </div>}
-    {rows.length === 0
+    <section className="move-in-records" aria-labelledby="move-in-records-title">
+    <div className="move-in-subheading"><div><h3 id="move-in-records-title">Room payment records</h3><p>Advance, deposit, and settlement status for each room occupancy.</p></div></div>
+    {views.length === 0
       ? <div className="move-in-empty"><ShieldCheck aria-hidden="true" /><p>No move-in obligation recorded yet. Existing occupied rooms keep their legacy tenancy without an invented deposit. A new tenant in a vacant room creates one room-level obligation.</p></div>
-      : <PaginatedDataTable rows={rows} resetKey={`${views.length}:${summary.outstandingCents}`} recordLabel="move-in balances" caption="Move-in advance and security deposit balances" columns={[
-        { key: 'room', label: 'Room & payer', render: view => <div className="move-in-room-cell"><span>Room {view.room.name}</span><small>{view.payerName} · since {formatDate(view.cycle.startedAt)}</small></div> },
-        { key: 'advance', label: 'Advance', render: (view: MoveInObligationView) => <div className="move-in-balance-cell"><Status value={view.advanceStatus} /><span>{formatMoney(view.advancePaidCents)} of {formatMoney(view.obligation.advanceRequiredCents)}</span><small>{formatMoney(view.advanceRemainingCents)} left</small></div> },
-        { key: 'deposit', label: 'Security deposit', render: (view: MoveInObligationView) => <div className="move-in-balance-cell"><Status value={view.depositStatus} /><span>{formatMoney(view.depositPaidCents)} of {formatMoney(view.obligation.depositRequiredCents)}</span><small>{view.obligation.depositDisposition === 'NON_REFUNDABLE' ? 'Non-refundable' : 'Refundable — manual review'} · {formatMoney(view.depositRemainingCents)} left</small></div> },
-        { key: 'status', label: 'Overall', render: (view: MoveInObligationView) => <div className="move-in-balance-cell"><Status value={view.status} /><small>{formatMoney(view.totalRemainingCents)} remaining</small></div> },
-        { key: 'action', label: '', align: 'right', render: (view: MoveInObligationView) => <Button variant="outline" size="sm" aria-label={view.cycle.status === 'CLOSED' ? `Review move-out settlement for room ${view.room.name}` : `Record move-in payment for room ${view.room.name}`} disabled={view.status === 'PAID' || view.cycle.status === 'CLOSED'} onClick={event => { setNotice(''); triggerRef.current = event.currentTarget; setSelectedId(view.obligation.id) }}>{view.cycle.status === 'CLOSED' ? 'Settlement review' : 'Record payment'}</Button> },
-      ]} />}
-    {selected && <MoveInPaymentDialog key={selected.obligation.id} view={selected} onClose={() => { setSelectedId(null); window.setTimeout(() => triggerRef.current?.focus(), 0) }} onSaved={setNotice} />}
+      : <MoveInRecords views={views} resetKey={`${views.length}:${summary.outstandingCents}`} onRecord={(view, event) => { setNotice(''); triggerRef.current = event.currentTarget; setSelectedId(view.obligation.id) }} />}
+    </section>
+    </div></div></div>
+    {selected && <MoveInPaymentDialog key={selected.obligation.id} view={selected} onClose={() => { setSelectedId(null); window.setTimeout(() => { if (triggerRef.current && !triggerRef.current.disabled) triggerRef.current.focus(); else headingRef.current?.focus() }, 0) }} onSaved={setNotice} />}
   </section>
 }
