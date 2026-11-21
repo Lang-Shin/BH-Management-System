@@ -1513,18 +1513,18 @@ li:nth-child(n + 5) > .notification-item { animation-delay: 120ms; }
 .move-in-records { min-width: 0; }
 .move-in-records > .move-in-subheading { margin-bottom: 20px; }
 .move-in-records-scroll { max-width: 100%; overflow-x: auto; border: 1px solid var(--border); border-radius: 16px; }
-.move-in-records-table { width: 100%; min-width: 980px; table-layout: fixed; border-collapse: collapse; text-align: left; font-size: 13px; }
-.move-in-room-column { width: 23%; }
+.move-in-records-table { width: 100%; min-width: 760px; table-layout: fixed; border-collapse: collapse; text-align: left; font-size: 13px; }
+.move-in-room-column { width: 24%; }
 .move-in-action-column { width: 190px; }
 .move-in-records-table th { padding: 16px 20px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--surface-2) 60%, var(--card)); color: var(--muted-foreground); font-size: 11px; font-weight: 700; letter-spacing: 0.035em; text-transform: uppercase; }
 .move-in-records-table td { padding: 24px 20px; vertical-align: top; }
 .move-in-records-table tbody tr + tr td { border-top: 1px solid var(--border); }
 .move-in-room-cell { display: flex; flex-direction: column; gap: 7px; min-width: 0; overflow-wrap: anywhere; }
 .move-in-room-cell span { font-size: 16px; font-weight: 750; }
-.move-in-room-cell small, .move-in-balance-cell small { color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
-.move-in-balance-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; min-width: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.move-in-balance-cell strong { margin-top: 5px; font-size: 16px; font-weight: 750; }
-.move-in-balance-cell > span:not(.move-in-status) { color: var(--muted-foreground); font-size: 12px; }
+.move-in-category-amount { display: inline-block; color: var(--label); font-size: 16px; font-weight: 750; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.move-in-settled { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 46px; padding: 12px 14px; border: 1px solid color-mix(in srgb, #0f7b5a 24%, var(--border)); border-radius: 999px; background: color-mix(in srgb, #0f7b5a 8%, var(--card)); color: #0f7b5a; font-size: 12px; font-weight: 750; }
+.move-in-settled svg { width: 16px; height: 16px; flex: none; }
+.dark .move-in-settled { color: #7dd8b6; }
 .move-in-records-table .move-in-record-action { vertical-align: middle; }
 .move-in-record-button[data-slot="button"] { width: 100%; min-height: 46px; padding: 12px 14px; font-size: 12px; border: 1px solid var(--border); transition: background-color 180ms ease, border-color 180ms ease; }
 .move-in-record-button[data-slot="button"]:active { transform: none; }

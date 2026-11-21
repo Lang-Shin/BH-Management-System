@@ -77,7 +77,7 @@ describe('move-in advance and security deposit UI', () => {
     expect(screen.getByLabelText('Advance application policy')).toBeInTheDocument()
   })
 
-  it('uses a single responsive row action and preserves fully settled payment eligibility', async () => {
+  it('uses a non-interactive settled indicator when the room is fully settled', async () => {
     const seeded = prototypeReducer(createDemoData(), { type: 'tenant/created', draft })
     const view = selectMoveInObligations(seeded, '2026-11-13', 'room-9')[0]!
     const paid = prepareMoveInPayment(seeded, {
@@ -89,11 +89,59 @@ describe('move-in advance and security deposit UI', () => {
     renderApp()
     const section = await screen.findByRole('region', { name: 'Move-in advance & security deposit' })
     expect(within(section).getAllByRole('table')).toHaveLength(1)
-    const actions = within(section).getAllByRole('button', { name: 'Record move-in payment for room 01' })
-    expect(actions).toHaveLength(1)
-    expect(actions[0]).toBeDisabled()
-    expect(actions[0]).toHaveTextContent('Fully settled')
+    expect(within(section).queryByRole('button', { name: 'Record move-in payment for room 01' })).not.toBeInTheDocument()
+    expect(within(section).getByText('Settled')).toBeVisible()
     expect(section.querySelector('.move-in-heading')).toHaveTextContent('1 of 1 fully settled')
+  })
+
+  it('renders only room, advance, deposit, and action with amount-or-PAID category values', async () => {
+    let data = createDemoData()
+    const seeds = [
+      { roomId: 'room-9', name: 'Unpaid Resident' },
+      { roomId: 'room-10', name: 'Settled Resident' },
+      { roomId: 'room-13', name: 'Legacy Partial Resident' },
+    ]
+    for (const seed of seeds) {
+      data = prototypeReducer(data, {
+        type: 'tenant/created',
+        draft: { ...draft, name: seed.name, email: `${seed.roomId}@example.com`, roomId: seed.roomId, moveInDate: '2026-11-01' },
+      })
+    }
+    const payFor = (roomId: string, advanceCents: number, depositCents: number) => {
+      const view = selectMoveInObligations(data, '2026-11-13', roomId)[0]!
+      const result = prepareMoveInPayment(data, {
+        obligationId: view.obligation.id, payerTenantId: data.tenants.find(tenant => tenant.name.includes(roomId === 'room-9' ? 'Unpaid' : roomId === 'room-10' ? 'Settled' : 'Legacy'))!.id,
+        advanceCents, depositCents, paidOn: '2026-11-13', method: 'cash',
+      })
+      if (!result.ok) throw new Error(result.reason)
+      data = result.data
+    }
+    payFor('room-10', 400_000, 400_000)
+    payFor('room-13', 100_000, 0)
+    await localStorageRepository.save(data)
+    renderApp()
+    const section = await screen.findByRole('region', { name: 'Move-in advance & security deposit' })
+    const table = within(section).getByRole('table')
+    expect(within(table).getAllByRole('columnheader').map(header => header.textContent)).toEqual(['Room', 'Advance', 'Security deposit', 'Action'])
+    expect(within(table).queryByText('Overall')).not.toBeInTheDocument()
+    expect(within(table).queryByText('Room & payer')).not.toBeInTheDocument()
+    const unpaid = within(table).getByText('Room 01').closest('tr')!
+    expect(within(unpaid).getAllByText('₱4,000.00')).toHaveLength(2)
+    expect(within(unpaid).queryByText('PAID')).not.toBeInTheDocument()
+    expect(within(unpaid).queryByText('NOT PAID')).not.toBeInTheDocument()
+    expect(unpaid).not.toHaveTextContent('Unpaid Resident')
+    const settled = within(table).getByText('Room 03').closest('tr')!
+    expect(within(settled).getAllByText('PAID')).toHaveLength(2)
+    expect(within(settled).queryByText('₱4,000.00')).not.toBeInTheDocument()
+    expect(within(settled).getByText('Settled')).toBeInTheDocument()
+    expect(within(settled).queryByRole('button')).not.toBeInTheDocument()
+    const partial = within(table).getByText('Room 06').closest('tr')!
+    expect(within(partial).getByText('₱3,000.00')).toBeInTheDocument()
+    expect(within(partial).getByText('₱4,000.00')).toBeInTheDocument()
+    expect(within(partial).queryByText('PARTLY PAID')).not.toBeInTheDocument()
+    expect(within(partial).queryByText('NOT PAID')).not.toBeInTheDocument()
+    expect(within(partial).queryByText('of')).not.toBeInTheDocument()
+    expect(within(table).getAllByRole('button', { name: /Record move-in payment for room/ })).toHaveLength(2)
   })
 
   it('records a room-level move-in payment and persists its receipt', async () => {
@@ -127,7 +175,8 @@ describe('move-in advance and security deposit UI', () => {
       expect(data.paymentAllocations.filter(allocation => allocation.paymentId === data.payments.at(-1)!.id)).toHaveLength(2)
       expect(data.receipts.filter(receipt => receipt.paymentId === data.payments.at(-1)!.id)).toHaveLength(1)
     })
-    expect(within(section).getAllByText('PAID', { selector: '.move-in-status' })).toHaveLength(3)
+    expect(within(section).getAllByText('PAID', { selector: '.move-in-status' })).toHaveLength(2)
+    expect(within(section).getByText('Settled')).toBeInTheDocument()
   }, 30000)
 
   it('does not invent move-in balances for the sample legacy tenancies', async () => {
