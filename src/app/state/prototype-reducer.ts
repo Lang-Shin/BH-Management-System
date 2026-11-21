@@ -6,6 +6,8 @@ import { applyRateChange } from '@/domain/calculations/billing-rates'
 import { prepareElectricityPayment } from '@/domain/calculations/electricity-payment'
 import { prepareRoomPayment } from '@/domain/calculations/room-payment'
 import { preparePaymentCorrection } from '@/domain/calculations/payment-correction'
+import { prepareMoveInPayment, reconcileOccupancy } from '@/domain/calculations/move-in'
+import { activeMoveInPolicy } from '@/domain/calculations/move-in-policy'
 import { createRoom, deleteRoom, updateRoom } from '@/domain/calculations/room-management'
 import { createTenant, deleteTenant, moveOutTenant, updateTenant } from '@/domain/calculations/tenant-management'
 
@@ -22,19 +24,19 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
       }
     case 'tenant/created': {
       const result = createTenant(state, action.draft, DEMO_DATE)
-      return result.ok ? result.data : state
+      return result.ok ? reconcileOccupancy(state, result.data, DEMO_DATE, { createMoveInObligations: true }) : state
     }
     case 'tenant/updated': {
       const result = updateTenant(state, action.tenantId, action.draft, DEMO_DATE)
-      return result.ok ? result.data : state
+      return result.ok ? reconcileOccupancy(state, result.data, DEMO_DATE, { createMoveInObligations: false }) : state
     }
     case 'tenant/movedOut': {
       const result = moveOutTenant(state, action.tenantId, DEMO_DATE)
-      return result.ok ? result.data : state
+      return result.ok ? reconcileOccupancy(state, result.data, DEMO_DATE, { createMoveInObligations: false }) : state
     }
     case 'tenant/deleted': {
       const result = deleteTenant(state, action.tenantId, DEMO_DATE)
-      return result.ok ? result.data : state
+      return result.ok ? reconcileOccupancy(state, result.data, DEMO_DATE, { createMoveInObligations: false }) : state
     }
     case 'rates/planned':
       return applyRateChange(state, action.plan)
@@ -86,6 +88,27 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
         moneyExchangeConfirmed: action.moneyExchangeConfirmed, correctedAt: action.correctedAt,
       })
       return result.ok ? result.data : state
+    }
+    case 'moveIn/paymentRecorded': {
+      const result = prepareMoveInPayment(state, action)
+      return result.ok ? result.data : state
+    }
+    case 'moveIn/policyUpdated': {
+      const current = activeMoveInPolicy(state)
+      return {
+        ...state,
+        moveInPolicy: {
+          ...current,
+          version: current.version + 1,
+          advanceApplication: action.advanceApplication,
+        },
+        auditEvents: [...state.auditEvents, {
+          id: `audit-move-in-policy-${current.version + 1}`, actorId: 'demo-admin', occurredOn: DEMO_DATE,
+          action: 'MOVE_IN_POLICY_UPDATED' as const, entityType: 'PROTOTYPE' as const, entityId: 'move-in-policy',
+          reason: `Advance application policy set to ${action.advanceApplication}.`,
+          beforeSnapshot: JSON.stringify(current), afterSnapshot: JSON.stringify({ ...current, version: current.version + 1, advanceApplication: action.advanceApplication }),
+        }],
+      }
     }
     case 'demo/reset':
       return createDemoData()

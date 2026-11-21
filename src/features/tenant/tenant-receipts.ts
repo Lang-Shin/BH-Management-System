@@ -6,6 +6,8 @@ export const RECEIPT_CATEGORIES: { category: ChargeCategory; label: string }[] =
   { category: 'ELECTRICITY', label: 'Electricity' },
   { category: 'WATER', label: 'Water' },
   { category: 'WASHING_MACHINE', label: 'Washing' },
+  { category: 'ADVANCE', label: 'Advance payment' },
+  { category: 'SECURITY_DEPOSIT', label: 'Security deposit' },
 ]
 
 export interface ReceiptCategoryLine {

@@ -18,12 +18,15 @@ import { DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
 import { formatDate, formatMoney } from '@/lib/format'
 import { activeElectricityRate, activeRoomRentRate, activeWashingRate, activeWaterRate, ROOM_RATE_CATEGORY_IDS } from '@/domain/calculations/billing-rates'
 import type { AuditEvent } from '@/domain/types/models'
+import { moveInSummary, selectMoveInObligations } from '@/domain/calculations/move-in'
 
 const changeLabels: Record<AuditEvent['action'], string> = {
   DEMO_SEEDED: 'Sample records added', READING_CORRECTED: 'Meter reading corrected', CHARGE_CORRECTED: 'Bill corrected',
   PAYMENT_CORRECTED: 'Payment corrected', ALLOCATION_REVERSED: 'Payment removed from a bill',
   ELECTRICITY_PAYMENT_RECORDED: 'Electricity payment recorded',
   ROOM_PAYMENT_RECORDED: 'Room payment recorded',
+  MOVE_IN_PAYMENT_RECORDED: 'Move-in payment recorded',
+  MOVE_IN_POLICY_UPDATED: 'Move-in policy updated',
 }
 
 export default function Reports() {
@@ -36,6 +39,8 @@ export default function Reports() {
   const pendingRoom = pendingRoomId ? allRoomRows.find(room => room.id === pendingRoomId) : undefined
   const roomTotals = selectSummary(data, DEMO_DATE, roomPeriod)
   const summary = selectSummary(data, DEMO_DATE, DEMO_PERIOD)
+  const moveIn = moveInSummary(data, DEMO_DATE)
+  const moveInRows = selectMoveInObligations(data, DEMO_DATE).map(view => ({ ...view, id: view.obligation.id }))
   const periods = data.billingPeriods.map(period => ({ ...period, summary: selectSummary(data, DEMO_DATE, period.id) }))
   const currentRate = activeElectricityRate(data, DEMO_DATE)
   const waterRate = activeWaterRate(data, DEMO_DATE)
@@ -60,7 +65,7 @@ export default function Reports() {
       <StatCard label="Already paid" value={formatMoney(summary.applied)} detail="Paid toward November’s bills." icon={ReceiptText} />
       <StatCard label={summary.unresolved > 0 ? 'Known outstanding' : 'Still to pay'} value={formatMoney(summary.outstanding)} detail={summary.unresolved > 0 ? `Known November amounts only; ${summary.unresolved} electricity ${summary.unresolved === 1 ? 'bill' : 'bills'} awaiting a meter reading.` : 'What tenants still owe for November.'} icon={CircleAlert} />
     </section>
-    <section className="mt-8" aria-labelledby="monthly-reports"><h2 id="monthly-reports" className="mb-2 text-xl font-semibold">Monthly summary</h2><p className="mb-5 text-base text-muted-foreground">Money received may include payments for older bills or money paid in advance.</p><PaginatedDataTable rows={periods} resetKey={periods.length} recordLabel="months" caption="Monthly summary" columns={[
+    <section className="mt-8" aria-labelledby="monthly-reports"><h2 id="monthly-reports" className="mb-2 text-xl font-semibold">Monthly summary</h2><p className="mb-5 text-base text-muted-foreground">Money received may include payments for older bills, unapplied credit, or move-in advance/security-deposit cash. Move-in cash is shown separately below and is not part of monthly billed totals.</p><PaginatedDataTable rows={periods} resetKey={periods.length} recordLabel="months" caption="Monthly summary" columns={[
       { key: 'period', label: 'Month', render: p => p.label },
       { key: 'billed', label: 'Total bills', align: 'right', render: p => formatMoney(p.summary.billed) },
       { key: 'applied', label: 'Paid for these bills', align: 'right', render: p => formatMoney(p.summary.applied) },
@@ -87,13 +92,35 @@ export default function Reports() {
       <p className="mt-4 text-sm" aria-label="Room report reconciliation">All room/context totals: billed {formatMoney(roomTotals.billed)} · applied {formatMoney(roomTotals.applied)} · known outstanding {formatMoney(roomTotals.outstanding)}{roomTotals.unresolved > 0 ? ` · ${roomTotals.unresolved} electricity ${roomTotals.unresolved === 1 ? 'bill' : 'bills'} awaiting a meter reading (amount not included)` : ''}. Includes any room-needs-review rows. Total billed excludes uncalculated electricity. Pending Payment uses all unpaid or unresolved billing periods, while the other columns describe {data.billingPeriods.find(period => period.id === roomPeriod)?.label ?? 'the selected month'}. Cash received is reported separately in Monthly summary.</p>
       {pendingRoom && <PendingPaymentsDialog key={pendingRoom.id} data={data} room={pendingRoom} asOf={DEMO_DATE} onClose={() => setPendingRoomId(null)} onReturnFocus={() => pendingTrigger.current?.focus()} />}
     </section>
-    <Card className="mt-8 shadow-none"><CardHeader><CardTitle>House settings</CardTitle><CardDescription>You can view these settings. Changing them will be added later.</CardDescription></CardHeader><CardContent><dl className="grid gap-6 text-base sm:grid-cols-2">{([
+    <section className="mt-8" aria-labelledby="move-in-report-title">
+      <h2 id="move-in-report-title" className="text-xl font-semibold">Advance &amp; security deposit</h2>
+      <p className="mb-5 mt-2 text-sm text-muted-foreground">Cash collected for room move-in obligations. Deposits are held, not rental income. These amounts are excluded from monthly billed totals and rent payment status.</p>
+      <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Advance collected" value={formatMoney(moveIn.advanceCollectedCents)} detail="Applied only under the recorded policy." icon={Wallet} />
+        <StatCard label="Deposits held" value={formatMoney(moveIn.depositCollectedCents)} detail="No automatic refund, forfeit, or income recognition." icon={ReceiptText} />
+        <StatCard label="Move-in outstanding" value={formatMoney(moveIn.outstandingCents)} detail="Still to collect across room obligations." icon={CircleAlert} />
+        <StatCard label="Fully settled" value={`${moveIn.paidObligations} of ${moveIn.obligations}`} detail="Room occupancy obligations paid in full." icon={ReceiptText} />
+      </div>
+      <PaginatedDataTable rows={moveInRows} resetKey={moveInRows.length} recordLabel="move-in balances" caption="Advance and security deposit report" emptyState={<p className="rounded-2xl border bg-card p-5 text-sm text-muted-foreground">No move-in obligations are recorded yet.</p>} columns={[
+        { key: 'room', label: 'Room', render: view => <span className="font-semibold">Room {view.room.name}</span> },
+        { key: 'tenant', label: 'Payer', render: view => view.payerName },
+        { key: 'started', label: 'Occupancy started', render: view => formatDate(view.cycle.startedAt) },
+        { key: 'advance', label: 'Advance paid', align: 'right', render: view => `${formatMoney(view.advancePaidCents)} / ${formatMoney(view.obligation.advanceRequiredCents)}` },
+        { key: 'deposit', label: 'Deposit held', align: 'right', render: view => `${formatMoney(view.depositPaidCents)} / ${formatMoney(view.obligation.depositRequiredCents)}` },
+        { key: 'remaining', label: 'Outstanding', align: 'right', render: view => <span className="font-semibold">{formatMoney(view.totalRemainingCents)}</span> },
+        { key: 'status', label: 'Status', render: view => <span className="move-in-status" data-status={view.status}>{view.status}</span> },
+      ]} />
+      <p className="mt-4 text-sm text-muted-foreground">Policy version {data.moveInPolicy.version}: advance application {data.moveInPolicy.advanceApplication.replace('_', ' ').toLowerCase()}; deposit disposition and all move-out settlement remain manual review. New obligations store the active policy version and existing obligations are not rewritten.</p>
+    </section>
+    <Card className="mt-8 shadow-none"><CardHeader><CardTitle>House settings</CardTitle><CardDescription>Rates and the advance policy are managed in Billing. Other settings remain view-only.</CardDescription></CardHeader><CardContent><dl className="grid gap-6 text-base sm:grid-cols-2">{([
       ['Currency', 'Philippine peso (₱)'],
       ['Monthly rent', roomRates.map(item => `${formatMoney(item.rate!.monthlyRentCents)} (${item.roomCount} ${item.roomCount === 1 ? 'room' : 'rooms'})`).join(' · ')],
       ['When rent is due', 'To be confirmed'],
       ['Electricity price', currentRate ? <><AnimatedNumber value={formatMoney(currentRate.rateCentsPerKwh)} /> per kWh, starting {formatDate(currentRate.effectiveFrom)}</> : 'No price set'],
       ['Sharing the electricity bill', 'Who uses each meter and how to share the bill still need to be agreed'],
       ['Water and washing', <><AnimatedNumber value={formatMoney(waterRate?.rateCents ?? 0)} /> per tenant for water. Washing is optional at <AnimatedNumber value={formatMoney(washingRate?.rateCents ?? 0)} /> per room.</>],
+      ['Move-in advance', `${data.moveInPolicy.advanceApplication.replace('_', ' ').toLowerCase()} (policy v${data.moveInPolicy.version}); review before applying.`],
+      ['Security deposit', 'Held as a room-level liability; refund, forfeiture, and deductions require manual review.'],
     ] as const).map(([label, value]) => <div key={label} className="rounded-lg border bg-muted/40 p-4"><dt className="text-xs font-semibold text-muted-foreground">{label}</dt><dd className="mt-2 text-sm leading-relaxed font-medium">{value}</dd></div>)}</dl></CardContent></Card>
     <details open={Boolean(storageWarning)} className="mt-7 rounded-xl border bg-card p-5 sm:p-6"><summary className="min-h-12 cursor-pointer py-2 text-lg font-semibold">More settings and sample records</summary>
       <section className="mt-5" aria-labelledby="sample-records"><h2 id="sample-records" className="mb-3 text-xl font-semibold">Start again with sample records</h2><p className="mb-5 max-w-2xl text-base text-muted-foreground">Restore the original sample records and remove your saved notes and room changes. This is only for trying the app.</p><ResetDemoButton /></section>
@@ -101,7 +128,7 @@ export default function Reports() {
         { key: 'date', label: 'Date', render: a => formatDate(a.occurredOn) },
         { key: 'action', label: 'What changed', render: a => changeLabels[a.action] },
         { key: 'reason', label: 'Note', render: a => <span className="inline-block max-w-sm whitespace-normal leading-relaxed">{a.action === 'DEMO_SEEDED' ? 'Sample records were added so you can try the screens.' : a.reason}</span> },
-      ]} /></section>
+    ]} /></section>
       <p className="mt-5 text-sm text-muted-foreground">Your changes are saved only in this browser. This is not a backup.</p>
     </details>
     <WorkflowPlaceholders title="More report tools" items={[

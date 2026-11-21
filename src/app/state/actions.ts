@@ -18,6 +18,8 @@ export type PrototypeAction =
   | { type: 'electricity/paymentConfirmed'; obligationId: string; currentReadingMilliKwh: number; paidOn: string }
   | { type: 'room/paymentConfirmed'; roomId: string; periodId: string; selected: ChargeCategory[]; electricityReadingMilliKwh: number | null; asOf: string }
   | { type: 'payment/corrected'; paymentId: string; selectedCategories: ChargeCategory[]; correctedElectricityReadingMilliKwh: number | null; reason: string; settlementStatus: CorrectionSettlementStatus | ''; moneyExchangeConfirmed: boolean; correctedAt: string }
+  | { type: 'moveIn/paymentRecorded'; obligationId: string; payerTenantId: string; advanceCents: number; depositCents: number; paidOn: string; method: 'cash' | 'bank-transfer' }
+  | { type: 'moveIn/policyUpdated'; advanceApplication: 'FIRST_MONTH' | 'LAST_MONTH' | 'MANUAL' }
   | { type: 'demo/reset' }
 
 export type StateAction = PrototypeAction | { type: 'data/loaded'; data: PrototypeData }

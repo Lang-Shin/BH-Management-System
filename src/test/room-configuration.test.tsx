@@ -102,7 +102,7 @@ describe('actual boarding house configuration', () => {
   })
 })
 
-describe('non-destructive version 8 to 9 migration', () => {
+describe('non-destructive version 8/9 to 10 migration', () => {
   it('preserves the complete saved dataset, including corrections, labels, and rate history', async () => {
     const legacy = legacySnapshotData()
     const before = JSON.stringify(legacy)

@@ -9,7 +9,6 @@ import {
 } from '@/domain/calculations/billing-rates'
 import { formatMoney, formatMonthYear } from '@/lib/format'
 import { BillingRateDialog } from './billing-rate-dialog'
-import type { ChargeCategory } from '@/domain/types/models'
 
 function RateCard({ title, icon: Icon, value, unit, detail, scheduled, renderDialog }: {
   title: string
@@ -63,7 +62,7 @@ export function BillingRatesSection() {
     ? `Scheduled ${formatMonthYear(rentScheduled[0]!.effectiveFrom)} · ${rentScheduled.map(rate => formatMoney(rate.monthlyRentCents)).join(' · ')}`
     : undefined
 
-  function dialog(kind: ChargeCategory, title: string) {
+  function dialog(kind: 'RENT' | 'ELECTRICITY' | 'WATER' | 'WASHING_MACHINE', title: string) {
     return (key: number) => <BillingRateDialog key={key} kind={kind} title={title} onSaved={setNotice} />
   }
 

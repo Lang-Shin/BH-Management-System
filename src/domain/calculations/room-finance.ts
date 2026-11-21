@@ -18,6 +18,10 @@ export function roomContext(data: PrototypeAppState, roomId: string, source: Fin
 
 export function chargeRoom(data: PrototypeAppState, charge: Charge): FinancialRoom {
   const unresolved: FinancialRoom = { id: `review:${charge.id}`, roomId: null, label: 'Room needs review', source: 'unresolved', note: 'Missing or ambiguous historical room context; this charge remains in totals.' }
+  if (charge.category === 'ADVANCE' || charge.category === 'SECURITY_DEPOSIT') {
+    const obligation = data.moveInObligations.find(item => item.id === charge.moveInObligationId)
+    return obligation ? roomContext(data, obligation.roomId, 'rent-assignment', 'Move-in obligation room') ?? unresolved : unresolved
+  }
   if (charge.category === 'RENT') {
     const assignment = data.roomAssignments.find(item => item.id === charge.roomAssignmentId && item.tenantId === charge.tenantId)
     return assignment ? roomContext(data, assignment.roomId, 'rent-assignment', 'Recorded rent assignment') ?? unresolved : unresolved

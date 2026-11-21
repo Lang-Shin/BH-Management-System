@@ -1,25 +1,12 @@
 import type { Payment, PrototypeAppState, Receipt } from '@/domain/types/models'
 import { calculateElectricityCharge, type ElectricityCalculationError } from './electricity-calculation'
+import { nextReceiptNumbers } from './receipt-numbering'
 
 export type ElectricityPaymentError = ElectricityCalculationError | 'DUPLICATE_PAYMENT'
 
 export type ElectricityPaymentResult =
   | { ok: true; data: PrototypeAppState; payment: Payment; receipt: Receipt; chargeId: string }
   | { ok: false; reason: ElectricityPaymentError }
-
-function nextReceiptNumber(data: PrototypeAppState): string {
-  const used = new Set(data.receipts.map(receipt => receipt.receiptNumber))
-  let sequence = data.receipts.reduce((max, receipt) => {
-    const match = /^DEMO-RCT-(\d+)$/.exec(receipt.receiptNumber)
-    return match ? Math.max(max, Number(match[1])) : max
-  }, 0) + 1
-  let number = `DEMO-RCT-${String(sequence).padStart(3, '0')}`
-  while (used.has(number)) {
-    sequence += 1
-    number = `DEMO-RCT-${String(sequence).padStart(3, '0')}`
-  }
-  return number
-}
 
 /**
  * Builds the payment, reading, charge, allocation, and receipt as one immutable snapshot.
@@ -36,7 +23,7 @@ export function prepareElectricityPayment(
   const paymentId = `payment-${calculation.charge.id}`
   if (data.payments.some(payment => payment.id === paymentId)) return { ok: false, reason: 'DUPLICATE_PAYMENT' }
   const allocationId = `allocation-${paymentId}-${calculation.charge.id}`
-  const receiptNumber = nextReceiptNumber(data)
+  const receiptNumber = nextReceiptNumbers(data, 1)[0]!
   const receipt: Receipt = {
     id: `receipt-${paymentId}`, paymentId, receiptNumber, issuedOn: paidOn,
     amountCents: calculation.charge.amountCents, allocationIds: [allocationId], state: 'ISSUED', revision: 1, supersedesReceiptId: null,

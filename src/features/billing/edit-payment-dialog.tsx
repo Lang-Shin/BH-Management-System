@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowLeft, Check, Droplets, House, WashingMachine, Zap } from 'lucide-react'
+import { ArrowLeft, Check, Droplets, House, ShieldCheck, Wallet, WashingMachine, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useAnimatedDialogClose } from '@/components/ui/use-animated-dialog-close'
@@ -12,7 +12,7 @@ import { DEMO_DATE } from '@/data/fixtures/demo'
 import { formatDate, formatMoney } from '@/lib/format'
 import { CATEGORY_LABELS } from '@/lib/labels'
 
-const icons = { RENT: House, ELECTRICITY: Zap, WATER: Droplets, WASHING_MACHINE: WashingMachine }
+const icons = { RENT: House, ELECTRICITY: Zap, WATER: Droplets, WASHING_MACHINE: WashingMachine, ADVANCE: Wallet, SECURITY_DEPOSIT: ShieldCheck }
 const correctionReasonOptions = ['Incorrect bill selected', 'Incorrect electricity reading', 'Incorrect recorded amount', 'Incorrect room or period']
 
 export function EditPaymentDialog({ paymentId, onClose, onReturnFocus, onSaved }: {

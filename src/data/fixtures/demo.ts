@@ -3,6 +3,7 @@ import {
   DEFAULT_ELECTRICITY_RATE_CENTS, DEFAULT_RENT_CENTS, DEFAULT_WASHING_RATE_CENTS, DEFAULT_WATER_RATE_CENTS,
   initialRoomRentRates, initialWashingRates, initialWaterRates,
 } from '@/domain/calculations/billing-rates'
+import { DEFAULT_MOVE_IN_POLICY } from '@/domain/calculations/move-in-policy'
 
 export const DEMO_DATE = '2026-11-13'
 export const DEMO_PERIOD = 'period-nov'
@@ -193,5 +194,18 @@ export function createDemoData(): PrototypeAppState {
   const receipts = payments.map((payment, index) => ({ id: `receipt-${index + 1}`, paymentId: payment.id, receiptNumber: `DEMO-RCT-${String(index + 1).padStart(3, '0')}`, issuedOn: payment.paidOn, amountCents: payment.amountCents, allocationIds: paymentAllocations.filter(a => a.paymentId === payment.id).map(a => a.id), state: 'ISSUED' as const, revision: 1, supersedesReceiptId: null }))
   const paymentCorrections: PaymentCorrection[] = []
   const auditEvents = [{ id: 'audit-seed', actorId: 'demo-admin', occurredOn: DEMO_DATE, action: 'DEMO_SEEDED' as const, entityType: 'PROTOTYPE' as const, entityId: 'demo-workspace', reason: 'Fictional fixture snapshot prepared; no real transaction or authenticated actor.', beforeSnapshot: null, afterSnapshot: 'Sample records loaded' }]
-  return { tenants, rooms, roomAssignments, electricityMeters, meterReadings, electricityBillObligations, electricityRates, roomRentRates, waterRates, washingRates, billingPeriods, charges, payments, paymentAllocations, tenantCredits, receipts, paymentCorrections, auditEvents }
+  const occupancyCycles = [...new Set(roomAssignments.filter(assignment => assignment.endDate === null).map(assignment => assignment.roomId))]
+    .map(roomId => {
+      const startedAt = roomAssignments.filter(assignment => assignment.roomId === roomId && assignment.endDate === null)
+        .map(assignment => assignment.startDate).sort()[0] ?? '2026-09-01'
+      return {
+        id: `cycle-${roomId}`, roomId, startedAt, endedAt: null, status: 'ACTIVE' as const,
+        createdAt: startedAt, updatedAt: startedAt,
+      }
+    })
+  return {
+    tenants, rooms, roomAssignments, electricityMeters, meterReadings, electricityBillObligations, electricityRates,
+    roomRentRates, waterRates, washingRates, billingPeriods, charges, payments, paymentAllocations, tenantCredits, receipts,
+    paymentCorrections, auditEvents, occupancyCycles, moveInObligations: [], moveInPolicy: { ...DEFAULT_MOVE_IN_POLICY },
+  }
 }

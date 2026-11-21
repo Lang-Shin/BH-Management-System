@@ -1,5 +1,5 @@
 /** Currency is PHP. Every authoritative monetary field is integer centavos. */
-export type ChargeCategory = 'RENT' | 'ELECTRICITY' | 'WATER' | 'WASHING_MACHINE'
+export type ChargeCategory = 'RENT' | 'ELECTRICITY' | 'WATER' | 'WASHING_MACHINE' | 'ADVANCE' | 'SECURITY_DEPOSIT'
 /** Derived from active allocations; absence of a charge means not applicable. */
 export type ChargeStatus = 'UNPAID' | 'PARTIALLY_PAID' | 'PAID'
 /** Owner-defined room status; distinct from an individual bill's settlement status. */
@@ -143,7 +143,43 @@ export type Charge = ChargeRecord & (
   | { category: 'ELECTRICITY'; electricity: ElectricityChargeBasis }
   | { category: 'RENT'; roomAssignmentId: string; agreedRentCents: number }
   | { category: 'WATER' | 'WASHING_MACHINE'; entryMethod: 'MANUAL' }
+  | { category: 'ADVANCE' | 'SECURITY_DEPOSIT'; moveInObligationId: string }
 )
+
+/** One continuous period of occupancy for a room; a fully vacant room ends the cycle. */
+export interface OccupancyCycle {
+  id: string
+  roomId: string
+  startedAt: string
+  endedAt: string | null
+  status: 'ACTIVE' | 'CLOSED'
+  createdAt: string
+  updatedAt: string
+}
+
+/** One room-level advance/deposit requirement per occupancy cycle. */
+export interface MoveInObligation {
+  id: string
+  occupancyCycleId: string
+  roomId: string
+  agreedMonthlyRentCents: number
+  advanceRequiredCents: number
+  depositRequiredCents: number
+  advanceChargeId: string
+  depositChargeId: string
+  policyVersion: number
+  createdAt: string
+  status: 'OPEN'
+}
+
+export interface MoveInPolicy {
+  version: number
+  advanceApplication: 'FIRST_MONTH' | 'LAST_MONTH' | 'MANUAL'
+  depositDisposition: 'MANUAL_REVIEW'
+  transferIncrease: 'PROPOSE_TOP_UP'
+  transferDecrease: 'MANUAL_REVIEW'
+  moveOutSettlement: 'MANUAL_REVIEW'
+}
 
 export interface Payment {
   id: string
@@ -224,7 +260,7 @@ export interface AuditEvent {
   id: string
   actorId: string
   occurredOn: string
-  action: 'DEMO_SEEDED' | 'READING_CORRECTED' | 'CHARGE_CORRECTED' | 'PAYMENT_CORRECTED' | 'ALLOCATION_REVERSED' | 'ELECTRICITY_PAYMENT_RECORDED' | 'ROOM_PAYMENT_RECORDED'
+  action: 'DEMO_SEEDED' | 'READING_CORRECTED' | 'CHARGE_CORRECTED' | 'PAYMENT_CORRECTED' | 'ALLOCATION_REVERSED' | 'ELECTRICITY_PAYMENT_RECORDED' | 'ROOM_PAYMENT_RECORDED' | 'MOVE_IN_PAYMENT_RECORDED' | 'MOVE_IN_POLICY_UPDATED'
   entityType: 'PROTOTYPE' | 'METER_READING' | 'CHARGE' | 'PAYMENT' | 'PAYMENT_ALLOCATION'
   entityId: string
   reason: string
@@ -252,6 +288,9 @@ export interface PrototypeAppState {
   receipts: Receipt[]
   paymentCorrections: PaymentCorrection[]
   auditEvents: AuditEvent[]
+  occupancyCycles: OccupancyCycle[]
+  moveInObligations: MoveInObligation[]
+  moveInPolicy: MoveInPolicy
 }
 
 /** Existing prototype reducer/repository payload name; identical to the app state. */

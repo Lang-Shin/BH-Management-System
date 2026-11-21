@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { usePrototype } from '@/hooks/use-prototype'
 import { useTenantDemo } from '@/app/providers/tenant-demo'
 import { roomOccupants, roomOccupancy, tenantAccount } from '@/domain/calculations/summary'
+import { selectMoveInObligations } from '@/domain/calculations/move-in'
 import { DEMO_DATE } from '@/data/fixtures/demo'
 import { formatDate, formatMoney, formatMonthYear } from '@/lib/format'
 import { selectTenantPersona } from './tenant-persona'
@@ -34,6 +35,7 @@ export default function TenantOverview() {
   const occupantTitle = occupants.length === 0 ? 'No current tenants' : occupants.length === 1 ? 'Tenant' : 'Tenants'
   const occupancy = persona?.room ? roomOccupancy(data, persona.room, DEMO_DATE) : null
   const billing = tenantRoomBilling(data, tenantId, persona?.room?.id ?? null, period?.id ?? '', DEMO_DATE)
+  const moveIn = persona?.room ? selectMoveInObligations(data, DEMO_DATE, persona.room.id).find(view => view.cycle.status === 'ACTIVE') : undefined
   const statusTone = billing.status === 'PAID' ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
     : billing.status === 'NOT PAID' ? 'border-rose-200 bg-rose-50 text-rose-900' : 'border-amber-200 bg-amber-50 text-amber-950'
 
@@ -61,6 +63,20 @@ export default function TenantOverview() {
           </div>
           <h3 className="mt-6 mb-3 text-base font-semibold">{occupantTitle}</h3>
           {occupants.length > 0 ? <ul className="grid gap-3 sm:grid-cols-2">{occupants.map(tenant => <li key={tenant.id} className="flex min-w-0 items-center gap-3 rounded-2xl border bg-muted/30 p-4"><User className="size-5 shrink-0 text-[var(--tint)]" aria-hidden="true" /><span className="break-words font-semibold">{tenant.name}</span></li>)}</ul> : <p className="text-sm text-muted-foreground">No active occupants are recorded for the selected room.</p>}
+        </CardContent>
+      </Card>
+    </section>
+    <section aria-label="Move-in advance and security deposit" className="mb-6">
+      <Card>
+        <CardHeader><CardTitle>Move-in advance &amp; security deposit</CardTitle><CardDescription>Room-level amounts for this occupancy. Roommates share the same obligation; this is not a separate personal debt.</CardDescription></CardHeader>
+        <CardContent>
+          {moveIn ? <>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border bg-muted/30 p-4"><p className="text-sm text-muted-foreground">Advance</p><p className="mt-1 text-lg font-bold">{formatMoney(moveIn.advancePaidCents)} paid of {formatMoney(moveIn.obligation.advanceRequiredCents)}</p><p className="mt-1 text-sm text-muted-foreground">{formatMoney(moveIn.advanceRemainingCents)} remaining</p><span className="move-in-status mt-2" data-status={moveIn.advanceStatus}>{moveIn.advanceStatus}</span></div>
+              <div className="rounded-2xl border bg-muted/30 p-4"><p className="text-sm text-muted-foreground">Security deposit</p><p className="mt-1 text-lg font-bold">{formatMoney(moveIn.depositPaidCents)} paid of {formatMoney(moveIn.obligation.depositRequiredCents)}</p><p className="mt-1 text-sm text-muted-foreground">{formatMoney(moveIn.depositRemainingCents)} remaining</p><span className="move-in-status mt-2" data-status={moveIn.depositStatus}>{moveIn.depositStatus}</span></div>
+            </div>
+            <p className="mt-4 text-xs leading-relaxed text-muted-foreground">The advance is not automatically used to pay a month. Deposit refund or deduction needs manual review. Monthly bills remain separate.</p>
+          </> : <p className="text-sm leading-relaxed text-muted-foreground">No move-in advance or deposit obligation is recorded for the current room occupancy. Legacy tenancies do not receive invented deposit records.</p>}
         </CardContent>
       </Card>
     </section>

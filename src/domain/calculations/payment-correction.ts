@@ -5,7 +5,7 @@ import type {
 import { chargeRoom } from './room-finance'
 import { formatMoney } from '@/lib/format'
 
-const categoryOrder: ChargeCategory[] = ['RENT', 'ELECTRICITY', 'WATER', 'WASHING_MACHINE']
+const categoryOrder: ChargeCategory[] = ['RENT', 'ELECTRICITY', 'WATER', 'WASHING_MACHINE', 'ADVANCE', 'SECURITY_DEPOSIT']
 
 export const currentCorrectionStatuses: CorrectionSettlementStatus[] = ['CORRECTED', 'REFUNDED', 'ADDITIONAL_RECEIVED']
 export const legacyCorrectionStatuses: CorrectionSettlementStatus[] = ['NO_DIFFERENCE', 'NO_MONEY_MOVED', 'REFUND_COMPLETED', 'REFUND_PENDING', 'ADDITIONAL_PENDING']

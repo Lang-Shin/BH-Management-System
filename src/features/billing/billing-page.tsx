@@ -9,6 +9,7 @@ import { formatMoney } from '@/lib/format'
 import { BillingStatusMatrix } from './billing-status-matrix'
 import { BillingRatesSection } from './billing-rates-section'
 import { PaymentCalculator } from './payment-calculator'
+import { MoveInSection } from './move-in-section'
 import { BillingStatusChart } from './billing-status-chart'
 import { selectBillingRooms } from './billing-room-status'
 import { BillingFiltersMenu } from './billing-filters-menu'
@@ -23,13 +24,14 @@ export default function Billing() {
 
   return <>
     <PageHeader title="Billing" description="Check rent, electricity, water, and washing payments in one place." />
-    <PreviewNotice>Electricity bills are created only when you confirm a payment-time meter reading. Calculate Payment settles existing rent, water, washing, and electricity bills. Recorded payment corrections are available from Payments &amp; Receipts.</PreviewNotice>
+    <PreviewNotice>Electricity bills are created only when you confirm a payment-time meter reading. Calculate Payment settles existing rent, water, washing, and electricity bills. Advance and security deposit are separate room-level balances below. Recorded payment corrections are available from Payments &amp; Receipts.</PreviewNotice>
     <div className="mb-6"><div className="max-w-full"><label htmlFor="billing-period" className="mb-2 block text-base font-semibold">Choose a month</label><select id="billing-period" value={periodId} onChange={e => { setPeriodId(e.target.value); setStatusFilter(null) }} className="min-h-14 max-w-full rounded-lg border bg-card px-4 py-3 text-base">{data.billingPeriods.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}</select></div></div>
     <section className="mb-7 grid gap-5 xl:grid-cols-3" aria-label="Bills overview">
       <StatCard label="Total bills" value={formatMoney(summary.billed)} detail="All bills for the month you chose." icon={ReceiptText} />
       <StatCard label="Already paid" value={formatMoney(summary.applied)} detail="Payments used to pay these bills." icon={Wallet} />
       <StatCard label={summary.unresolved > 0 ? 'Known outstanding' : 'Still to pay'} value={formatMoney(summary.outstanding)} detail={<><AnimatedNumber value={summary.overdue} /> bills are past their due date.{summary.unresolved > 0 && <> Plus <AnimatedNumber value={summary.unresolved} /> electricity {summary.unresolved === 1 ? 'bill' : 'bills'} awaiting a meter reading.</>}</>} icon={CircleAlert} />
     </section>
+    <MoveInSection />
     <BillingStatusChart key={periodId} rooms={billingRooms} periodLabel={data.billingPeriods.find(period => period.id === periodId)?.label ?? 'Selected billing period'} outstandingOnly={false} />
     <div className="billing-table-toolbar">
       <BillingFiltersMenu value={statusFilter} onChange={setStatusFilter} />

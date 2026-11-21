@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowLeft, ArrowUpRight, Calculator, Check, Droplets, House, WashingMachine, Zap } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, Calculator, Check, Droplets, House, ShieldCheck, Wallet, WashingMachine, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { usePrototype } from '@/hooks/use-prototype'
@@ -11,7 +11,7 @@ import { parseMeterReadingMilliKwh } from '@/domain/calculations/electricity-cal
 import { formatDate, formatMoney } from '@/lib/format'
 import { CATEGORY_LABELS } from '@/lib/labels'
 
-const icons = { RENT: House, ELECTRICITY: Zap, WATER: Droplets, WASHING_MACHINE: WashingMachine }
+const icons = { RENT: House, ELECTRICITY: Zap, WATER: Droplets, WASHING_MACHINE: WashingMachine, ADVANCE: Wallet, SECURITY_DEPOSIT: ShieldCheck }
 const emptySelection: ChargeCategory[] = []
 
 function electricityError(code: string | undefined) {

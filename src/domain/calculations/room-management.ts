@@ -52,6 +52,8 @@ export function roomDeletionBlockers(data: PrototypeAppState, roomId: string, as
   const receipts = data.receipts.filter(receipt => paymentIds.has(receipt.paymentId)
     || receipt.allocationIds.some(allocationId => allocations.some(allocation => allocation.id === allocationId)))
   const obligations = data.electricityBillObligations.filter(obligation => obligation.roomId === roomId || meterIds.has(obligation.meterId))
+  const occupancyCycles = data.occupancyCycles.filter(cycle => cycle.roomId === roomId)
+  const moveInObligations = data.moveInObligations.filter(obligation => obligation.roomId === roomId)
   const readings = data.meterReadings.filter(reading => meterIds.has(reading.meterId))
   const credits = data.tenantCredits.filter(credit => paymentIds.has(credit.sourcePaymentId) || tenantIds.has(credit.tenantId))
   const outstanding = charges.filter(charge => charge.state === 'ISSUED' && chargeBalance(data, charge, asOf) > 0)
@@ -65,6 +67,7 @@ export function roomDeletionBlockers(data: PrototypeAppState, roomId: string, as
   if (receipts.length > 0) blockers.push('This room has receipt history.')
   if (meterIds.size > 0 || readings.length > 0) blockers.push('This room has electricity meter or reading history.')
   if (obligations.length > 0) blockers.push('This room has an electricity bill awaiting a reading.')
+  if (occupancyCycles.length > 0 || moveInObligations.length > 0) blockers.push('This room has occupancy-cycle or move-in advance/deposit history.')
   if (credits.length > 0) blockers.push('This room has advance-credit or other financial references.')
 
   return blockers

@@ -11,9 +11,11 @@ import {
 } from '@/domain/calculations/billing-rates'
 import { formatDate, formatMoney, formatMonthYear } from '@/lib/format'
 import { roomCategoryLabel } from '@/lib/room-rates'
-import type { ChargeCategory, RoomCategoryId } from '@/domain/types/models'
+import type { RoomCategoryId } from '@/domain/types/models'
 
-const unitLabels: Record<ChargeCategory, string> = {
+type RateCategory = 'RENT' | 'ELECTRICITY' | 'WATER' | 'WASHING_MACHINE'
+
+const unitLabels: Record<RateCategory, string> = {
   RENT: 'per room per month',
   ELECTRICITY: 'per kWh',
   WATER: 'per tenant per billing period',
@@ -34,7 +36,7 @@ function utilityCents(rate: { rateCentsPerKwh: number } | { rateCents: number } 
   return rate ? ('rateCentsPerKwh' in rate ? rate.rateCentsPerKwh : rate.rateCents) : undefined
 }
 
-export function BillingRateDialog({ kind, title, onSaved }: { kind: ChargeCategory; title: string; onSaved: (message: string) => void }) {
+export function BillingRateDialog({ kind, title, onSaved }: { kind: RateCategory; title: string; onSaved: (message: string) => void }) {
   const { data, dispatch } = usePrototype()
   const effectiveFrom = nextRateEffectiveFrom(data, DEMO_DATE)
   const activeRentRates = ROOM_RATE_CATEGORY_IDS.map(categoryId => ({ categoryId, rate: activeRoomRentRate(data, categoryId, DEMO_DATE) }))

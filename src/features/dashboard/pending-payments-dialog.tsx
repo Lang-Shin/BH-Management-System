@@ -1,4 +1,4 @@
-import { ChevronDown, DoorOpen, Droplets, House, WashingMachine, Zap } from 'lucide-react'
+import { ChevronDown, DoorOpen, Droplets, House, ShieldCheck, Wallet, WashingMachine, Zap } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useAnimatedDialogClose } from '@/components/ui/use-animated-dialog-close'
 import { Button } from '@/components/ui/button'
@@ -10,7 +10,7 @@ import { formatDate, formatMoney } from '@/lib/format'
 import { pendingPaymentCategories } from './pending-payment-groups'
 import { unresolvedElectricity } from '@/domain/calculations/summary'
 
-const icons = { RENT: House, ELECTRICITY: Zap, WATER: Droplets, WASHING_MACHINE: WashingMachine }
+const icons = { RENT: House, ELECTRICITY: Zap, WATER: Droplets, WASHING_MACHINE: WashingMachine, ADVANCE: Wallet, SECURITY_DEPOSIT: ShieldCheck }
 const timingLabels = { earlier: 'Past month', current: 'Current month', upcoming: 'Upcoming month', review: 'Month needs review' }
 const formatKwh = (milliKwh: number) => `${milliKwh / 1000} kWh`
 

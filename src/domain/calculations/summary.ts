@@ -54,7 +54,9 @@ export function creditRemaining(data: PrototypeAppState, credit: TenantCredit, a
 }
 
 export function issuedCharges(data: PrototypeAppState, asOf: string, periodId?: string) {
-  return data.charges.filter(c => c.state === 'ISSUED' && c.issuedOn <= asOf && (!periodId || c.billingPeriodId === periodId))
+  return data.charges.filter(c => c.state === 'ISSUED' && c.issuedOn <= asOf
+    && c.category !== 'ADVANCE' && c.category !== 'SECURITY_DEPOSIT'
+    && (!periodId || c.billingPeriodId === periodId))
 }
 
 export function tenantAccount(data: PrototypeAppState, tenantId: string, asOf: string) {

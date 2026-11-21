@@ -2,6 +2,7 @@ import type { ChargeCategory, ChargeStatus, RoomPaymentStatus, Tenant } from '@/
 
 export const CATEGORY_LABELS: Record<ChargeCategory, string> = {
   RENT: 'Rent', ELECTRICITY: 'Electricity', WATER: 'Water', WASHING_MACHINE: 'Washing machine',
+  ADVANCE: 'Advance payment', SECURITY_DEPOSIT: 'Security deposit',
 }
 export const CHARGE_STATUS_LABELS: Record<ChargeStatus, string> = {
   UNPAID: 'Not yet paid', PARTIALLY_PAID: 'Partly paid', PAID: 'Paid',

@@ -44,6 +44,7 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
       && date(r.issuedOn) && date(r.dueDate) && oneOf(r.state, ['ISSUED', 'VOIDED']) && correction(r.correction))) return false
     if (r.category === 'RENT') return id(r.roomAssignmentId) && positive(r.agreedRentCents)
     if (r.category === 'WATER' || r.category === 'WASHING_MACHINE') return r.entryMethod === 'MANUAL'
+    if (r.category === 'ADVANCE' || r.category === 'SECURITY_DEPOSIT') return id(r.moveInObligationId)
     if (r.category !== 'ELECTRICITY' || !isRecord(r.electricity)) return false
     const e = r.electricity
     return id(e.intervalId) && id(e.meterId) && id(e.previousReadingId) && id(e.currentReadingId) && money(e.previousReadingMilliKwh)
@@ -63,12 +64,25 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     && id(r.correctedReceiptId) && date(r.correctedAt) && id(r.correctedBy) && text(r.reason) && r.reason.length <= 500
     && money(r.originalAmountCents) && money(r.correctedAmountCents) && Number.isSafeInteger(r.differenceCents)
     && oneOf(r.settlementStatus, ['CORRECTED', 'REFUNDED', 'ADDITIONAL_RECEIVED', 'NO_DIFFERENCE', 'NO_MONEY_MOVED', 'ADDITIONAL_PENDING', 'REFUND_COMPLETED', 'REFUND_PENDING'])
-    && money(r.settlementAmountCents) && Array.isArray(r.originalCategories) && r.originalCategories.every(category => oneOf(category, ['RENT', 'ELECTRICITY', 'WATER', 'WASHING_MACHINE']))
-    && Array.isArray(r.correctedCategories) && r.correctedCategories.every(category => oneOf(category, ['RENT', 'ELECTRICITY', 'WATER', 'WASHING_MACHINE']))
+    && money(r.settlementAmountCents) && Array.isArray(r.originalCategories) && r.originalCategories.every(category => oneOf(category, ['RENT', 'ELECTRICITY', 'WATER', 'WASHING_MACHINE', 'ADVANCE', 'SECURITY_DEPOSIT']))
+    && Array.isArray(r.correctedCategories) && r.correctedCategories.every(category => oneOf(category, ['RENT', 'ELECTRICITY', 'WATER', 'WASHING_MACHINE', 'ADVANCE', 'SECURITY_DEPOSIT']))
     && (r.originalElectricityReadingMilliKwh === null || money(r.originalElectricityReadingMilliKwh))
     && (r.correctedElectricityReadingMilliKwh === null || money(r.correctedElectricityReadingMilliKwh)) && id(r.auditEventId))) return false
+  if (!rows(value, 'occupancyCycles', r => id(r.roomId) && date(r.startedAt) && (r.endedAt === null || date(r.endedAt))
+    && oneOf(r.status, ['ACTIVE', 'CLOSED']) && date(r.createdAt) && date(r.updatedAt))) return false
+  if (!rows(value, 'moveInObligations', r => id(r.occupancyCycleId) && id(r.roomId)
+    && positive(r.agreedMonthlyRentCents) && positive(r.advanceRequiredCents) && positive(r.depositRequiredCents)
+    && id(r.advanceChargeId) && id(r.depositChargeId) && Number.isSafeInteger(r.policyVersion) && (r.policyVersion as number) > 0
+    && date(r.createdAt) && r.status === 'OPEN')) return false
+  if (!isRecord(value.moveInPolicy)
+    || !Number.isSafeInteger(value.moveInPolicy.version) || (value.moveInPolicy.version as number) < 1
+    || !oneOf(value.moveInPolicy.advanceApplication, ['FIRST_MONTH', 'LAST_MONTH', 'MANUAL'])
+    || value.moveInPolicy.depositDisposition !== 'MANUAL_REVIEW'
+    || value.moveInPolicy.transferIncrease !== 'PROPOSE_TOP_UP'
+    || value.moveInPolicy.transferDecrease !== 'MANUAL_REVIEW'
+    || value.moveInPolicy.moveOutSettlement !== 'MANUAL_REVIEW') return false
   if (!rows(value, 'auditEvents', r => id(r.actorId) && date(r.occurredOn) && id(r.entityId) && text(r.reason)
-    && oneOf(r.action, ['DEMO_SEEDED', 'READING_CORRECTED', 'CHARGE_CORRECTED', 'PAYMENT_CORRECTED', 'ALLOCATION_REVERSED', 'ELECTRICITY_PAYMENT_RECORDED', 'ROOM_PAYMENT_RECORDED'])
+    && oneOf(r.action, ['DEMO_SEEDED', 'READING_CORRECTED', 'CHARGE_CORRECTED', 'PAYMENT_CORRECTED', 'ALLOCATION_REVERSED', 'ELECTRICITY_PAYMENT_RECORDED', 'ROOM_PAYMENT_RECORDED', 'MOVE_IN_PAYMENT_RECORDED', 'MOVE_IN_POLICY_UPDATED'])
     && oneOf(r.entityType, ['PROTOTYPE', 'METER_READING', 'CHARGE', 'PAYMENT', 'PAYMENT_ALLOCATION'])
     && nullableText(r.beforeSnapshot) && nullableText(r.afterSnapshot))) return false
 
@@ -77,7 +91,7 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
   if ([data.tenants, data.rooms, data.roomAssignments, data.electricityMeters, data.meterReadings,
     data.electricityBillObligations, data.electricityRates, data.roomRentRates, data.waterRates, data.washingRates,
     data.billingPeriods, data.charges, data.payments, data.paymentAllocations, data.tenantCredits, data.receipts,
-    data.paymentCorrections, data.auditEvents]
+    data.paymentCorrections, data.auditEvents, data.occupancyCycles, data.moveInObligations]
     .some(items => new Set(items.map(item => item.id)).size !== items.length)) return false
   if (new Set(data.electricityRates.map(rate => rate.effectiveFrom)).size !== data.electricityRates.length
     || new Set(data.roomRentRates.map(rate => `${rate.categoryId}:${rate.effectiveFrom}`)).size !== data.roomRentRates.length
@@ -103,6 +117,23 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
   }
   if (!data.roomAssignments.every(a => tenant(a.tenantId) && data.rooms.some(r => r.id === a.roomId)
     && (a.endDate === null || a.endDate >= a.startDate))) return false
+  if (!data.occupancyCycles.every(cycle => data.rooms.some(room => room.id === cycle.roomId)
+    && cycle.startedAt <= (cycle.endedAt ?? '9999-12-31'))) return false
+  if (new Set(data.occupancyCycles.filter(cycle => cycle.status === 'ACTIVE').map(cycle => cycle.roomId)).size
+    !== data.occupancyCycles.filter(cycle => cycle.status === 'ACTIVE').length) return false
+  if (!data.moveInObligations.every(obligation => {
+    const cycle = data.occupancyCycles.find(item => item.id === obligation.occupancyCycleId)
+    const advance = data.charges.find(item => item.id === obligation.advanceChargeId)
+    const deposit = data.charges.find(item => item.id === obligation.depositChargeId)
+    return cycle && cycle.roomId === obligation.roomId
+      && advance?.category === 'ADVANCE' && 'moveInObligationId' in advance && advance.moveInObligationId === obligation.id
+      && deposit?.category === 'SECURITY_DEPOSIT' && 'moveInObligationId' in deposit && deposit.moveInObligationId === obligation.id
+      && advance.amountCents === obligation.advanceRequiredCents
+      && deposit.amountCents === obligation.depositRequiredCents
+  })) return false
+  if (new Set(data.moveInObligations.map(obligation => obligation.occupancyCycleId)).size !== data.moveInObligations.length) return false
+  if (!data.charges.filter(charge => charge.category === 'ADVANCE' || charge.category === 'SECURITY_DEPOSIT')
+    .every(charge => 'moveInObligationId' in charge && data.moveInObligations.some(obligation => obligation.id === charge.moveInObligationId))) return false
   if (!data.tenants.every(t => {
     const openAssignments = data.roomAssignments.filter(a => a.tenantId === t.id && a.endDate === null).length
     return openAssignments <= 1 && (t.status !== 'MOVED_OUT' || openAssignments === 0)

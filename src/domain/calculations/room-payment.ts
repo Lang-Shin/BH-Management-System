@@ -3,6 +3,7 @@ import { chargeBalance, issuedCharges, unresolvedElectricity } from './summary'
 import { chargeRoom, roomContext } from './room-finance'
 import { calculateElectricityCharge, latestSettledReading, type ElectricityCharge } from './electricity-calculation'
 import { activeElectricityRate } from './billing-rates'
+import { nextReceiptNumbers } from './receipt-numbering'
 import { proposedRoomCharges } from './billing-eligibility'
 
 export const roomPaymentCategories: ChargeCategory[] = ['RENT', 'ELECTRICITY', 'WATER', 'WASHING_MACHINE']
@@ -131,21 +132,6 @@ export function buildRoomPaymentQuote(data: PrototypeAppState, input: RoomPaymen
     periodLabel: period?.label ?? input.periodId, options, selected, totalCents,
     pendingElectricity, canConfirm, electricity,
   }
-}
-
-function nextReceiptNumbers(data: PrototypeAppState, count: number): string[] {
-  const used = new Set(data.receipts.map(receipt => receipt.receiptNumber))
-  const numbers: string[] = []
-  let sequence = data.receipts.reduce((max, receipt) => {
-    const match = /^DEMO-RCT-(\d+)$/.exec(receipt.receiptNumber)
-    return match ? Math.max(max, Number(match[1])) : max
-  }, 0) + 1
-  while (numbers.length < count) {
-    const number = `DEMO-RCT-${String(sequence).padStart(3, '0')}`
-    if (!used.has(number)) numbers.push(number)
-    sequence += 1
-  }
-  return numbers
 }
 
 function stableDigest(value: string): string {
