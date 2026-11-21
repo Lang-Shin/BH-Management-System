@@ -3,6 +3,7 @@ import { chargeBalance, issuedCharges, unresolvedElectricity } from './summary'
 import { chargeRoom, roomContext } from './room-finance'
 import { calculateElectricityCharge, latestSettledReading, type ElectricityCharge } from './electricity-calculation'
 import { activeElectricityRate } from './billing-rates'
+import { proposedRoomCharges } from './billing-eligibility'
 
 export const roomPaymentCategories: ChargeCategory[] = ['RENT', 'ELECTRICITY', 'WATER', 'WASHING_MACHINE']
 
@@ -15,6 +16,8 @@ export interface RoomPaymentOption {
   chargeIds: string[]
   detail: string
   obligationId?: string
+  /** Missing period charges created only when this category is confirmed. */
+  proposedCharges?: Charge[]
 }
 
 export interface RoomElectricityQuote {
@@ -55,13 +58,16 @@ function categoryCharges(data: PrototypeAppState, roomId: string, periodId: stri
     .filter(charge => charge.category === category && chargeRoom(data, charge).roomId === roomId)
 }
 
-function finalizedOption(category: ChargeCategory, charges: Charge[], data: PrototypeAppState, asOf: string): RoomPaymentOption {
-  if (charges.length === 0) return { category, state: 'UNAVAILABLE', amountCents: null, chargeIds: [], detail: category === 'WASHING_MACHINE' ? 'Did not avail' : 'No bill' }
+function finalizedOption(category: ChargeCategory, charges: Charge[], data: PrototypeAppState, asOf: string, proposedCharges: Charge[] = []): RoomPaymentOption {
+  const proposedTotal = proposedCharges.reduce((sum, charge) => sum + charge.amountCents, 0)
+  if (charges.length === 0 && proposedCharges.length === 0) return { category, state: 'UNAVAILABLE', amountCents: null, chargeIds: [], detail: category === 'WASHING_MACHINE' ? 'Did not avail' : 'No bill' }
   const unpaid = charges.filter(charge => chargeBalance(data, charge, asOf) > 0)
-  if (unpaid.length === 0) return { category, state: 'PAID', amountCents: 0, chargeIds: [], detail: 'Paid' }
+  const unpaidTotal = unpaid.reduce((sum, charge) => sum + chargeBalance(data, charge, asOf), 0)
+  if (unpaid.length === 0 && proposedCharges.length === 0) return { category, state: 'PAID', amountCents: 0, chargeIds: [], detail: 'Paid' }
   return {
-    category, state: 'SELECTABLE', amountCents: unpaid.reduce((sum, charge) => sum + chargeBalance(data, charge, asOf), 0),
-    chargeIds: unpaid.map(charge => charge.id), detail: 'Unpaid',
+    category, state: 'SELECTABLE', amountCents: unpaidTotal + proposedTotal,
+    chargeIds: unpaid.map(charge => charge.id), detail: proposedCharges.length > 0 ? 'Newly applicable' : 'Unpaid',
+    proposedCharges: proposedCharges.length > 0 ? proposedCharges : undefined,
   }
 }
 
@@ -69,17 +75,18 @@ export function buildRoomPaymentQuote(data: PrototypeAppState, input: RoomPaymen
   const period = data.billingPeriods.find(item => item.id === input.periodId)
   const room = data.rooms.find(item => item.id === input.roomId)
   const context = room ? roomContext(data, room.id, 'period-assignment', 'Selected room') : null
+  const proposed = room && period ? proposedRoomCharges(data, room, period, input.asOf) : []
   const options: RoomPaymentOption[] = []
   let electricity: RoomElectricityQuote | undefined
 
   for (const category of roomPaymentCategories) {
     if (category !== 'ELECTRICITY') {
-      options.push(finalizedOption(category, categoryCharges(data, input.roomId, input.periodId, input.asOf, category), data, input.asOf))
+      options.push(finalizedOption(category, categoryCharges(data, input.roomId, input.periodId, input.asOf, category), data, input.asOf, proposed.filter(charge => charge.category === category)))
       continue
     }
     const obligation = unresolvedElectricity(data, input.asOf, input.periodId, input.roomId)[0]
     if (!obligation) {
-      options.push(finalizedOption(category, categoryCharges(data, input.roomId, input.periodId, input.asOf, category), data, input.asOf))
+      options.push(finalizedOption(category, categoryCharges(data, input.roomId, input.periodId, input.asOf, category), data, input.asOf, proposed.filter(charge => charge.category === category)))
       continue
     }
     const previous = latestSettledReading(data, obligation.meterId)
@@ -179,6 +186,10 @@ export function prepareRoomPayment(data: PrototypeAppState, input: RoomPaymentIn
       const balance = chargeBalance(data, charge, input.asOf)
       if (balance > 0) lines.push({ charge, amountCents: balance })
     }
+    for (const charge of option.proposedCharges ?? []) {
+      if (data.charges.some(item => item.id === charge.id) || lines.some(line => line.charge.id === charge.id)) return { ok: false, reason: 'STALE_SELECTION' }
+      lines.push({ charge, amountCents: charge.amountCents })
+    }
   }
   if (lines.length === 0) return { ok: false, reason: 'STALE_SELECTION' }
   const totalCents = lines.reduce((sum, line) => sum + line.amountCents, 0)
@@ -217,7 +228,10 @@ export function prepareRoomPayment(data: PrototypeAppState, input: RoomPaymentIn
     receipts.push(receipt)
   }
 
-  const extraCharges: Charge[] = quote.electricity?.charge ? [quote.electricity.charge] : []
+  const extraCharges: Charge[] = [
+    ...(quote.electricity?.charge ? [quote.electricity.charge] : []),
+    ...quote.selected.flatMap(category => quote.options.find(option => option.category === category)?.proposedCharges ?? []),
+  ]
   const extraReadings: MeterReading[] = quote.electricity?.currentReading ? [quote.electricity.currentReading] : []
   const next: PrototypeAppState = {
     ...data,

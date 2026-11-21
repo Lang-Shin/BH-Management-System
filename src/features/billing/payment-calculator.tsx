@@ -5,7 +5,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle, Dia
 import { usePrototype } from '@/hooks/use-prototype'
 import { DEMO_DATE } from '@/data/fixtures/demo'
 import type { ChargeCategory } from '@/domain/types/models'
-import { selectRoomFinance } from '@/domain/calculations/room-finance'
+import { selectBillingEligibleRooms } from '@/domain/calculations/billing-eligibility'
 import { buildRoomPaymentQuote, prepareRoomPayment, roomPaymentCategories, type RoomPaymentResult } from '@/domain/calculations/room-payment'
 import { parseMeterReadingMilliKwh } from '@/domain/calculations/electricity-calculation'
 import { formatDate, formatMoney } from '@/lib/format'
@@ -36,8 +36,7 @@ export function PaymentCalculator({ periodId, periodLabel }: { periodId: string;
   const [preview, setPreview] = useState<Extract<RoomPaymentResult, { ok: true }> | null>(null)
   const [submitError, setSubmitError] = useState('')
   const [saving, setSaving] = useState(false)
-  const roomIds = new Set(selectRoomFinance(data, DEMO_DATE, periodId).map(row => row.context.roomId).filter((id): id is string => Boolean(id)))
-  const rooms = data.rooms.filter(room => roomIds.has(room.id))
+  const rooms = selectBillingEligibleRooms(data, periodId, DEMO_DATE)
   const parsedReading = reading === '' ? null : parseMeterReadingMilliKwh(reading)
   const readingError = reading !== '' && parsedReading === null ? 'Enter a non-negative reading with up to three decimal places.' : null
   const quote = roomId ? buildRoomPaymentQuote(data, { roomId, periodId, selected, electricityReadingMilliKwh: parsedReading, asOf: DEMO_DATE }) : null

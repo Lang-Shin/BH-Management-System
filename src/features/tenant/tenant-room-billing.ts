@@ -22,8 +22,8 @@ export function tenantRoomBilling(data: PrototypeAppState, tenantId: string, roo
   // A current room number alone does not authorize access to an earlier tenancy's bills.
   const through = period.endDate < asOf ? period.endDate : asOf
   const tenancy = data.roomAssignments.find(item => item.tenantId === tenantId && item.roomId === roomId
-    && item.startDate <= period.startDate && (item.endDate === null || item.endDate >= through))
-  if (!tenancy) return empty('UNAVAILABLE', 'This billing period is outside the selected room tenancy, or covers a transfer. Historical room billing needs review.')
+    && item.startDate <= through && (item.endDate === null || item.endDate >= period.startDate))
+  if (!tenancy) return empty('UNAVAILABLE', 'This billing period is outside the selected room tenancy. Historical room billing needs review.')
   const allCharges = issuedCharges(data, asOf, periodId)
   const ambiguous = allCharges.some(charge => chargeRoom(data, charge).roomId === null
     && data.roomAssignments.some(item => item.tenantId === charge.tenantId && item.roomId === roomId
@@ -50,7 +50,9 @@ export function tenantRoomBilling(data: PrototypeAppState, tenantId: string, roo
     return amount > 0 || pending ? [{ category, outstandingCents: amount, pendingCalculation: pending }] : []
   })
   return {
-    status, detail: 'Room-level billing totals across applicable issued charges. These are not an individual tenant balance.',
+    status, detail: tenancy.startDate > period.startDate || (tenancy.endDate !== null && tenancy.endDate < period.endDate)
+      ? 'Room-level billing totals for this period. A partial-period tenancy is billed for the applicable period without a proration rule.'
+      : 'Room-level billing totals across applicable issued charges. These are not an individual tenant balance.',
     billedCents, appliedCents, outstandingCents, pendingCalculation, unsettled,
   }
 }

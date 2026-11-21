@@ -1,0 +1,177 @@
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
+import { describe, expect, it } from 'vitest'
+import { AppRouter } from '@/app/router/app-router'
+import { PrototypeProvider } from '@/app/providers/prototype-provider'
+import { createDemoData, DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
+import { localStorageRepository, STORAGE_KEY } from '@/data/repositories/local-storage-repository'
+import { buildRoomPaymentQuote, prepareRoomPayment } from '@/domain/calculations/room-payment'
+import { selectBillingEligibleRooms } from '@/domain/calculations/billing-eligibility'
+import { createRoom, updateRoom, type RoomDraft } from '@/domain/calculations/room-management'
+import { createTenant } from '@/domain/calculations/tenant-management'
+import { selectTenantReceipts } from '@/features/tenant/tenant-receipts'
+import { isPrototypeData } from '@/domain/validation/prototype-data'
+import type { ChargeCategory } from '@/domain/types/models'
+
+const emptyTenant = { email: '', phone: '', address: '', notes: '', moveInDate: DEMO_DATE }
+
+function addRoom(data: ReturnType<typeof createDemoData>, name: string, capacity = 1, categoryId: RoomDraft['categoryId'] = 'RATE_4000') {
+  const result = createRoom(data, { name, capacity, categoryId, kind: 'PRIVATE', status: 'available' }, DEMO_DATE)
+  if (!result.ok) throw new Error('room creation failed')
+  return result
+}
+
+function addTenant(data: ReturnType<typeof createDemoData>, name: string, roomId: string) {
+  const result = createTenant(data, { ...emptyTenant, name, roomId }, DEMO_DATE)
+  if (!result.ok) throw new Error(`tenant creation failed: ${JSON.stringify(result.errors)}`)
+  return result
+}
+
+describe('dynamic Billing room availability', () => {
+  it('quotes and records rent/water for a newly created room with one tenant', () => {
+    const room = addRoom(createDemoData(), '906')
+    const tenant = addTenant(room.data, 'New Room Tenant', room.room.id)
+    const data = tenant.data
+    expect(isPrototypeData(data)).toBe(true)
+    const eligible = selectBillingEligibleRooms(data, DEMO_PERIOD, DEMO_DATE)
+    expect(eligible.filter(item => item.id === room.room.id)).toHaveLength(1)
+    expect(new Set(eligible.map(item => item.id)).size).toBe(eligible.length)
+
+    const quote = buildRoomPaymentQuote(data, { roomId: room.room.id, periodId: DEMO_PERIOD, selected: [], electricityReadingMilliKwh: null, asOf: DEMO_DATE })
+    const option = (category: ChargeCategory) => quote.options.find(item => item.category === category)!
+    expect(option('RENT')).toMatchObject({ state: 'SELECTABLE', amountCents: 400_000, detail: 'Newly applicable' })
+    expect(option('WATER')).toMatchObject({ state: 'SELECTABLE', amountCents: 10_000 })
+    expect(option('WASHING_MACHINE').state).toBe('UNAVAILABLE')
+    expect(quote.options.filter(item => item.category === 'RENT')).toHaveLength(1)
+
+    const result = prepareRoomPayment(data, { roomId: room.room.id, periodId: DEMO_PERIOD, selected: ['RENT', 'WATER'], electricityReadingMilliKwh: null, asOf: DEMO_DATE })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.totalCents).toBe(410_000)
+    expect(result.payments).toHaveLength(1)
+    expect(result.receipts).toHaveLength(1)
+    expect(isPrototypeData(result.data)).toBe(true)
+    expect(result.data.charges.filter(charge => charge.id === `rent-${DEMO_PERIOD}-${room.room.id}`)).toHaveLength(1)
+    expect(result.data.charges.filter(charge => charge.id === `water-${DEMO_PERIOD}-${tenant.tenant.id}`)).toHaveLength(1)
+
+    const receipts = selectTenantReceipts(result.data, tenant.tenant.id).receipts
+    expect(receipts).toHaveLength(1)
+    expect(receipts[0]!.rooms.label).toBe('Room 906')
+    expect(receipts[0]!.categories.find(item => item.category === 'RENT')?.amountCents).toBe(400_000)
+    expect(receipts[0]!.categories.find(item => item.category === 'WATER')?.amountCents).toBe(10_000)
+    const after = buildRoomPaymentQuote(result.data, { roomId: room.room.id, periodId: DEMO_PERIOD, selected: [], electricityReadingMilliKwh: null, asOf: DEMO_DATE })
+    expect(after.options.find(item => item.category === 'RENT')?.state).toBe('PAID')
+    expect(after.options.find(item => item.category === 'WATER')?.state).toBe('PAID')
+    expect(prepareRoomPayment(result.data, { roomId: room.room.id, periodId: DEMO_PERIOD, selected: ['RENT'], electricityReadingMilliKwh: null, asOf: DEMO_DATE }).ok).toBe(false)
+  })
+
+  it('charges room rent once but water per tenant in a new shared room', () => {
+    const room = addRoom(createDemoData(), '907', 2)
+    const first = addTenant(room.data, 'Shared One', room.room.id)
+    const second = addTenant(first.data, 'Shared Two', room.room.id)
+    const data = second.data
+    const quote = buildRoomPaymentQuote(data, { roomId: room.room.id, periodId: DEMO_PERIOD, selected: [], electricityReadingMilliKwh: null, asOf: DEMO_DATE })
+    expect(quote.options.find(item => item.category === 'RENT')?.amountCents).toBe(400_000)
+    expect(quote.options.find(item => item.category === 'WATER')?.amountCents).toBe(20_000)
+    const result = prepareRoomPayment(data, { roomId: room.room.id, periodId: DEMO_PERIOD, selected: ['RENT', 'WATER'], electricityReadingMilliKwh: null, asOf: DEMO_DATE })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.totalCents).toBe(420_000)
+    expect(result.payments).toHaveLength(2)
+    expect(result.receipts).toHaveLength(2)
+    expect(result.data.charges.filter(charge => charge.id === `rent-${DEMO_PERIOD}-${room.room.id}`)).toHaveLength(1)
+    expect(result.data.charges.filter(charge => charge.category === 'WATER' && [first.tenant.id, second.tenant.id].includes(charge.tenantId))).toHaveLength(2)
+  })
+
+  it('keeps existing, moved-out, fully paid, and partially paid rooms eligible for their period', () => {
+    const data = createDemoData()
+    const november = selectBillingEligibleRooms(data, DEMO_PERIOD, DEMO_DATE).map(room => room.name)
+    expect(november).toEqual(['1', '2', '3', '4'])
+    expect(new Set(november).size).toBe(november.length)
+    const october = selectBillingEligibleRooms(data, 'period-oct', DEMO_DATE).map(room => room.name)
+    expect(october).toContain('5')
+
+    const paidQuote = buildRoomPaymentQuote(data, { roomId: 'room-1', periodId: DEMO_PERIOD, selected: [], electricityReadingMilliKwh: null, asOf: DEMO_DATE })
+    expect(paidQuote.options.every(option => option.state === 'PAID')).toBe(true)
+    const partialQuote = buildRoomPaymentQuote(data, { roomId: 'room-2', periodId: DEMO_PERIOD, selected: [], electricityReadingMilliKwh: null, asOf: DEMO_DATE })
+    expect(partialQuote.options.find(option => option.category === 'RENT')?.state).toBe('PAID')
+    expect(partialQuote.options.find(option => option.category === 'WATER')?.state).toBe('PAID')
+    expect(partialQuote.options.find(option => option.category === 'ELECTRICITY')?.state).toBe('AWAITING_READING')
+    const historical = buildRoomPaymentQuote(data, { roomId: 'room-5', periodId: 'period-oct', selected: [], electricityReadingMilliKwh: null, asOf: DEMO_DATE })
+    expect(historical.options.every(option => ['PAID', 'UNAVAILABLE'].includes(option.state))).toBe(true)
+  })
+
+  it('surfaces Room 06 and keeps Room 2 and Room 02 independent', () => {
+    let data = createDemoData()
+    const room6 = data.rooms.find(room => room.name === '6')!
+    const available = updateRoom(data, room6.id, { name: '6', capacity: 1, categoryId: 'RATE_3500', kind: 'PRIVATE', status: 'available' }, DEMO_DATE)
+    expect(available.ok).toBe(true)
+    if (!available.ok) return
+    data = addTenant(available.data, 'Room Six Tenant', room6.id).data
+    const room02 = data.rooms.find(room => room.name === '02')!
+    data = addTenant(data, 'Room Zero Two Tenant', room02.id).data
+    const eligible = selectBillingEligibleRooms(data, DEMO_PERIOD, DEMO_DATE)
+    expect(eligible.some(room => room.name === '06')).toBe(false)
+    expect(eligible.find(room => room.name === '6')?.id).toBe(room6.id)
+    expect(eligible.find(room => room.name === '02')?.id).toBe(room02.id)
+    expect(eligible.find(room => room.name === '2')?.id).toBe('room-2')
+    const quote6 = buildRoomPaymentQuote(data, { roomId: room6.id, periodId: DEMO_PERIOD, selected: [], electricityReadingMilliKwh: null, asOf: DEMO_DATE })
+    expect(quote6.options.find(option => option.category === 'RENT')?.amountCents).toBe(350_000)
+    const quote02 = buildRoomPaymentQuote(data, { roomId: room02.id, periodId: DEMO_PERIOD, selected: [], electricityReadingMilliKwh: null, asOf: DEMO_DATE })
+    expect(quote02.roomLabel).toBe('Room 02')
+    expect(quote02.options.find(option => option.category === 'RENT')?.amountCents).toBe(500_000)
+    expect(quote02.options.find(option => option.category === 'WATER')?.amountCents).toBe(10_000)
+  })
+})
+
+describe('Billing selector UI after tenant creation', () => {
+  it('shows a newly occupied room without refresh and records its first bill into tenant receipts', async () => {
+    const user = userEvent.setup()
+    render(<PrototypeProvider repository={localStorageRepository}><MemoryRouter initialEntries={['/rooms']}><AppRouter /></MemoryRouter></PrototypeProvider>)
+    await user.click(await screen.findByRole('button', { name: 'Add room' }))
+    let dialog = await screen.findByRole('dialog', { name: 'Add a room' })
+    await user.type(within(dialog).getByLabelText('Room number or name'), '908')
+    await user.selectOptions(within(dialog).getByLabelText('Monthly rental rate'), 'RATE_4000')
+    await user.click(within(dialog).getByRole('button', { name: 'Add room' }))
+    await user.click(within(await screen.findByRole('dialog', { name: 'Room added successfully' })).getByRole('button', { name: 'Got it' }))
+    await waitFor(() => expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null').data.rooms.some((room: { name: string }) => room.name === '908')).toBe(true))
+    const roomId = JSON.parse(localStorage.getItem(STORAGE_KEY)!).data.rooms.find((room: { name: string }) => room.name === '908').id
+
+    const nav = screen.getByRole('navigation', { name: 'Main navigation' })
+    await user.click(within(nav).getByRole('link', { name: 'Tenants' }))
+    await user.click(await screen.findByRole('button', { name: 'Add tenant' }))
+    dialog = await screen.findByRole('dialog', { name: 'Add a tenant' })
+    await user.type(within(dialog).getByLabelText('Full name'), 'New Billing Tenant')
+    await user.selectOptions(within(dialog).getByLabelText('Room assignment'), roomId)
+    await user.click(within(dialog).getByRole('button', { name: 'Add tenant' }))
+    await user.click(within(await screen.findByRole('dialog', { name: 'Tenant added successfully' })).getByRole('button', { name: 'Got it' }))
+
+    await user.click(within(nav).getByRole('link', { name: 'Billing' }))
+    await user.click(await screen.findByRole('button', { name: /Calculate payment/ }))
+    dialog = screen.getByRole('dialog', { name: 'Choose a room and its bills.' })
+    const options = within(within(dialog).getByLabelText('Choose room')).getAllByRole('option').map(option => [option.getAttribute('value'), option.textContent])
+    expect(options).toContainEqual([roomId, 'Room 908'])
+    expect(new Set(options.map(([value]) => value)).size).toBe(options.length)
+    await user.selectOptions(within(dialog).getByLabelText('Choose room'), roomId)
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Rent' }))
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Water' }))
+    expect(within(dialog).getByLabelText('Total to pay')).toHaveTextContent('₱4,100.00')
+    await user.click(within(dialog).getByRole('button', { name: /Review payment/ }))
+    dialog = screen.getByRole('dialog', { name: 'Confirm payment received' })
+    await user.click(within(dialog).getByRole('button', { name: 'Confirm payment received' }))
+    await user.click(within(await screen.findByRole('dialog', { name: 'Payment recorded' })).getByRole('button', { name: 'Got it' }))
+
+    await user.click(screen.getByRole('button', { name: 'Switch to Tenant UI' }))
+    await screen.findByRole('heading', { level: 1, name: 'Overview' })
+    const demoTenant = screen.getByLabelText('Demo tenant')
+    const tenantId = JSON.parse(localStorage.getItem(STORAGE_KEY)!).data.tenants.find((tenant: { name: string }) => tenant.name === 'New Billing Tenant').id
+    await user.selectOptions(demoTenant, tenantId)
+    expect(within(await screen.findByRole('region', { name: 'Monthly room billing' })).getByRole('status')).toHaveTextContent('PAID')
+    await user.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('link', { name: 'My Payments & Receipts' }))
+    const receipt = await screen.findByRole('article', { name: /Receipt DEMO-RCT-015/ })
+    expect(receipt).toHaveTextContent('Room 908')
+    expect(receipt).toHaveTextContent('Rent')
+    expect(receipt).toHaveTextContent('Water')
+  }, 30000)
+})

@@ -47,7 +47,7 @@ describe('tenant room billing status and ownership', () => {
     expect(tenantRoomBilling(awaitingOnly, 'tenant-2', 'room-2', DEMO_PERIOD, DEMO_DATE).status).toBe('PENDING CALCULATION')
     data.roomAssignments.find(item => item.id === 'assignment-2')!.endDate = '2026-11-06'
     data.roomAssignments.push({ id: 'transfer', tenantId: 'tenant-2', roomId: 'room-15', startDate: '2026-11-07', endDate: null, agreedRentCents: 500_000 })
-    expect(tenantRoomBilling(data, 'tenant-4', 'room-2', DEMO_PERIOD, DEMO_DATE).status).toBe('UNAVAILABLE')
+    expect(tenantRoomBilling(data, 'tenant-9', 'room-2', DEMO_PERIOD, DEMO_DATE).status).toBe('UNAVAILABLE')
   })
 
   it('recalculates after a correction and does not count reversed allocations or advance credit', () => {
