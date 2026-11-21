@@ -8,6 +8,7 @@ import { createDemoData, DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
 import { localStorageRepository, STORAGE_KEY } from '@/data/repositories/local-storage-repository'
 import { buildRoomPaymentQuote, prepareRoomPayment } from '@/domain/calculations/room-payment'
 import { selectBillingEligibleRooms } from '@/domain/calculations/billing-eligibility'
+import { selectBillingRooms } from '@/features/billing/billing-room-status'
 import { createRoom, updateRoom, type RoomDraft } from '@/domain/calculations/room-management'
 import { createTenant } from '@/domain/calculations/tenant-management'
 import { selectTenantReceipts } from '@/features/tenant/tenant-receipts'
@@ -102,8 +103,48 @@ describe('dynamic Billing room availability', () => {
     expect(historical.options.every(option => ['PAID', 'UNAVAILABLE'].includes(option.state))).toBe(true)
   })
 
-  it('surfaces Room 06 and keeps Room 2 and Room 02 independent', () => {
-    let data = createDemoData()
+  it('projects washing only when the room subscription is applicable', () => {
+    const room = addRoom(createDemoData(), '911')
+    room.data.rooms.find(item => item.id === room.room.id)!.washingMachineEnabled = true
+    const tenant = addTenant(room.data, 'Washing Tenant', room.room.id)
+    const quote = buildRoomPaymentQuote(tenant.data, { roomId: room.room.id, periodId: DEMO_PERIOD, selected: [], electricityReadingMilliKwh: null, asOf: DEMO_DATE })
+    expect(quote.options.find(option => option.category === 'WASHING_MACHINE')).toMatchObject({ state: 'SELECTABLE', amountCents: 10_000 })
+    const rows = selectBillingRooms(tenant.data, DEMO_PERIOD, DEMO_DATE, false)
+    const row = rows.find(item => item.context.roomId === room.room.id)!
+    expect(row.projectedCharges.map(charge => charge.category).sort()).toEqual(['RENT', 'WASHING_MACHINE', 'WATER'])
+    expect(row).toMatchObject({ billingStatus: 'NOT YET PAID', outstanding: 420_000 })
+  })
+
+  it('shows projected room rows and statuses before any payment is written', () => {
+    const room = addRoom(createDemoData(), '909', 2)
+    const first = addTenant(room.data, 'Projected One', room.room.id)
+    const data = addTenant(first.data, 'Projected Two', room.room.id).data
+    const before = JSON.stringify(data)
+    const rows = selectBillingRooms(data, DEMO_PERIOD, DEMO_DATE, false)
+    const projected = rows.find(row => row.context.roomId === room.room.id)!
+    expect(rows.filter(row => row.context.roomId === room.room.id)).toHaveLength(1)
+    expect(projected).toMatchObject({ billingStatus: 'NOT YET PAID', paid: 0, outstanding: 420_000, unresolved: 0 })
+    expect(new Set(rows.map(row => row.id)).size).toBe(rows.length)
+    expect(projected.charges).toHaveLength(0)
+    expect(projected.projectedCharges.map(charge => charge.category).sort()).toEqual(['RENT', 'WATER', 'WATER'])
+    expect(JSON.stringify(data)).toBe(before)
+
+    const partial = prepareRoomPayment(data, { roomId: room.room.id, periodId: DEMO_PERIOD, selected: ['RENT'], electricityReadingMilliKwh: null, asOf: DEMO_DATE })
+    expect(partial.ok).toBe(true)
+    if (!partial.ok) return
+    const partialRow = selectBillingRooms(partial.data, DEMO_PERIOD, DEMO_DATE, false).find(row => row.context.roomId === room.room.id)!
+    expect(partialRow).toMatchObject({ billingStatus: 'PARTLY PAID', paid: 400_000, outstanding: 20_000 })
+    expect(partialRow.projectedCharges.filter(charge => charge.category === 'WATER')).toHaveLength(2)
+
+    const full = prepareRoomPayment(partial.data, { roomId: room.room.id, periodId: DEMO_PERIOD, selected: ['WATER'], electricityReadingMilliKwh: null, asOf: DEMO_DATE })
+    expect(full.ok).toBe(true)
+    if (!full.ok) return
+    const fullRow = selectBillingRooms(full.data, DEMO_PERIOD, DEMO_DATE, false).find(row => row.context.roomId === room.room.id)!
+    expect(fullRow).toMatchObject({ billingStatus: 'PAID', paid: 420_000, outstanding: 0 })
+    expect(fullRow.projectedCharges).toHaveLength(0)
+  })
+
+  it('surfaces Room 06 and keeps Room 2 and Room 02 independent', () => {    let data = createDemoData()
     const room6 = data.rooms.find(room => room.name === '6')!
     const available = updateRoom(data, room6.id, { name: '6', capacity: 1, categoryId: 'RATE_3500', kind: 'PRIVATE', status: 'available' }, DEMO_DATE)
     expect(available.ok).toBe(true)
@@ -148,6 +189,12 @@ describe('Billing selector UI after tenant creation', () => {
     await user.click(within(await screen.findByRole('dialog', { name: 'Tenant added successfully' })).getByRole('button', { name: 'Got it' }))
 
     await user.click(within(nav).getByRole('link', { name: 'Billing' }))
+    const table = await screen.findByRole('table', { name: 'Who has paid' })
+    let row = within(table).getByRole('row', { name: /Room 908/ })
+    expect(row).toHaveTextContent('NOT YET PAID')
+    expect(row).toHaveTextContent('₱4,000.00')
+    expect(row).toHaveTextContent('₱100.00')
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).data.payments).toHaveLength(14)
     await user.click(await screen.findByRole('button', { name: /Calculate payment/ }))
     dialog = screen.getByRole('dialog', { name: 'Choose a room and its bills.' })
     const options = within(within(dialog).getByLabelText('Choose room')).getAllByRole('option').map(option => [option.getAttribute('value'), option.textContent])
@@ -161,6 +208,11 @@ describe('Billing selector UI after tenant creation', () => {
     dialog = screen.getByRole('dialog', { name: 'Confirm payment received' })
     await user.click(within(dialog).getByRole('button', { name: 'Confirm payment received' }))
     await user.click(within(await screen.findByRole('dialog', { name: 'Payment recorded' })).getByRole('button', { name: 'Got it' }))
+
+    await user.click(within(nav).getByRole('link', { name: 'Billing' }))
+    row = within(await screen.findByRole('table', { name: 'Who has paid' })).getByRole('row', { name: /Room 908/ })
+    expect(row).not.toHaveTextContent('NOT YET PAID')
+    expect(row).toHaveTextContent('Paid')
 
     await user.click(screen.getByRole('button', { name: 'Switch to Tenant UI' }))
     await screen.findByRole('heading', { level: 1, name: 'Overview' })

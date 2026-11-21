@@ -266,12 +266,12 @@ describe('room financial presentation and reconciliation', () => {
     expect(screen.queryByRole('columnheader', { name: 'Underlying charges' })).not.toBeInTheDocument()
   })
 
-  it('shows DID NOT AVAIL only for a skipped washing charge while other missing categories remain NO BILL', () => {
+  it('projects missing applicable water while showing skipped washing as unavailable', () => {
     const data = createDemoData()
     data.charges = data.charges.filter(charge => !(charge.category === 'WATER' && charge.billingPeriodId === DEMO_PERIOD && chargeRoom(data, charge).id === 'room-3'))
     render(<BillingStatusMatrix data={data} periodId={DEMO_PERIOD} asOf={DEMO_DATE} outstandingOnly={false} />)
     const cells = within(screen.getByRole('row', { name: /Room 3/ })).getAllByRole('cell')
-    expect(cells[3]).toHaveTextContent('NO BILL')
+    expect(cells[3]).toHaveTextContent('₱200.00')
     expect(cells[4]).toHaveTextContent('DID NOT AVAIL')
   })
 

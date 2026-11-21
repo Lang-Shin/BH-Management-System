@@ -42,9 +42,9 @@ describe('tenant room billing status and ownership', () => {
     const data = createDemoData()
     expect(tenantRoomBilling(data, 'tenant-1', 'room-15', DEMO_PERIOD, DEMO_DATE).status).toBe('UNAVAILABLE')
     data.roomAssignments.push({ id: 'new-tenancy', tenantId: 'tenant-9', roomId: 'room-15', startDate: '2026-11-01', endDate: null, agreedRentCents: 500_000 })
-    expect(tenantRoomBilling(data, 'tenant-9', 'room-15', DEMO_PERIOD, DEMO_DATE).status).toBe('NOT YET BILLED')
+    expect(tenantRoomBilling(data, 'tenant-9', 'room-15', DEMO_PERIOD, DEMO_DATE).status).toBe('NOT PAID')
     const awaitingOnly = { ...data, charges: [] }
-    expect(tenantRoomBilling(awaitingOnly, 'tenant-2', 'room-2', DEMO_PERIOD, DEMO_DATE).status).toBe('PENDING CALCULATION')
+    expect(tenantRoomBilling(awaitingOnly, 'tenant-2', 'room-2', DEMO_PERIOD, DEMO_DATE).status).toBe('NOT PAID')
     data.roomAssignments.find(item => item.id === 'assignment-2')!.endDate = '2026-11-06'
     data.roomAssignments.push({ id: 'transfer', tenantId: 'tenant-2', roomId: 'room-15', startDate: '2026-11-07', endDate: null, agreedRentCents: 500_000 })
     expect(tenantRoomBilling(data, 'tenant-9', 'room-2', DEMO_PERIOD, DEMO_DATE).status).toBe('UNAVAILABLE')
@@ -106,6 +106,6 @@ describe('room-first tenant overview', () => {
     expect(within(room).getByText('Rate category 3 — Private CR + Aircon')).toBeInTheDocument()
     expect(within(room).queryByText('Room 2')).not.toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Monthly room billing' })).not.toHaveTextContent('Pending calculation')
-    expect(within(screen.getByRole('region', { name: 'Monthly room billing' })).getByRole('status')).toHaveTextContent('NOT YET BILLED')
+    expect(within(screen.getByRole('region', { name: 'Monthly room billing' })).getByRole('status')).toHaveTextContent('NOT PAID')
   })
 })

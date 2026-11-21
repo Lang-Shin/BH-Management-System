@@ -36,17 +36,19 @@ function RoomStatus({ status }: { status: BillingRoomStatus }) {
 export function BillingStatusMatrix({ data, periodId, asOf, outstandingOnly, statusFilter = null }: { data: PrototypeAppState; periodId: string; asOf: string; outstandingOnly: boolean; statusFilter?: BillingRoomStatus | null }) {
   const rooms = selectBillingRooms(data, periodId, asOf, outstandingOnly).filter(room => !statusFilter || room.billingStatus === statusFilter)
   return <PaginatedDataTable rows={rooms} resetKey={`${periodId}:${outstandingOnly}:${statusFilter ?? 'ALL'}`} recordLabel="bills" caption="Who has paid" columns={[
-    { key: 'room', label: 'Room', render: room => <div className="max-w-xs whitespace-normal"><p className="font-semibold">{room.context.label}</p><p className="mt-1 text-xs text-muted-foreground">{room.charges.length} individual charges</p></div> },
+    { key: 'room', label: 'Room', render: room => <div className="max-w-xs whitespace-normal"><p className="font-semibold">{room.context.label}</p><p className="mt-1 text-xs text-muted-foreground">{room.charges.length} issued {room.charges.length === 1 ? 'charge' : 'charges'}{room.projectedCharges.length > 0 && ` · ${room.projectedCharges.length} projected`}</p></div> },
     ...billingCategories.map(category => ({ key: category, label: CATEGORY_LABELS[category], render: (room: typeof rooms[number]) => {
       const items = room.charges.filter(charge => charge.category === category)
+      const projected = room.projectedCharges.filter(charge => charge.category === category)
       const awaitingReading = category === 'ELECTRICITY' && room.context.roomId
         ? unresolvedElectricity(data, asOf, periodId, room.context.roomId).length > 0
         : false
       if (awaitingReading) return <AwaitingReadingLabel />
-      if (!items.length) return <MissingCategoryLabel washing={category === 'WASHING_MACHINE'} />
+      if (!items.length && !projected.length) return <MissingCategoryLabel washing={category === 'WASHING_MACHINE'} />
       const totals = financialTotals(data, items, asOf)
-      if (category === 'ELECTRICITY') return totals.outstanding > 0 ? <UnsettledLabel /> : <PaidCategoryLabel />
-      return totals.outstanding > 0 ? <p className="font-semibold tabular-nums">{formatMoney(totals.outstanding)}</p> : <PaidCategoryLabel />
+      const outstanding = totals.outstanding + projected.reduce((sum, charge) => sum + charge.amountCents, 0)
+      if (category === 'ELECTRICITY') return outstanding > 0 ? <UnsettledLabel /> : <PaidCategoryLabel />
+      return outstanding > 0 ? <p className="font-semibold tabular-nums">{formatMoney(outstanding)}</p> : <PaidCategoryLabel />
     } })),
     { key: 'status', label: 'Status', render: room => <RoomStatus status={room.billingStatus} /> },
   ]} />
