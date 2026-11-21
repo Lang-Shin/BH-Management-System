@@ -8,7 +8,6 @@ import { DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
 import { formatMoney } from '@/lib/format'
 import { BillingStatusMatrix } from './billing-status-matrix'
 import { BillingRatesSection } from './billing-rates-section'
-import { ElectricityPreview } from './electricity-preview'
 import { PaymentCalculator } from './payment-calculator'
 import { BillingStatusChart } from './billing-status-chart'
 import { selectBillingRooms } from './billing-room-status'
@@ -39,7 +38,6 @@ export default function Billing() {
     <div key={statusFilter ?? 'ALL'} className="billing-table-enter">
       <BillingStatusMatrix data={data} periodId={periodId} asOf={DEMO_DATE} outstandingOnly={false} statusFilter={statusFilter} />
     </div>
-    <ElectricityPreview data={data} periodId={periodId} asOf={DEMO_DATE} />
     <BillingRatesSection />
   </>
 }

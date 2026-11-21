@@ -539,7 +539,6 @@ describe('admin workspace integration', () => {
     await user.click(within(nav).getByRole('link', { name: 'Billing' }))
     await screen.findByRole('table', { name: 'Who has paid' })
     expect(screen.getByText('Showing 1–4 of 4 bills')).toBeInTheDocument()
-    expect(screen.getByText('Showing 1–10 of 10 readings')).toBeInTheDocument()
 
     await user.click(within(nav).getByRole('link', { name: 'Payments & Receipts' }))
     await screen.findByRole('table', { name: 'Transactions' })
