@@ -10,7 +10,7 @@ import { roomOccupancy, roomOccupants } from '@/domain/calculations/summary'
 import { latestSettledReading } from '@/domain/calculations/electricity-calculation'
 import { roomDeletionBlockers, validateRoomDraft, type RoomDraft, type RoomDraftErrors } from '@/domain/calculations/room-management'
 import { activeRoomRentRate, activeWashingRate, roomMonthlyRentCents, ROOM_RATE_CATEGORY_IDS } from '@/domain/calculations/billing-rates'
-import { DEMO_DATE, DEMO_RATES } from '@/data/fixtures/demo'
+import { DEMO_DATE } from '@/data/fixtures/demo'
 import { formatDate, formatMoney } from '@/lib/format'
 import { roomCategoryLabel } from '@/lib/room-rates'
 import type { RoomCategoryId } from '@/domain/types/models'
@@ -43,7 +43,7 @@ export function RoomDetailsDialog({ roomId, onClose, onReturnFocus, onNotice }: 
   const status = roomOccupancy(data, room, DEMO_DATE)
   const tenants = roomOccupants(data, room.id, DEMO_DATE)
   const monthlyRentCents = roomMonthlyRentCents(data, room, DEMO_DATE)
-  const washingRateCents = activeWashingRate(data, DEMO_DATE)?.rateCents ?? DEMO_RATES.washingCentsPerRoom
+  const washingRateCents = activeWashingRate(data, DEMO_DATE)?.rateCents ?? null
   const meterNumber = room.id.replace('room-', '')
   const meter = data.electricityMeters.find(item => item.id === `meter-room-${meterNumber}`)
   const latest = meter ? latestSettledReading(data, meter.id) : null
@@ -136,7 +136,7 @@ export function RoomDetailsDialog({ roomId, onClose, onReturnFocus, onNotice }: 
           <h2 id="room-washing-title" className="flex items-center gap-2"><WashingMachine className="size-5" aria-hidden="true" />Washing machine</h2>
           <label className="room-details-check">
             <input type="checkbox" checked={washingEnabled} onChange={event => setWashingEnabled(event.target.checked)} />
-            <span><span className="block font-semibold">Washing Machine</span><span className="mt-0.5 block text-sm text-muted-foreground">{formatMoney(washingRateCents)} per room per applicable billing period.</span></span>
+              <span><span className="block font-semibold">Washing Machine</span><span className="mt-0.5 block text-sm text-muted-foreground">{washingRateCents === null ? 'Rate needs review.' : `${formatMoney(washingRateCents)} per room per applicable billing period.`}</span></span>
           </label>
           <p className="room-details-note">Changes apply to future applicable billing periods only. Existing issued bills, payments, and unpaid obligations are not rewritten. Saving this checkbox does not record a payment.</p>
         </section>
