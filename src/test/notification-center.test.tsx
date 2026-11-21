@@ -23,7 +23,7 @@ describe('notification center', () => {
     expect(within(panel).getByText(/₱11,056\.00 known still to pay/)).toBeInTheDocument()
     expect(within(panel).getByText('3 bills are due in the next 7 days')).toBeInTheDocument()
     expect(within(panel).getByText(/₱3,700\.00 still to pay/)).toBeInTheDocument()
-    expect(within(panel).getByText('Room 106 is under repair')).toBeInTheDocument()
+    expect(within(panel).getByText('Room 6 is under repair')).toBeInTheDocument()
     expect(within(panel).getByText('₱500.00 advance payment is held')).toBeInTheDocument()
 
     await user.click(within(panel).getByRole('link', { name: /8 bills are past due/ }))

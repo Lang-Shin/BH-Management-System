@@ -5,8 +5,12 @@ import { formatMoney } from './format'
 export { ROOM_RATE_CATEGORY_IDS }
 
 export function roomCategoryLabel(categoryId: RoomCategoryId): string {
-  const index = ROOM_RATE_CATEGORY_IDS.indexOf(categoryId)
-  return `Rate category ${index + 1}`
+  const labels: Record<RoomCategoryId, string> = {
+    RATE_3500: 'Rate category 1 — Public CR',
+    RATE_4000: 'Rate category 2 — Private CR',
+    RATE_5000: 'Rate category 3 — Private CR + Aircon',
+  }
+  return labels[categoryId]
 }
 
 export function roomRate(data: PrototypeAppState, room: Pick<Room, 'categoryId'>, asOf: string) {

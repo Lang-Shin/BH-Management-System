@@ -110,6 +110,8 @@ export function RoomDetailsDialog({ roomId, onClose, onReturnFocus, onNotice }: 
             <div><dt>Monthly rental rate</dt><dd>{formatMoney(monthlyRentCents)}/month</dd></div>
             <div><dt>Floor</dt><dd>{room.floor}</dd></div>
             <div><dt>Number of beds</dt><dd>{room.capacity}</dd></div>
+            <div><dt>Room type</dt><dd>{room.kind === 'SHARED' ? 'Shared-capacity room' : 'Private room'}</dd></div>
+            <div><dt>Rental category</dt><dd>{roomCategoryLabel(room.categoryId)}</dd></div>
             <div><dt>Maximum occupancy</dt><dd>{room.capacity} {room.capacity === 1 ? 'tenant' : 'tenants'}</dd></div>
             <div><dt>Current occupancy</dt><dd>{tenants.length} {tenants.length === 1 ? 'tenant' : 'tenants'}</dd></div>
             <div><dt>Room status</dt><dd>{statusLabels[status]}</dd></div>

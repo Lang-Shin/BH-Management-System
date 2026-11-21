@@ -20,7 +20,7 @@ function version7Snapshot() {
 describe('safe prototype snapshot parsing', () => {
   it('returns validated typed data from a supported envelope', () => {
     const data = createDemoData()
-    expect(parsePrototypeSnapshot(JSON.stringify({ version: 8, data }))).toEqual({ ok: true, data })
+    expect(parsePrototypeSnapshot(JSON.stringify({ version: 9, data }))).toEqual({ ok: true, data })
   })
 
   it('migrates version 7 snapshots without losing saved records', () => {
@@ -32,6 +32,18 @@ describe('safe prototype snapshot parsing', () => {
     expect(result.data.waterRates).toEqual(initialWaterRates())
     expect(result.data.washingRates).toEqual(initialWashingRates())
     expect(result.data.electricityRates.every(rate => rate.recordedOn === rate.effectiveFrom)).toBe(true)
+  })
+
+  it('retains legacy room labels and financial records when upgrading version 7', () => {
+    const snapshot = JSON.parse(version7Snapshot())
+    snapshot.data.rooms.forEach((room: { name: string }, index: number) => { room.name = String(101 + index) })
+    const result = parsePrototypeSnapshot(JSON.stringify(snapshot))
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.data.rooms).toEqual(snapshot.data.rooms)
+    for (const key of ['roomAssignments', 'charges', 'payments', 'paymentAllocations', 'receipts', 'meterReadings', 'electricityMeters'] as const) {
+      expect(result.data[key]).toEqual(snapshot.data[key])
+    }
   })
 
   it.each([

@@ -45,7 +45,7 @@ describe('notification selector', () => {
       {
         id: 'repair:room-6',
         kind: 'repair',
-        title: 'Room 106 is under repair',
+        title: 'Room 6 is under repair',
         description: 'It is unavailable until you mark it as available.',
         href: '/rooms',
       },

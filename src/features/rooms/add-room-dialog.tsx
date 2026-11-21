@@ -66,7 +66,7 @@ export function AddRoomDialog({ onSaved }: { onSaved?: (message: string) => void
             <form className="grid gap-5" noValidate onSubmit={submit}>
               <div className="grid gap-2">
                 <label htmlFor="add-room-name" className="text-sm font-semibold">Room number or name</label>
-                <Input id="add-room-name" value={name} onChange={event => { setName(event.target.value); setErrors({}) }} placeholder="For example: 107" maxLength={80} autoComplete="off" aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? 'add-room-name-error' : undefined} className="h-12 bg-card" />
+                <Input id="add-room-name" value={name} onChange={event => { setName(event.target.value); setErrors({}) }} placeholder="For example: 9 or 09" maxLength={80} autoComplete="off" aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? 'add-room-name-error' : undefined} className="h-12 bg-card" />
                 {errors.name && <p id="add-room-name-error" role="alert" className="text-sm text-destructive">{errors.name}</p>}
               </div>
               <div className="grid gap-2">

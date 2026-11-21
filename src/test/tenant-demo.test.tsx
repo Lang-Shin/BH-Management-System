@@ -30,7 +30,7 @@ describe('demo tenant context', () => {
     expect(within(select).getByRole('option', { name: 'Sam Navarro' })).toHaveValue('tenant-2')
     expect(within(select).getByRole('option', { name: 'Casey Ramos' })).toHaveValue('tenant-7')
     expect(screen.getAllByText('Alex Rivera').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Room 101').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Room 1').length).toBeGreaterThan(0)
     expect(TENANT_DEMO_STORAGE_KEY).toBe('bhms:tenant-demo:v1')
   })
 
@@ -41,7 +41,7 @@ describe('demo tenant context', () => {
     await user.selectOptions(select, 'tenant-2')
     const main = screen.getByRole('main')
     expect(within(main).getByText('Sam Navarro')).toBeInTheDocument()
-    expect(within(main).getByText('Room 102')).toBeInTheDocument()
+    expect(within(main).getByText('Room 2')).toBeInTheDocument()
     expect(select).toHaveValue('tenant-2')
     expect(screen.getAllByText('Sam Navarro').length).toBeGreaterThan(0)
     expect(within(select).getAllByRole('option')).toHaveLength(10)
@@ -56,7 +56,7 @@ describe('demo tenant context', () => {
     expect(within(paymentSummary()).getByText('Nov 6, 2026')).toBeInTheDocument()
     await user.selectOptions(select, 'tenant-4')
     expect(within(screen.getByRole('main')).getByText('Morgan Cruz')).toBeInTheDocument()
-    expect(within(screen.getByRole('main')).getByText('Room 102')).toBeInTheDocument()
+    expect(within(screen.getByRole('main')).getByText('Room 2')).toBeInTheDocument()
     expect(within(paymentSummary()).getByText('Nov 12, 2026')).toBeInTheDocument()
     expect(within(paymentSummary()).queryByText('Nov 6, 2026')).not.toBeInTheDocument()
   })
@@ -89,7 +89,7 @@ describe('demo tenant context', () => {
 
     renderTenantApp('/tenant/room')
     expect(await screen.findByLabelText('Demo tenant')).toHaveValue('tenant-3')
-    expect(within(screen.getByRole('main')).getByText('Room 103 at a glance')).toBeInTheDocument()
+    expect(within(screen.getByRole('main')).getByText('Room 3 at a glance')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Switch to Landlord UI' }))
     await screen.findByRole('button', { name: 'Switch to Tenant UI' })

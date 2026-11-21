@@ -27,7 +27,7 @@ describe('tenant digital receipts', () => {
     const card = screen.getByRole('article', { name: 'Receipt DEMO-RCT-006' })
     expect(within(card).getByText('November 2026 (sample)')).toBeInTheDocument()
     expect(within(card).getByText('Nov 8, 2026')).toBeInTheDocument()
-    expect(within(card).getByText('Room 101')).toBeInTheDocument()
+    expect(within(card).getByText('Room 1')).toBeInTheDocument()
     expect(within(card).getByText('Alex Rivera')).toBeInTheDocument()
     expect(within(card).getByText('Total recorded amount')).toBeInTheDocument()
     expect(within(card).getByText('₱3,700.00')).toBeInTheDocument()
@@ -77,7 +77,7 @@ describe('tenant digital receipts', () => {
     await waitForPage()
     await user.selectOptions(screen.getByLabelText('Demo tenant'), 'tenant-2')
     const samWater = await screen.findByRole('article', { name: 'Receipt DEMO-RCT-008' })
-    expect(within(samWater).getByText('Room 102')).toBeInTheDocument()
+    expect(within(samWater).getByText('Room 2')).toBeInTheDocument()
     expect(within(samWater).getByText('Sam Navarro')).toBeInTheDocument()
     expect(screen.getByRole('article', { name: 'Receipt DEMO-RCT-009' })).toBeInTheDocument()
     expect(screen.queryByRole('article', { name: 'Receipt DEMO-RCT-006' })).not.toBeInTheDocument()
@@ -85,7 +85,7 @@ describe('tenant digital receipts', () => {
 
     await user.selectOptions(screen.getByLabelText('Demo tenant'), 'tenant-4')
     const morganRent = await screen.findByRole('article', { name: 'Receipt DEMO-RCT-012' })
-    expect(within(morganRent).getByText('Room 102')).toBeInTheDocument()
+    expect(within(morganRent).getByText('Room 2')).toBeInTheDocument()
     expect(within(morganRent).getByText('Morgan Cruz')).toBeInTheDocument()
     expect(screen.getByRole('article', { name: 'Receipt DEMO-RCT-013' })).toBeInTheDocument()
     expect(screen.queryByRole('article', { name: 'Receipt DEMO-RCT-008' })).not.toBeInTheDocument()
@@ -129,7 +129,7 @@ describe('tenant digital receipts', () => {
     await user.selectOptions(screen.getByLabelText('Billing month'), 'period-oct')
     const historical = await screen.findByRole('article', { name: 'Receipt DEMO-RCT-005' })
     expect(within(historical).getByText('October 2026 (sample)')).toBeInTheDocument()
-    expect(within(historical).getByText('Room 105')).toBeInTheDocument()
+    expect(within(historical).getByText('Room 5')).toBeInTheDocument()
   })
 
   it('reports receipts whose payment link cannot identify an owner', () => {

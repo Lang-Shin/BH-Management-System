@@ -26,7 +26,7 @@ describe('room management', () => {
     expect(after.occupiedRooms).toBe(before.occupiedRooms)
   })
 
-  it.each(['101', ' 101 '])('rejects duplicate room names: %s', name => {
+  it.each(['1', ' 1 ', '02'])('rejects duplicate room names: %s', name => {
     const data = createDemoData()
     expect(validateRoomDraft(data, { ...draft, name }, { asOf: DEMO_DATE }).name).toMatch(/already in use/)
     expect(createRoom(data, { ...draft, name }, DEMO_DATE).ok).toBe(false)
@@ -66,7 +66,7 @@ describe('room management', () => {
 
   it('blocks duplicate room names during editing', () => {
     const data = createDemoData()
-    const result = updateRoom(data, 'room-6', { ...draft, name: '101' }, DEMO_DATE)
+    const result = updateRoom(data, 'room-6', { ...draft, name: '1' }, DEMO_DATE)
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.errors.name).toMatch(/already in use/)
@@ -74,7 +74,7 @@ describe('room management', () => {
 
   it('does not reduce beds below current occupancy', () => {
     const data = createDemoData()
-    const result = updateRoom(data, 'room-2', { name: '102', capacity: 1, categoryId: 'RATE_3500', kind: 'SHARED', status: 'available' }, DEMO_DATE)
+    const result = updateRoom(data, 'room-2', { name: '2', capacity: 1, categoryId: 'RATE_3500', kind: 'SHARED', status: 'available' }, DEMO_DATE)
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.errors.capacity).toMatch(/2 assigned tenants/)
@@ -82,7 +82,7 @@ describe('room management', () => {
 
   it('rejects changing an occupied room to under repair', () => {
     const data = createDemoData()
-    const result = updateRoom(data, 'room-1', { name: '101', capacity: 2, categoryId: 'RATE_3500', kind: 'SHARED', status: 'maintenance' }, DEMO_DATE)
+    const result = updateRoom(data, 'room-1', { name: '1', capacity: 2, categoryId: 'RATE_3500', kind: 'SHARED', status: 'maintenance' }, DEMO_DATE)
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.errors.status).toMatch(/occupied room/i)
@@ -90,7 +90,7 @@ describe('room management', () => {
 
   it('preserves historical bills and tenant agreements when the room rate changes', () => {
     const data = createDemoData()
-    const result = updateRoom(data, 'room-1', { name: '101', capacity: 2, categoryId: 'RATE_5000', kind: 'SHARED', status: 'available' }, DEMO_DATE)
+    const result = updateRoom(data, 'room-1', { name: '1', capacity: 2, categoryId: 'RATE_5000', kind: 'SHARED', status: 'available' }, DEMO_DATE)
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.data.charges).toEqual(data.charges)

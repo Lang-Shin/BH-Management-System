@@ -78,7 +78,7 @@ describe('tenant management UI', { timeout: 15000 }, () => {
     const success = await screen.findByRole('dialog', { name: 'Tenant added successfully' })
     await user.click(within(success).getByRole('button', { name: 'Got it' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(screen.getByRole('row', { name: /Room Seven Tenant/ })).toHaveTextContent('Room 107')
+    expect(screen.getByRole('row', { name: /Room Seven Tenant/ })).toHaveTextContent('Room 7')
     await waitFor(() => {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null').data
       const tenant = saved.tenants.find((item: { name: string }) => item.name === 'Room Seven Tenant')
@@ -86,7 +86,7 @@ describe('tenant management UI', { timeout: 15000 }, () => {
     })
 
     await user.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('link', { name: 'Rooms' }))
-    const roomCard = await screen.findByRole('button', { name: 'Room 107 details' })
+    const roomCard = await screen.findByRole('button', { name: 'Room 7 details' })
     expect(roomCard).toHaveTextContent('Room Seven Tenant')
   })
 
@@ -120,7 +120,7 @@ describe('tenant management UI', { timeout: 15000 }, () => {
     })
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(screen.getByRole('row', { name: /Alex Rivera Updated/ })).toHaveTextContent('Room 101')
+    expect(screen.getByRole('row', { name: /Alex Rivera Updated/ })).toHaveTextContent('Room 1')
   })
 
   it('transfers a tenant to another room and updates occupancy without rewriting history', async () => {
@@ -146,9 +146,9 @@ describe('tenant management UI', { timeout: 15000 }, () => {
     })
     await user.click(within(screen.getByRole('dialog', { name: 'Alex Rivera' })).getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(screen.getByRole('row', { name: /Alex Rivera/ })).toHaveTextContent('Room 107')
+    expect(screen.getByRole('row', { name: /Alex Rivera/ })).toHaveTextContent('Room 7')
     await user.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('link', { name: 'Rooms' }))
-    expect(await screen.findByRole('button', { name: 'Room 107 details' })).toHaveTextContent('Alex Rivera')
+    expect(await screen.findByRole('button', { name: 'Room 7 details' })).toHaveTextContent('Alex Rivera')
   })
 
   it('deletes an eligible tenant after confirmation and cancellation', async () => {
@@ -204,7 +204,7 @@ describe('tenant management UI', { timeout: 15000 }, () => {
       expect(saved.receipts).toEqual(original.receipts)
     })
     await user.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('link', { name: 'Rooms' }))
-    expect(await screen.findByRole('button', { name: 'Room 101 details' })).toHaveTextContent('Available — 0 tenants')
+    expect(await screen.findByRole('button', { name: 'Room 1 details' })).toHaveTextContent('Available — 0 tenants')
   })
 
   it('blocks move-out while unresolved advance credit exists', async () => {

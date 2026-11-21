@@ -10,7 +10,7 @@ describe('Billing room-status chart', () => {
     const before = JSON.stringify(data)
     const rooms = selectBillingRooms(data, DEMO_PERIOD, DEMO_DATE, false)
     expect(rooms.map(room => [room.context.label, room.billingStatus])).toEqual([
-      ['Room 101', 'PAID'], ['Room 102', 'PARTLY PAID'], ['Room 103', 'PAID'], ['Room 104', 'NOT YET PAID'],
+      ['Room 1', 'PAID'], ['Room 2', 'PARTLY PAID'], ['Room 3', 'PAID'], ['Room 4', 'NOT YET PAID'],
     ])
     expect(billingStatusCounts(rooms)).toEqual({ total: 4, paid: 2, partlyPaid: 1, notPaid: 1 })
     render(<BillingStatusChart rooms={rooms} periodLabel="November 2026" outstandingOnly={false} />)
@@ -29,7 +29,7 @@ describe('Billing room-status chart', () => {
     expect(billingStatusCounts(rooms)).toEqual({ total: 5, paid: 2, partlyPaid: 1, notPaid: 2 })
     const filtered = selectBillingRooms(data, 'period-oct', DEMO_DATE, true)
     expect(billingStatusCounts(filtered)).toEqual({ total: 3, paid: 0, partlyPaid: 1, notPaid: 2 })
-    expect(filtered.map(room => room.context.label)).toEqual(['Room 102', 'Room 103', 'Room 104'])
+    expect(filtered.map(room => room.context.label)).toEqual(['Room 2', 'Room 3', 'Room 4'])
     render(<BillingStatusChart rooms={rooms} periodLabel="October 2026" outstandingOnly={false} />)
     const figure = screen.getByRole('figure', { name: 'Billing room payment status' })
     expect(figure).toHaveTextContent('2 of 5 rooms fully paid')

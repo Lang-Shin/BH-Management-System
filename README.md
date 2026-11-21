@@ -3,6 +3,12 @@ A web-based Boarding House Management System for managing tenants, rooms, monthl
 
 ## Phase 1 · Interactive admin prototype foundation
 
+### Actual room numbering
+
+Fresh demo data now uses **Public CR: rooms `1`–`8` (₱3,500/month)**, **Private CR: `01`, `03`, `04`, `05`, `06`, `07` (₱4,000/month)**, and **Private CR + Aircon: `02` (₱5,000/month)**. Room `2` and room `02` have distinct permanent IDs. Rates still use effective-dated categories. Tenant/financial examples remain fictional.
+
+The storage envelope is now **version 9**. Valid saved version 7/8 datasets are retained without relabeling historical rooms or moving tenants/transactions. Automatic conversion from 101–115 requires an owner-approved correspondence; it is intentionally blocked. An explicit sample-record restore replaces the dataset, rather than migrating it. See [room configuration and migration notes](docs/room-configuration.md). Older narrative examples below describe the original fixture; they are not a migration map.
+
 This repository currently implements a **frontend-only demonstration**, intended to support a conversation with a prospective client. The description above is the long-term project vision. Billing can record room-based sample payments; other transaction, persistence, and production workflows remain future work.
 
 ### Run locally

@@ -16,7 +16,7 @@ describe('tenant workspace layout', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument()
     const main = screen.getByRole('main')
     expect(within(main).getByText('Alex Rivera')).toBeInTheDocument()
-    expect(within(main).getByText('Room 101')).toBeInTheDocument()
+    expect(within(main).getByText('Room 1')).toBeInTheDocument()
     expect(within(main).getAllByText('Active').length).toBeGreaterThan(0)
     expect(within(main).getAllByText('November 2026').length).toBeGreaterThan(0)
     expect(screen.getByText('Current open billing period.')).toBeInTheDocument()
@@ -65,7 +65,7 @@ describe('tenant workspace layout', () => {
 
   it('shows the sample tenant room details without landlord controls', async () => {
     renderTenantApp('/tenant/room')
-    const card = await screen.findByText('Room 101 at a glance').then(title => title.closest('[data-slot="card"]') as HTMLElement)
+    const card = await screen.findByText('Room 1 at a glance').then(title => title.closest('[data-slot="card"]') as HTMLElement)
     expect(within(card).getByText('Floor 1')).toBeInTheDocument()
     expect(within(card).getByText('Stay started')).toBeInTheDocument()
     expect(within(card).getAllByText('Occupied').length).toBeGreaterThan(0)

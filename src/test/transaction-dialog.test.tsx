@@ -35,7 +35,7 @@ describe('Payment History transaction dialog', () => {
     await user.click(screen.getByRole('button', { name: /See Transaction/ }))
     const dialog = screen.getByRole('dialog', { name: 'Transaction Details' })
     expect(dialog).toHaveTextContent('Payment information for the selected room.')
-    expect(within(dialog).getAllByText('Room 103')).toHaveLength(1)
+    expect(within(dialog).getAllByText('Room 3')).toHaveLength(1)
     expect(dialog).toHaveTextContent(formatDate(payment.paidOn))
     expect(dialog).toHaveTextContent(formatMoney(payment.amountCents))
     const amount = within(dialog).getByText('Amount paid').parentElement!

@@ -2,7 +2,7 @@ import type { PrototypeAppState } from '@/domain/types/models'
 import { initialRoomRentRates, initialWashingRates, initialWaterRates } from '@/domain/calculations/billing-rates'
 import { isPrototypeData, isRecord } from '@/domain/validation/prototype-data'
 
-export const STORAGE_SCHEMA_VERSION = 8
+export const STORAGE_SCHEMA_VERSION = 9
 
 type ParseResult =
   | { ok: true; data: PrototypeAppState }
@@ -25,6 +25,17 @@ function migrateVersion7(value: unknown): PrototypeAppState | null {
   return isPrototypeData(candidate) ? candidate : null
 }
 
+/**
+ * Version 9 changes the fresh fixture to the actual 15-room house layout. Older saved
+ * snapshots keep their room numbers, tenant assignments, bills, payments, and receipts
+ * unchanged: the old fictional room numbers cannot be mapped onto the actual rooms without
+ * silently reassigning historical records, so retained data is validated and kept as-is.
+ * Restore sample records loads the actual configuration explicitly.
+ */
+function retainLegacySnapshot(value: unknown): PrototypeAppState | null {
+  return isPrototypeData(value) ? value : null
+}
+
 /** Pure, non-throwing decoding. Storage access and recovery decisions stay in the adapter. */
 export function parsePrototypeSnapshot(raw: string): ParseResult {
   let parsed: unknown
@@ -34,6 +45,10 @@ export function parsePrototypeSnapshot(raw: string): ParseResult {
     return { ok: false, reason: 'MALFORMED_JSON' }
   }
   if (!isRecord(parsed)) return { ok: false, reason: 'INVALID_DATA' }
+  if (parsed.version === 8) {
+    const retained = retainLegacySnapshot(parsed.data)
+    return retained ? { ok: true, data: retained } : { ok: false, reason: 'INVALID_DATA' }
+  }
   if (parsed.version === 7) {
     const migrated = migrateVersion7(parsed.data)
     return migrated ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }

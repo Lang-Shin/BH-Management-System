@@ -32,16 +32,31 @@ export function createDemoData(): PrototypeAppState {
       status: movedOutTenantNumbers.has(number) ? 'MOVED_OUT' as const : 'ACTIVE' as const, notes: '',
     }
   })
-  const roomSpecs: { capacity: number; kind: 'PRIVATE' | 'SHARED'; status: 'available' | 'maintenance'; categoryId: RoomCategoryId; washingMachineEnabled: boolean }[] = [
-    ...Array.from({ length: 5 }, (_, index) => ({ capacity: 2, kind: 'SHARED' as const, status: 'available' as const, categoryId: 'RATE_3500' as const, washingMachineEnabled: index < 2 })),
-    { capacity: 1, kind: 'PRIVATE', status: 'maintenance', categoryId: 'RATE_3500', washingMachineEnabled: false },
-    ...[1, 2].map(() => ({ capacity: 2, kind: 'SHARED' as const, status: 'available' as const, categoryId: 'RATE_3500' as const, washingMachineEnabled: false })),
-    ...[1, 2, 3, 4, 5, 6].map(() => ({ capacity: 2, kind: 'SHARED' as const, status: 'available' as const, categoryId: 'RATE_4000' as const, washingMachineEnabled: false })),
-    { capacity: 1, kind: 'PRIVATE', status: 'available', categoryId: 'RATE_5000', washingMachineEnabled: false },
+  /**
+   * Actual Halili BH room configuration: room numbers are strings and keep leading zeros.
+   * IDs stay opaque and stable; "2" and "02" are different rooms with different IDs.
+   */
+  const roomSpecs: {
+    id: string; name: string; capacity: number; kind: 'PRIVATE' | 'SHARED'; status: 'available' | 'maintenance'
+    categoryId: RoomCategoryId; washingMachineEnabled: boolean
+  }[] = [
+    { id: 'room-1', name: '1', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_3500', washingMachineEnabled: true },
+    { id: 'room-2', name: '2', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_3500', washingMachineEnabled: true },
+    { id: 'room-3', name: '3', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_3500', washingMachineEnabled: false },
+    { id: 'room-4', name: '4', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_3500', washingMachineEnabled: false },
+    { id: 'room-5', name: '5', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_3500', washingMachineEnabled: false },
+    { id: 'room-6', name: '6', capacity: 1, kind: 'PRIVATE', status: 'maintenance', categoryId: 'RATE_3500', washingMachineEnabled: false },
+    { id: 'room-7', name: '7', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_3500', washingMachineEnabled: false },
+    { id: 'room-8', name: '8', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_3500', washingMachineEnabled: false },
+    { id: 'room-9', name: '01', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_4000', washingMachineEnabled: false },
+    { id: 'room-10', name: '03', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_4000', washingMachineEnabled: false },
+    { id: 'room-11', name: '04', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_4000', washingMachineEnabled: false },
+    { id: 'room-12', name: '05', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_4000', washingMachineEnabled: false },
+    { id: 'room-13', name: '06', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_4000', washingMachineEnabled: false },
+    { id: 'room-14', name: '07', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_4000', washingMachineEnabled: false },
+    { id: 'room-15', name: '02', capacity: 1, kind: 'PRIVATE', status: 'available', categoryId: 'RATE_5000', washingMachineEnabled: false },
   ]
-  const rooms = roomSpecs.map((room, index) => ({
-    id: `room-${index + 1}`, name: String(101 + index), floor: 1, ...room,
-  }))
+  const rooms = roomSpecs.map(({ id, name, ...room }) => ({ id, name, floor: 1, ...room }))
   const assignmentSpecs: { tenant: number; room: number; endDate: string | null }[] = [
     { tenant: 1, room: 1, endDate: null },
     { tenant: 2, room: 2, endDate: null },
@@ -75,9 +90,12 @@ export function createDemoData(): PrototypeAppState {
     { room: 4, values: [300_000] },
     { room: 5, values: [90_000, 100_000] },
   ]
-  const electricityMeters = meterSeries.map(({ room }) => ({
-    id: `meter-room-${room}`, label: `Room ${100 + room} meter`, serialNumber: `FICTIONAL-MTR-${100 + room}`, ownership: 'UNCONFIRMED' as const,
-  }))
+  const electricityMeters = meterSeries.map(({ room }) => {
+    const roomName = rooms[room - 1]?.name ?? String(room)
+    return {
+      id: `meter-room-${room}`, label: `Room ${roomName} meter`, serialNumber: `FICTIONAL-MTR-${roomName}`, ownership: 'UNCONFIRMED' as const,
+    }
+  })
   const readingDates = [
     ['sep', '2026-09-30'],
     ['oct', '2026-10-31'],
