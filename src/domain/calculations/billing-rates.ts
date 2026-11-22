@@ -13,6 +13,16 @@ export const DEFAULT_WATER_RATE_CENTS = 10_000
 export const DEFAULT_WASHING_RATE_CENTS = 10_000
 export const INITIAL_RATE_EFFECTIVE_FROM = '2026-09-01'
 
+export function initialElectricityRates(): ElectricityRate[] {
+  return [{
+    id: `electricity-rate-${INITIAL_RATE_EFFECTIVE_FROM}`,
+    rateCentsPerKwh: DEFAULT_ELECTRICITY_RATE_CENTS,
+    effectiveFrom: INITIAL_RATE_EFFECTIVE_FROM,
+    recordedOn: INITIAL_RATE_EFFECTIVE_FROM,
+    label: 'Default electricity rate',
+  }]
+}
+
 export function initialRoomRentRates(): RoomRentRate[] {
   return ROOM_RATE_CATEGORY_IDS.map(categoryId => ({
     id: `rent-rate-${categoryId}-${INITIAL_RATE_EFFECTIVE_FROM}`,

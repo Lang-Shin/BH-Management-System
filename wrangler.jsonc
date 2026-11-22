@@ -26,7 +26,8 @@
     "ENVIRONMENT": "development",
     "WORKSPACE_ID": "demo-workspace",
     "APP_TIMEZONE": "Asia/Manila",
-    "ALLOW_IMPORT_APPLY": "false"
+    "ALLOW_IMPORT_APPLY": "false",
+    "ALLOW_TEST_RESET": "false"
   },
   "dev": {
     "port": 8787,

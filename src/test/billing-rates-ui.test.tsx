@@ -1,7 +1,7 @@
 ﻿import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppRouter } from '@/app/router/app-router'
 import { PrototypeProvider } from '@/app/providers/prototype-provider'
 import { localStorageRepository, STORAGE_KEY } from '@/data/repositories/local-storage-repository'
@@ -14,6 +14,15 @@ function renderApp(route = '/') {
 function savedData() {
   return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}').data
 }
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-11-13T04:00:00.000Z'))
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 describe('billing rates UI', { timeout: 20000 }, () => {
   it('renders four rate cards in the billing grid and opens each correct dialog with keyboard focus return', async () => {

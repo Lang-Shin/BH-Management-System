@@ -3,7 +3,7 @@ import { ArrowLeft, CalendarClock, Check, History, ShieldCheck } from 'lucide-re
 import { Button } from '@/components/ui/button'
 import { DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { usePrototype } from '@/hooks/use-prototype'
-import { DEMO_DATE } from '@/data/fixtures/demo'
+import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import {
   activeElectricityRate, activeRoomRentRate, activeWashingRate, activeWaterRate,
   nextRateEffectiveFrom, parseRateInput, planRateChange, ROOM_RATE_CATEGORY_IDS,
@@ -38,11 +38,12 @@ function utilityCents(rate: { rateCentsPerKwh: number } | { rateCents: number } 
 
 export function BillingRateDialog({ kind, title, onSaved }: { kind: RateCategory; title: string; onSaved: (message: string) => void }) {
   const { data, dispatch } = usePrototype()
-  const effectiveFrom = nextRateEffectiveFrom(data, DEMO_DATE)
-  const activeRentRates = ROOM_RATE_CATEGORY_IDS.map(categoryId => ({ categoryId, rate: activeRoomRentRate(data, categoryId, DEMO_DATE) }))
-  const activeUtility = kind === 'ELECTRICITY' ? activeElectricityRate(data, DEMO_DATE)
-    : kind === 'WATER' ? activeWaterRate(data, DEMO_DATE)
-      : kind === 'WASHING_MACHINE' ? activeWashingRate(data, DEMO_DATE) : undefined
+  const occupancyDate = useOccupancyDate()
+  const effectiveFrom = nextRateEffectiveFrom(data, occupancyDate)
+  const activeRentRates = ROOM_RATE_CATEGORY_IDS.map(categoryId => ({ categoryId, rate: activeRoomRentRate(data, categoryId, occupancyDate) }))
+  const activeUtility = kind === 'ELECTRICITY' ? activeElectricityRate(data, occupancyDate)
+    : kind === 'WATER' ? activeWaterRate(data, occupancyDate)
+      : kind === 'WASHING_MACHINE' ? activeWashingRate(data, occupancyDate) : undefined
   const activeUtilityCents = utilityCents(activeUtility)
   const scheduledRentRates = data.roomRentRates.filter(rate => rate.effectiveFrom === effectiveFrom)
   const scheduledUtility = kind === 'ELECTRICITY' ? data.electricityRates.find(rate => rate.effectiveFrom === effectiveFrom)
@@ -100,7 +101,7 @@ export function BillingRateDialog({ kind, title, onSaved }: { kind: RateCategory
       }
       input = { kind, amountCents: parsed.cents }
     }
-    const result = planRateChange(data, input, DEMO_DATE)
+    const result = planRateChange(data, input, occupancyDate)
     if (!result.ok) {
       setErrors(result.errors)
       return
@@ -166,7 +167,7 @@ export function BillingRateDialog({ kind, title, onSaved }: { kind: RateCategory
       <details className="billing-rate-history">
         <summary><History aria-hidden="true" />Rate history</summary>
         <ul>{history.map(rate => {
-          const status = rate.effectiveFrom > DEMO_DATE ? 'Scheduled' : activeIds.has(rate.id) ? 'Active' : 'Historical'
+          const status = rate.effectiveFrom > occupancyDate ? 'Scheduled' : activeIds.has(rate.id) ? 'Active' : 'Historical'
           const label = kind === 'RENT' && 'categoryId' in rate ? roomCategoryLabel(rate.categoryId) : kind === 'ELECTRICITY' ? 'Electricity' : kind === 'WATER' ? 'Water' : 'Washing machine'
           return <li key={rate.id}><span>{label}<small>{formatDate(rate.effectiveFrom)} · Recorded {formatDate(rate.recordedOn)}</small></span><span>{rateHistoryAmount(rate)}<small>{status}</small></span></li>
         })}</ul>

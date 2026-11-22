@@ -91,7 +91,7 @@ describe('functional room and tenant management', () => {
 
     await user.click(screen.getByRole('button', { name: 'Switch to Tenant UI' }))
     await screen.findByRole('heading', { level: 1, name: 'Overview' })
-    const selector = await screen.findByLabelText('Demo tenant')
+    const selector = await screen.findByLabelText('Preview tenant')
     await user.selectOptions(selector, within(selector).getByRole('option', { name: 'Functional Resident' }))
     const overview = await screen.findByRole('region', { name: 'Room overview' })
     expect(within(overview).getByRole('heading', { name: 'Room 904' })).toBeInTheDocument()
@@ -100,7 +100,7 @@ describe('functional room and tenant management', () => {
 
     app.unmount()
     renderApp('/tenant')
-    expect(await screen.findByLabelText('Demo tenant')).toHaveValue(tenantId)
+    expect(await screen.findByLabelText('Preview tenant')).toHaveValue(tenantId)
     expect(within(await screen.findByRole('region', { name: 'Room overview' })).getByText('Functional Resident')).toBeInTheDocument()
     expect(savedData().rooms.filter((room: { name: string }) => room.name === '904')).toHaveLength(1)
   }, 30000)
@@ -131,13 +131,13 @@ describe('functional room and tenant management', () => {
 
     await user.click(screen.getByRole('button', { name: 'Switch to Tenant UI' }))
     await screen.findByRole('heading', { level: 1, name: 'Overview' })
-    const selector = await screen.findByLabelText('Demo tenant')
+    const selector = await screen.findByLabelText('Preview tenant')
     await user.selectOptions(selector, 'tenant-2')
     const overview = await screen.findByRole('region', { name: 'Room overview' })
     expect(within(overview).getByRole('heading', { name: 'Room 2B' })).toBeInTheDocument()
     expect(within(overview).queryByRole('heading', { name: 'Room 02' })).not.toBeInTheDocument()
     await user.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('link', { name: 'My Payments & Receipts' }))
-    const receipt = await screen.findByRole('article', { name: 'Receipt DEMO-RCT-008' })
+    const receipt = await screen.findByRole('article', { name: 'Receipt BHMS-RCT-008' })
     expect(receipt).toHaveTextContent('Room 2B')
     expect(receipt).toHaveTextContent('₱100.00')
     expect(receipt).not.toHaveTextContent('Room 02')

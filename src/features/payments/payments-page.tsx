@@ -4,7 +4,7 @@ import { PaginatedDataTable } from '@/components/shared/table-pagination'
 import { usePrototype } from '@/hooks/use-prototype'
 import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { creditRemaining, selectSummary } from '@/domain/calculations/summary'
-import { DEMO_PERIOD } from '@/data/fixtures/demo'
+import { currentBillingPeriodId } from '@/domain/calculations/billing-periods'
 import { moveInSummary, selectMoveInObligations } from '@/domain/calculations/move-in'
 import { latestPaymentReceipt } from '@/domain/calculations/payment-correction'
 import { formatDate, formatMoney } from '@/lib/format'
@@ -13,13 +13,13 @@ import { PaymentsTransactionWorkspace } from './payments-transaction-workspace'
 export default function Payments() {
   const { data } = usePrototype()
   const occupancyDate = useOccupancyDate()
-  const summary = selectSummary(data, occupancyDate, DEMO_PERIOD)
+  const summary = selectSummary(data, occupancyDate, currentBillingPeriodId(data, occupancyDate))
   const moveIn = moveInSummary(data, occupancyDate)
   const moveInRows = selectMoveInObligations(data, occupancyDate).map(view => ({ ...view, id: view.obligation.id }))
 
   return <>
     <PageHeader title="Payments & Receipts" description="See who paid, when they paid, and what the payment was for." />
-    <PreviewNotice>These are sample records. Electricity payments are recorded from Billing or a room’s Pending Payments; other payment workflows will be added later.</PreviewNotice>
+    <PreviewNotice>Electricity payments are recorded from Billing or a room pending-payments view. Other payment workflows remain separate.</PreviewNotice>
     <section className="mb-7 grid gap-5 xl:grid-cols-4" aria-label="Payments overview">
       <StatCard label="Money received" value={formatMoney(summary.received)} detail="All payments received in November." icon={Wallet} />
       <StatCard label="Move-in deposits held" value={formatMoney(moveIn.depositCollectedCents)} detail={`${data.moveInPolicy.depositDisposition === 'NON_REFUNDABLE' ? 'Non-refundable' : 'Refundable with manual review'} under current policy; plus ${formatMoney(moveIn.advanceCollectedCents)} advance collected.`} icon={ShieldCheck} />

@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppRouter } from '@/app/router/app-router'
 import { PrototypeProvider } from '@/app/providers/prototype-provider'
 import { localStorageRepository, STORAGE_KEY } from '@/data/repositories/local-storage-repository'
@@ -13,6 +13,15 @@ import { RoomOccupancyChart } from '@/features/dashboard/dashboard-analytics'
 function renderApp(route = '/') {
   return render(<PrototypeProvider repository={localStorageRepository}><MemoryRouter initialEntries={[route]}><AppRouter /></MemoryRouter></PrototypeProvider>)
 }
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-11-13T04:00:00.000Z'))
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 describe('admin workspace integration', () => {
   it('offers a back-to-top button on Dashboard and a return link on other pages', async () => {
@@ -141,22 +150,22 @@ describe('admin workspace integration', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
-  it('keeps damaged saved data until an explicit reset and then persists fresh data', async () => {
+  it('keeps damaged saved data until an explicit reset and then persists a blank workspace', async () => {
     localStorage.setItem(STORAGE_KEY, '{broken')
     const user = userEvent.setup()
     renderApp('/reports')
-    expect(await screen.findByRole('alert')).toHaveTextContent('saved sample records could not be opened')
+    expect(await screen.findByRole('alert')).toHaveTextContent('saved records could not be opened')
     await screen.findByRole('heading', { level: 1, name: 'Reports & Settings' })
     expect(localStorage.getItem(STORAGE_KEY)).toBe('{broken')
-    await user.click(screen.getByRole('button', { name: 'Restore sample records' }))
-    const dialog = screen.getByRole('dialog', { name: 'Restore the sample records?' })
-    await user.click(within(dialog).getByRole('button', { name: 'Keep my changes' }))
-    expect(localStorage.getItem(STORAGE_KEY)).toBe('{broken')
-    expect(screen.getByRole('alert')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Restore sample records' }))
-    await user.click(within(screen.getByRole('dialog', { name: 'Restore the sample records?' })).getByRole('button', { name: 'Yes, restore records' }))
+    await user.click(screen.getByRole('button', { name: 'Clear All Records' }))
+    const dialog = screen.getByRole('dialog', { name: 'Clear all records?' })
+    await user.type(within(dialog).getByLabelText(/Type RESET to confirm/), 'RESET')
+    await user.click(within(dialog).getByRole('button', { name: 'Clear All Records' }))
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 17)
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')
+    expect(stored).toHaveProperty('version', 17)
+    expect(stored.data.tenants).toEqual([])
+    expect(stored.data.rooms).toHaveLength(15)
   })
 
   it('shows a log-out button that opens a centered clarification dialog without signing out', async () => {
@@ -166,7 +175,7 @@ describe('admin workspace integration', () => {
     expect(logout).toHaveAttribute('type', 'button')
     await user.click(logout)
     const dialog = await screen.findByRole('dialog', { name: 'Log out of BHMS?' })
-    expect(within(dialog).getByText(/Signing out is not available in this sample yet/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/Signing out is not available in this version yet/)).toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Got it' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(screen.getByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument()
@@ -305,7 +314,7 @@ describe('admin workspace integration', () => {
     let details = screen.getByRole('dialog', { name: 'Transaction Details' })
     expect(details).toHaveTextContent('Room 1')
     expect(details).toHaveTextContent('Nov 11, 2026')
-    expect(details).toHaveTextContent('DEMO-RCT-007')
+    expect(details).toHaveTextContent('BHMS-RCT-007')
     expect(details).toHaveTextContent('₱169.00')
     expect(details).toHaveTextContent('Paid by: Alex Rivera')
     expect(details).toHaveTextContent('Electricity')
@@ -438,7 +447,7 @@ describe('admin workspace integration', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Confirm payment received' }))
     dialog = screen.getByRole('dialog', { name: 'Payment recorded' })
     expect(dialog).toHaveTextContent('₱4,025.00')
-    expect(dialog).toHaveTextContent('DEMO-RCT-015')
+    expect(dialog).toHaveTextContent('BHMS-RCT-015')
     expect(dialog).toHaveTextContent('Meter baseline advanced to 325 kWh')
     await waitFor(() => {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null')
@@ -490,7 +499,7 @@ describe('admin workspace integration', () => {
     expect(within(table).getAllByRole('row')).toHaveLength(15)
 
     const search = screen.getByRole('searchbox', { name: 'Search by room or receipt number' })
-    await user.type(search, 'DEMO-RCT-006')
+    await user.type(search, 'BHMS-RCT-006')
     expect(within(table).getAllByRole('row')).toHaveLength(2)
     expect(table).toHaveTextContent('₱3,700.00')
     expect(screen.getByText('Showing 1–1 of 1 transactions')).toBeInTheDocument()
@@ -536,7 +545,7 @@ describe('admin workspace integration', () => {
 
     await user.click(within(nav).getByRole('link', { name: 'Reports & Settings' }))
     await screen.findByRole('table', { name: 'Room financial summary' })
-    expect(screen.getByText('Showing 1–2 of 2 months')).toBeInTheDocument()
+    expect(screen.getByText('Showing 1–5 of 11 months')).toBeInTheDocument()
     expect(screen.getByText('Showing 1–4 of 4 rooms')).toBeInTheDocument()
     expect(screen.getByText('Showing 1–1 of 1 changes')).toBeInTheDocument()
   })
@@ -545,7 +554,7 @@ describe('admin workspace integration', () => {
     const user = userEvent.setup()
     renderApp('/payments')
     const table = await screen.findByRole('table', { name: 'Transactions' })
-    const row = within(table).getByRole('row', { name: /DEMO-RCT-014/ })
+    const row = within(table).getByRole('row', { name: /BHMS-RCT-014/ })
     await user.click(within(row).getByRole('button', { name: /See Transaction/ }))
     const dialog = screen.getByRole('dialog', { name: 'Transaction Details' })
     expect(dialog).toHaveTextContent('Advance payments have no bill categories to correct.')
@@ -556,7 +565,7 @@ describe('admin workspace integration', () => {
     const user = userEvent.setup()
     renderApp('/payments')
     const history = await screen.findByRole('table', { name: 'Transactions' })
-    const row = within(history).getByRole('row', { name: /DEMO-RCT-006/ })
+    const row = within(history).getByRole('row', { name: /BHMS-RCT-006/ })
     await user.click(within(row).getByRole('button', { name: /See Transaction/ }))
     let dialog = screen.getByRole('dialog', { name: 'Transaction Details' })
     await user.click(within(dialog).getByRole('button', { name: 'Edit Payment' }))
@@ -584,24 +593,24 @@ describe('admin workspace integration', () => {
     expect(within(dialog).getByRole('button', { name: 'Confirm correction' })).toBeEnabled()
     await user.click(within(dialog).getByRole('button', { name: 'Confirm correction' }))
     dialog = screen.getByRole('dialog', { name: 'Payment corrected' })
-    expect(dialog).toHaveTextContent('DEMO-RCT-006-R2')
+    expect(dialog).toHaveTextContent('BHMS-RCT-006-R2')
     expect(dialog).toHaveTextContent('Recorded amount corrected; no refund was required.')
     await user.click(within(dialog).getByRole('button', { name: 'Got it' }))
-    expect(screen.getByText(/Payment corrected · DEMO-RCT-006-R2/)).toBeInTheDocument()
+    expect(screen.getByText(/Payment corrected · BHMS-RCT-006-R2/)).toBeInTheDocument()
     await waitFor(() => {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null')
       expect(saved?.data.paymentCorrections).toHaveLength(1)
       expect(saved?.data.paymentCorrections[0]?.settlementStatus).toBe('CORRECTED')
       expect(saved?.data.payments.find((payment: { id: string }) => payment.id === 'payment-1-rent-water-washing').state).toBe('VOIDED')
       expect(saved?.data.receipts.find((receipt: { id: string }) => receipt.id === 'receipt-6').state).toBe('SUPERSEDED')
-      expect(saved?.data.receipts.some((receipt: { receiptNumber: string }) => receipt.receiptNumber === 'DEMO-RCT-006-R2')).toBe(true)
+      expect(saved?.data.receipts.some((receipt: { receiptNumber: string }) => receipt.receiptNumber === 'BHMS-RCT-006-R2')).toBe(true)
       expect(saved?.data.charges).toHaveLength(35)
       const summary = selectSummary(saved.data, DEMO_DATE, DEMO_PERIOD)
       expect(screen.getByRole('heading', { name: 'Money received' }).closest('[data-slot="card"]')).toHaveTextContent(formatMoney(summary.received))
       expect(summary.received).toBe(selectSummary(createDemoData(), DEMO_DATE, DEMO_PERIOD).received - 10_000)
     })
     const correctedHistory = await screen.findByRole('table', { name: 'Transactions' })
-    const correctedRow = within(correctedHistory).getByRole('row', { name: /DEMO-RCT-006-R2/ })
+    const correctedRow = within(correctedHistory).getByRole('row', { name: /BHMS-RCT-006-R2/ })
     expect(correctedRow).toHaveTextContent('Corrected')
     expect(correctedRow).toHaveTextContent('₱3,600.00')
 
@@ -610,7 +619,7 @@ describe('admin workspace integration', () => {
     const correctionWorkspace = correctionHistory.closest('section')!
     expect(within(correctionWorkspace).getByText('Showing 1–1 of 1 corrections')).toBeInTheDocument()
     expect(within(correctionWorkspace).getByText('Page 1 of 1')).toBeInTheDocument()
-    const correctionRow = within(correctionHistory).getByRole('row', { name: /DEMO-RCT-006-R2/ })
+    const correctionRow = within(correctionHistory).getByRole('row', { name: /BHMS-RCT-006-R2/ })
     expect(correctionRow).toHaveTextContent('Room 1')
     expect(correctionRow).toHaveTextContent('₱3,700.00')
     expect(correctionRow).toHaveTextContent('₱3,600.00')
@@ -625,9 +634,9 @@ describe('admin workspace integration', () => {
   it('requires an explicit refund confirmation for an actual overpayment', async () => {
     const user = userEvent.setup()
     renderApp('/payments')
-    await user.type(await screen.findByRole('searchbox', { name: 'Search by room or receipt number' }), 'DEMO-RCT-007')
+    await user.type(await screen.findByRole('searchbox', { name: 'Search by room or receipt number' }), 'BHMS-RCT-007')
     const history = screen.getByRole('table', { name: 'Transactions' })
-    await user.click(within(within(history).getByRole('row', { name: /DEMO-RCT-007/ })).getByRole('button', { name: /See Transaction/ }))
+    await user.click(within(within(history).getByRole('row', { name: /BHMS-RCT-007/ })).getByRole('button', { name: /See Transaction/ }))
     await user.click(within(screen.getByRole('dialog', { name: 'Transaction Details' })).getByRole('button', { name: 'Edit Payment' }))
     let dialog = await screen.findByRole('dialog', { name: 'Correct this transaction.' })
     await user.clear(within(dialog).getByLabelText('Corrected current reading (kWh)'))
@@ -653,7 +662,7 @@ describe('admin workspace integration', () => {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null')
       expect(saved?.data.paymentCorrections[0]?.settlementStatus).toBe('REFUNDED')
       expect(saved?.data.paymentCorrections[0]?.settlementAmountCents).toBe(6_500)
-      expect(saved?.data.receipts.some((receipt: { receiptNumber: string }) => receipt.receiptNumber === 'DEMO-RCT-007-R2')).toBe(true)
+      expect(saved?.data.receipts.some((receipt: { receiptNumber: string }) => receipt.receiptNumber === 'BHMS-RCT-007-R2')).toBe(true)
       expect(selectSummary(saved.data, DEMO_DATE, DEMO_PERIOD).received).toBe(selectSummary(createDemoData(), DEMO_DATE, DEMO_PERIOD).received - 6_500)
     })
     const savedAfterCorrection = JSON.parse(localStorage.getItem(STORAGE_KEY)!).data
@@ -670,7 +679,7 @@ describe('admin workspace integration', () => {
     await screen.findByRole('table', { name: 'Transactions' })
     await user.click(screen.getByRole('tab', { name: /Correction History/ }))
     const corrections = await screen.findByRole('table', { name: 'Correction history' })
-    const correctionRow = within(corrections).getByRole('row', { name: /DEMO-RCT-007-R2/ })
+    const correctionRow = within(corrections).getByRole('row', { name: /BHMS-RCT-007-R2/ })
     expect(correctionRow).toHaveTextContent('Refunded')
     await user.click(within(correctionRow).getByRole('button', { name: /View correction/ }))
     expect(screen.getByRole('dialog', { name: 'Correction Details' })).toHaveTextContent('Refund of ₱65.00 returned to the tenant.')
@@ -679,9 +688,9 @@ describe('admin workspace integration', () => {
   it('requires confirmation that an additional payment was received', async () => {
     const user = userEvent.setup()
     renderApp('/payments')
-    await user.type(await screen.findByRole('searchbox', { name: 'Search by room or receipt number' }), 'DEMO-RCT-007')
+    await user.type(await screen.findByRole('searchbox', { name: 'Search by room or receipt number' }), 'BHMS-RCT-007')
     const history = screen.getByRole('table', { name: 'Transactions' })
-    await user.click(within(within(history).getByRole('row', { name: /DEMO-RCT-007/ })).getByRole('button', { name: /See Transaction/ }))
+    await user.click(within(within(history).getByRole('row', { name: /BHMS-RCT-007/ })).getByRole('button', { name: /See Transaction/ }))
     await user.click(within(screen.getByRole('dialog', { name: 'Transaction Details' })).getByRole('button', { name: 'Edit Payment' }))
     let dialog = await screen.findByRole('dialog', { name: 'Correct this transaction.' })
     await user.clear(within(dialog).getByLabelText('Corrected current reading (kWh)'))
@@ -715,9 +724,9 @@ describe('admin workspace integration', () => {
   it('saves an equal-value correction without any settlement confirmation', async () => {
     const user = userEvent.setup()
     renderApp('/payments')
-    await user.type(await screen.findByRole('searchbox', { name: 'Search by room or receipt number' }), 'DEMO-RCT-007')
+    await user.type(await screen.findByRole('searchbox', { name: 'Search by room or receipt number' }), 'BHMS-RCT-007')
     const history = screen.getByRole('table', { name: 'Transactions' })
-    await user.click(within(within(history).getByRole('row', { name: /DEMO-RCT-007/ })).getByRole('button', { name: /See Transaction/ }))
+    await user.click(within(within(history).getByRole('row', { name: /BHMS-RCT-007/ })).getByRole('button', { name: /See Transaction/ }))
     await user.click(within(screen.getByRole('dialog', { name: 'Transaction Details' })).getByRole('button', { name: 'Edit Payment' }))
     let dialog = await screen.findByRole('dialog', { name: 'Correct this transaction.' })
     await user.type(within(dialog).getByLabelText('Reason for correction'), 'Incorrect room or period')
@@ -739,9 +748,9 @@ describe('admin workspace integration', () => {
   it('leaves the original transaction unchanged when a correction is cancelled', async () => {
     const user = userEvent.setup()
     renderApp('/payments')
-    await user.type(await screen.findByRole('searchbox', { name: 'Search by room or receipt number' }), 'DEMO-RCT-007')
+    await user.type(await screen.findByRole('searchbox', { name: 'Search by room or receipt number' }), 'BHMS-RCT-007')
     const history = screen.getByRole('table', { name: 'Transactions' })
-    await user.click(within(within(history).getByRole('row', { name: /DEMO-RCT-007/ })).getByRole('button', { name: /See Transaction/ }))
+    await user.click(within(within(history).getByRole('row', { name: /BHMS-RCT-007/ })).getByRole('button', { name: /See Transaction/ }))
     await user.click(within(screen.getByRole('dialog', { name: 'Transaction Details' })).getByRole('button', { name: 'Edit Payment' }))
     const dialog = await screen.findByRole('dialog', { name: 'Correct this transaction.' })
     await user.clear(within(dialog).getByLabelText('Corrected current reading (kWh)'))
@@ -757,9 +766,9 @@ describe('admin workspace integration', () => {
   it('blocks a simple electricity correction when a later settled reading depends on it', async () => {
     const user = userEvent.setup()
     renderApp('/payments')
-    await user.type(await screen.findByRole('searchbox', { name: 'Search by room or receipt number' }), 'DEMO-RCT-002')
+    await user.type(await screen.findByRole('searchbox', { name: 'Search by room or receipt number' }), 'BHMS-RCT-002')
     const history = screen.getByRole('table', { name: 'Transactions' })
-    const settledRow = within(history).getByRole('row', { name: /DEMO-RCT-002/ })
+    const settledRow = within(history).getByRole('row', { name: /BHMS-RCT-002/ })
     await user.click(within(settledRow).getByRole('button', { name: /See Transaction/ }))
     await user.click(within(screen.getByRole('dialog', { name: 'Transaction Details' })).getByRole('button', { name: 'Edit Payment' }))
     const dialog = await screen.findByRole('dialog', { name: 'Correct this transaction.' })

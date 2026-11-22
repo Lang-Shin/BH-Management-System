@@ -1,4 +1,4 @@
-import { createDemoData } from '@/data/fixtures/demo'
+import { createEmptyData } from '@/data/fixtures/empty'
 import { isPrototypeData } from '@/domain/validation/prototype-data'
 import { prototypeReducer } from '@/app/state/prototype-reducer'
 import type { PrototypeAction } from '@/app/state/actions'
@@ -6,6 +6,9 @@ import type { PrototypeAppState } from '@/domain/types/models'
 import type { Actor } from './env'
 import { ApiError, sha256 } from './http'
 import { withServerDate } from './validation'
+import { businessDate } from './date'
+import { ensureRegularRentPeriodsThrough } from '@/domain/calculations/rent-schedule'
+import { ensureBillingPeriodsThrough } from '@/domain/calculations/billing-periods'
 
 export interface CommandOutcome {
   data: PrototypeAppState
@@ -39,10 +42,10 @@ export class D1StateRepository {
       .bind(this.workspaceId).first<{ revision: number }>()
     if (current) return
     if (!allowSeed) throw new ApiError(503, 'WORKSPACE_NOT_INITIALIZED', 'This workspace has no imported data yet.')
-    const data = createDemoData()
+    const data = createEmptyData(businessDate())
     await this.db.batch([
       this.db.prepare('INSERT OR IGNORE INTO workspaces (id, name, timezone, dataset_kind, created_at) VALUES (?, ?, ?, ?, ?)')
-        .bind(this.workspaceId, 'Halili BH', this.timezone, 'DEMO', new Date().toISOString()),
+        .bind(this.workspaceId, 'Halili BH', this.timezone, 'REAL', new Date().toISOString()),
       this.db.prepare('INSERT OR IGNORE INTO workspace_state (workspace_id, revision, data_json, updated_at, updated_by) VALUES (?, ?, ?, ?, ?)')
         .bind(this.workspaceId, 1, JSON.stringify(data), new Date().toISOString(), 'system-seed'),
       ...this.projectionStatements(data),
@@ -63,6 +66,33 @@ export class D1StateRepository {
     return { data, revision: row.revision }
   }
 
+  async maintain(serverDate: string): Promise<{ data: PrototypeAppState; revision: number }> {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const current = await this.load()
+      let next = ensureBillingPeriodsThrough(current.data, serverDate)
+      next = ensureRegularRentPeriodsThrough(next, serverDate)
+      if (JSON.stringify(next) === JSON.stringify(current.data)) return current
+      const revision = current.revision + 1
+      const now = new Date().toISOString()
+      next = {
+        ...next,
+        auditEvents: [...next.auditEvents, {
+          id: `audit-periods-${revision}-${now}`, actorId: 'system-maintenance', occurredOn: serverDate,
+          action: 'RENT_PERIODS_ENSURED', entityType: 'PROTOTYPE', entityId: this.workspaceId,
+          reason: 'Materialized due anniversary rent periods and calendar billing months.',
+          beforeSnapshot: JSON.stringify({ revision: current.revision }), afterSnapshot: JSON.stringify({ revision }),
+        }],
+      }
+      const results = await this.db.batch([
+        this.db.prepare('UPDATE workspace_state SET revision = ?, data_json = ?, updated_at = ?, updated_by = ? WHERE workspace_id = ? AND revision = ?')
+          .bind(revision, JSON.stringify(next), now, 'system-maintenance', this.workspaceId, current.revision),
+        ...this.projectionStatements(next),
+      ])
+      if (results[0]?.meta.changes === 1) return { data: next, revision }
+    }
+    return this.load()
+  }
+
   async command(rawAction: PrototypeAction, actor: Actor, idempotencyKey: string, requestId: string, serverDate: string): Promise<CommandOutcome> {
     if (!idempotencyKey || idempotencyKey.length < 8 || idempotencyKey.length > 200) {
       throw new ApiError(400, 'IDEMPOTENCY_KEY_REQUIRED', 'Provide an Idempotency-Key header with 8 to 200 characters.')
@@ -80,7 +110,7 @@ export class D1StateRepository {
     const current = await this.load()
     const next = prototypeReducer(current.data, action)
     if (next === current.data) {
-      if (action.type === 'occupancy/dateChanged' || action.type === 'demo/reset') {
+      if (action.type === 'occupancy/dateChanged') {
         return { data: current.data, revision: current.revision, replayed: false }
       }
       throw new ApiError(422, 'COMMAND_REJECTED', 'The command was rejected or had no effect. Refresh and review the current records.')
@@ -123,6 +153,70 @@ export class D1StateRepository {
       throw new ApiError(409, 'STATE_CONFLICT', 'The workspace changed while this command was being saved. Refresh and retry.')
     }
     return { data: next, revision, replayed: false }
+  }
+
+  async clearAllRecords(actor: Actor, requestId: string, expectedRevision: number, serverDate: string, idempotencyKey: string): Promise<{ data: PrototypeAppState; revision: number }> {
+    const hash = await sha256(`clear-records:${expectedRevision}`)
+    const existing = await this.idempotency(idempotencyKey)
+    if (existing) {
+      if (existing.request_hash !== hash) throw new ApiError(409, 'IDEMPOTENCY_CONFLICT', 'This idempotency key was already used for another operation.')
+      const response = JSON.parse(existing.response_json) as { data: PrototypeAppState; revision: number }
+      if (!isPrototypeData(response.data)) throw new ApiError(500, 'STATE_INVALID', 'The stored idempotent response is invalid.')
+      return response
+    }
+    const current = await this.load()
+    if (current.revision !== expectedRevision) throw new ApiError(409, 'STATE_CONFLICT', 'The workspace changed before the reset. Refresh and try again.')
+    const revision = current.revision + 1
+    const now = new Date().toISOString()
+    const empty = createEmptyData(serverDate, current.data)
+    const auditId = `server-reset-${requestId}`
+    const operationId = `reset-${requestId}`
+    const responseJson = JSON.stringify({ data: empty, revision })
+    const before = {
+      revision: current.revision,
+      tenants: current.data.tenants.length,
+      assignments: current.data.roomAssignments.length,
+      charges: current.data.charges.length,
+      payments: current.data.payments.length,
+      receipts: current.data.receipts.length,
+    }
+    empty.auditEvents = [{
+      id: `workspace-reset-${requestId}`, actorId: actor.id, occurredOn: serverDate, action: 'WORKSPACE_RESET',
+      entityType: 'PROTOTYPE', entityId: this.workspaceId,
+      reason: 'Test workspace records cleared by an authorized administrator. Room configuration was preserved.',
+      beforeSnapshot: JSON.stringify(before), afterSnapshot: JSON.stringify({ revision, tenants: 0, payments: 0 }),
+    }]
+    const statements = [
+      this.db.prepare(`INSERT INTO workspace_operations
+        (id, workspace_id, operation, status, expected_revision, request_id, started_at)
+        VALUES (?, ?, 'CLEAR_RECORDS', 'RUNNING', ?, ?, ?)`)
+        .bind(operationId, this.workspaceId, expectedRevision, requestId, now),
+      this.db.prepare('UPDATE workspace_state SET revision = ?, data_json = ?, updated_at = ?, updated_by = ? WHERE workspace_id = ? AND revision = ?')
+        .bind(revision, JSON.stringify(empty), now, actor.id, this.workspaceId, current.revision),
+      this.db.prepare(`INSERT INTO idempotency_keys
+        (workspace_id, idempotency_key, request_hash, operation, response_json, created_at, request_id)
+        VALUES (?, ?, ?, 'CLEAR_RECORDS', ?, ?, ?)`)
+        .bind(this.workspaceId, idempotencyKey, hash, responseJson, now, requestId),
+      this.db.prepare(`INSERT INTO audit_events
+        (id, workspace_id, actor_id, actor_source, action, entity_type, entity_id, reason, occurred_on, request_id, idempotency_key, before_json, after_json, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(auditId, this.workspaceId, actor.id, actor.source, 'WORKSPACE_RESET', 'WORKSPACE_STATE', this.workspaceId,
+          'Test workspace records cleared by an authorized administrator.', serverDate, requestId, null,
+          JSON.stringify(before), JSON.stringify({ revision }), now),
+      ...this.projectionStatements(empty),
+      this.db.prepare("UPDATE workspace_operations SET status = 'COMPLETED', completed_at = ? WHERE id = ?")
+        .bind(new Date().toISOString(), operationId),
+    ]
+    try {
+      const results = await this.db.batch(statements)
+      if (!results[1] || results[1].meta.changes !== 1) throw new Error('stale revision')
+      return { data: empty, revision }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      if (/workspace revision changed|stale revision/i.test(message)) throw new ApiError(409, 'STATE_CONFLICT', 'The workspace changed before the reset. Refresh and try again.')
+      if (/workspace_operations/i.test(message) && /UNIQUE|constraint/i.test(message)) throw new ApiError(409, 'RESET_IN_PROGRESS', 'Another reset is already running.')
+      throw new ApiError(500, 'RESET_FAILED', 'The test workspace could not be cleared.')
+    }
   }
 
   async replaceFromImport(data: PrototypeAppState, actor: Actor, requestId: string, sourceHash: string): Promise<{ revision: number }> {

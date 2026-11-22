@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { resolveOccupancyDate } from '@/data/fixtures/demo'
+import { civilDateInTimeZone } from '@/lib/business-date'
 import { millisecondsUntilNextBusinessMidnight } from '@/lib/business-date'
 import { ApplicationDateContext } from './application-date-context'
 
@@ -15,7 +15,7 @@ export function ApplicationDateProvider({ children, now = systemClock }: {
   children: ReactNode
   now?: ApplicationClock
 }) {
-  const [occupancyDate, setOccupancyDate] = useState(() => resolveOccupancyDate(now()))
+  const [occupancyDate, setOccupancyDate] = useState(() => civilDateInTimeZone(now()))
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>
@@ -23,7 +23,7 @@ export function ApplicationDateProvider({ children, now = systemClock }: {
       const current = now()
       const delay = millisecondsUntilNextBusinessMidnight(current)
       timer = setTimeout(() => {
-        setOccupancyDate(resolveOccupancyDate(now()))
+        setOccupancyDate(civilDateInTimeZone(now()))
         schedule()
       }, delay)
     }

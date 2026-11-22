@@ -29,12 +29,12 @@ describe('recorded payment synchronization', () => {
     expect(confirm).toHaveTextContent('₱3,500.00')
     await user.click(within(confirm).getByRole('button', { name: 'Confirm payment received' }))
     const success = await screen.findByRole('dialog', { name: 'Payment recorded' })
-    expect(success).toHaveTextContent('DEMO-RCT-015')
+    expect(success).toHaveTextContent('BHMS-RCT-015')
     await waitFor(() => {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null').data
       expect(saved.payments).toHaveLength(15)
       expect(saved.receipts).toHaveLength(15)
-      expect(saved.receipts.find((receipt: { receiptNumber: string }) => receipt.receiptNumber === 'DEMO-RCT-015')).toMatchObject({ amountCents: 350_000, state: 'ISSUED' })
+      expect(saved.receipts.find((receipt: { receiptNumber: string }) => receipt.receiptNumber === 'BHMS-RCT-015')).toMatchObject({ amountCents: 350_000, state: 'ISSUED' })
       expect(saved.payments.find((payment: { id: string }) => payment.id.includes('payment-room-')).amountCents).toBe(350_000)
       expect(saved.paymentAllocations.filter((allocation: { paymentId: string }) => allocation.paymentId.includes('payment-room-')).reduce((sum: number, allocation: { amountCents: number }) => sum + allocation.amountCents, 0)).toBe(350_000)
     })
@@ -42,7 +42,7 @@ describe('recorded payment synchronization', () => {
 
     await user.click(screen.getByRole('button', { name: 'Switch to Tenant UI' }))
     await screen.findByRole('heading', { level: 1, name: 'Overview' })
-    await user.selectOptions(screen.getByLabelText('Demo tenant'), 'tenant-5')
+    await user.selectOptions(screen.getByLabelText('Preview tenant'), 'tenant-5')
     const billing = screen.getByRole('region', { name: 'Monthly room billing' })
     expect(within(billing).getByRole('status')).toHaveTextContent('PARTLY PAID')
     const unpaid = screen.getByRole('region', { name: 'Bill categories' })
@@ -51,13 +51,13 @@ describe('recorded payment synchronization', () => {
     expect(unpaid).toHaveTextContent(/RentPAID/)
 
     await user.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('link', { name: 'My Payments & Receipts' }))
-    const receipt = await screen.findByRole('article', { name: 'Receipt DEMO-RCT-015' })
+    const receipt = await screen.findByRole('article', { name: 'Receipt BHMS-RCT-015' })
     expect(receipt).toHaveTextContent('Room 4')
     expect(receipt).toHaveTextContent('Rent')
     expect(receipt).toHaveTextContent('₱3,500.00')
     expect(receipt).not.toHaveTextContent('Water')
-    await user.selectOptions(screen.getByLabelText('Demo tenant'), 'tenant-8')
-    const sharedReceipt = await screen.findByRole('article', { name: 'Receipt DEMO-RCT-015' })
+    await user.selectOptions(screen.getByLabelText('Preview tenant'), 'tenant-8')
+    const sharedReceipt = await screen.findByRole('article', { name: 'Receipt BHMS-RCT-015' })
     expect(sharedReceipt).toHaveTextContent('Room 4')
     expect(sharedReceipt).not.toHaveTextContent(/Paid by|payer|Shared room payment/)
   }, 20000)
@@ -76,6 +76,7 @@ describe('recorded payment synchronization', () => {
   }, 20000)
 
   it('does not report correction success when persistence fails and leaves the transaction unchanged', async () => {
+    localStorage.clear()
     const user = userEvent.setup()
     const repository: PrototypeRepository = {
       load: async () => ({ data: createDemoData(), warning: null, canPersist: true }),
@@ -83,7 +84,7 @@ describe('recorded payment synchronization', () => {
     }
     renderApp('/payments', repository)
     const table = await screen.findByRole('table', { name: 'Transactions' })
-    await user.click(within(within(table).getByRole('row', { name: /DEMO-RCT-006/ })).getByRole('button', { name: /See Transaction/ }))
+    await user.click(within(within(table).getByRole('row', { name: /BHMS-RCT-006/ })).getByRole('button', { name: /See Transaction/ }))
     await user.click(within(screen.getByRole('dialog', { name: 'Transaction Details' })).getByRole('button', { name: 'Edit Payment' }))
     let dialog = await screen.findByRole('dialog', { name: 'Correct this transaction.' })
     await user.click(within(dialog).getByRole('checkbox', { name: 'Water' }))

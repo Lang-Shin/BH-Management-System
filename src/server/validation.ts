@@ -84,7 +84,7 @@ const actionTypes = new Set<PrototypeAction['type']>([
   'room/paymentConfirmed', 'payment/corrected', 'moveIn/paymentRecorded', 'rent/prepaymentRecorded',
   'moveIn/policyUpdated', 'roomChange/requested', 'roomChange/cancelled', 'roomChange/approved',
   'roomChange/rejected', 'roomChange/reservationCancelled', 'roomChange/reservationRescheduled',
-  'occupancy/dateChanged', 'demo/reset',
+  'occupancy/dateChanged',
 ])
 
 /** Runtime allow-list for the typed client action union. Unknown actions never reach the reducer. */
@@ -191,8 +191,6 @@ export function parseAction(value: unknown): PrototypeAction {
     case 'occupancy/dateChanged':
       if (!isIsoDate(action.asOf)) invalid('The occupancy date is invalid.')
       return action as unknown as PrototypeAction
-    case 'demo/reset':
-      return { type: action.type }
     default:
       return invalid('Unknown command type.')
   }

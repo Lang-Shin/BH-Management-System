@@ -126,7 +126,7 @@ describe('room pending-payment presentation', () => {
     await user.click(trigger)
     const dialog = screen.getByRole('dialog', { name: 'Room 1 · Pending Payments' })
     expect(dialog).toHaveTextContent('All unpaid billing periods — older unpaid months first.')
-    expect(dialog).toHaveTextContent('As of Nov 13, 2026 (sample)')
+    expect(dialog).toHaveTextContent('As of Nov 13, 2026')
     expect(within(dialog).getAllByRole('region').map(section => section.getAttribute('aria-label'))).toEqual(['Rent pending payments', 'Electricity pending payments', 'Water pending payments'])
     expect(dialog).toHaveTextContent('₱7,825.00')
     expect(dialog).not.toHaveTextContent('Alex Rivera')

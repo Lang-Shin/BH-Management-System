@@ -1,6 +1,7 @@
 import type { ChargeCategory, PrototypeAppState } from '@/domain/types/models'
 import { proposedRoomCharges } from '@/domain/calculations/billing-eligibility'
 import { anniversaryCycleForBillingPeriod, selectBillingRent } from '@/domain/calculations/billing-rent'
+import { resolveBillingPeriod } from '@/domain/calculations/billing-periods'
 import { chargeRoom } from '@/domain/calculations/room-finance'
 import { chargeBalance, chargePaid, issuedCharges, unresolvedElectricity } from '@/domain/calculations/summary'
 
@@ -25,7 +26,7 @@ export function tenantRoomBilling(data: PrototypeAppState, tenantId: string, roo
     status, detail, billedCents: 0, appliedCents: 0, outstandingCents: 0, pendingCalculation: false,
     unsettled: [] as UnsettledRoomCategory[], categories: [] as TenantRoomCategoryLine[],
   })
-  const period = data.billingPeriods.find(item => item.id === periodId)
+  const period = resolveBillingPeriod(data, periodId)
   const room = roomId ? data.rooms.find(item => item.id === roomId) : undefined
   if (!room || !period) return empty('UNAVAILABLE', 'An assigned room and billing period are required to determine room payment status.')
   // A current room number alone does not authorize access to an earlier tenancy's bills.

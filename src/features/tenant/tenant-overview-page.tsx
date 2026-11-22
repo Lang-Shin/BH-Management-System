@@ -13,7 +13,6 @@ import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { useTenantDemo } from '@/app/providers/tenant-demo'
 import { roomOccupants, roomOccupancy, tenantAccount } from '@/domain/calculations/summary'
 import { selectMoveInObligations } from '@/domain/calculations/move-in'
-import { DEMO_DATE } from '@/data/fixtures/demo'
 import { formatDate, formatMoney, formatMonthYear } from '@/lib/format'
 import { selectTenantPersona } from './tenant-persona'
 import { tenantRoomBilling } from './tenant-room-billing'
@@ -26,15 +25,15 @@ export default function TenantOverview() {
   const { tenantId } = useTenantDemo()
   const occupancyDate = useOccupancyDate()
   const persona = selectTenantPersona(data, tenantId, occupancyDate)
-  const defaultPeriod = data.billingPeriods.find(item => item.startDate <= DEMO_DATE && item.endDate >= DEMO_DATE) ?? data.billingPeriods.at(-1)
+  const defaultPeriod = data.billingPeriods.find(item => item.startDate <= occupancyDate && item.endDate >= occupancyDate) ?? data.billingPeriods.at(-1)
   const [periodId, setPeriodId] = useState(defaultPeriod?.id ?? '')
   const period = data.billingPeriods.find(item => item.id === periodId) ?? defaultPeriod
   const monthLabel = period ? formatMonthYear(period.startDate) : 'Not available'
-  const account = persona ? tenantAccount(data, persona.tenant.id, DEMO_DATE) : null
+  const account = persona ? tenantAccount(data, persona.tenant.id, occupancyDate) : null
   const sharedReceipts = persona ? selectTenantReceipts(data, persona.tenant.id).receipts : []
   const effectiveReceipts = sharedReceipts.filter(item => item.effective)
   const payments = [...new Map(sharedReceipts.map(item => [item.payment.id, item.payment])).values()]
-    .filter(item => item.state === 'RECORDED' && item.paidOn <= DEMO_DATE)
+    .filter(item => item.state === 'RECORDED' && item.paidOn <= occupancyDate)
   const lastPayment = [...payments].sort((a, b) => b.paidOn.localeCompare(a.paidOn)).at(0)
   const occupants = persona?.room ? roomOccupants(data, persona.room.id, occupancyDate).filter(tenant => tenant.status === 'ACTIVE') : []
   const occupantTitle = occupants.length === 0 ? 'No current tenants' : occupants.length === 1 ? 'Tenant' : 'Tenants'
@@ -47,14 +46,14 @@ export default function TenantOverview() {
   if (!persona) {
     return <>
       <PageHeader title="Overview" description="Your stay at Halili BH at a glance." />
-      <EmptyState title="No tenant profile to show" description="The sample records do not include an active tenant yet. Restore sample records in the landlord workspace to preview this view." />
+      <EmptyState title="No tenant profile to show" description="No active tenant record is available yet. Ask the landlord to add a tenant before previewing this view." />
     </>
   }
 
   return <>
     <PageHeader title="Overview" description={`${monthLabel} · Your stay at Halili BH at a glance.`} />
-    <PreviewNotice>This tenant workspace previews one fictional tenant’s existing records. Tenant sign-in is not part of this phase.</PreviewNotice>
-    {persona.tenant.status === 'MOVED_OUT' && <p className="mb-6 max-w-3xl text-sm leading-relaxed text-muted-foreground">This sample tenant has moved out. The payments and tenancy details below are retained historical records.</p>}
+    <PreviewNotice>This tenant workspace previews one tenant's existing records. Tenant sign-in is not part of this phase.</PreviewNotice>
+    {persona.tenant.status === 'MOVED_OUT' && <p className="mb-6 max-w-3xl text-sm leading-relaxed text-muted-foreground">This tenant has moved out. The payments and tenancy details below are retained historical records.</p>}
     <section aria-label="Room overview" className="mb-6">
       <Card>
         <CardContent>

@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppRouter } from '@/app/router/app-router'
 import { PrototypeProvider } from '@/app/providers/prototype-provider'
 import { localStorageRepository } from '@/data/repositories/local-storage-repository'
@@ -10,6 +10,15 @@ import { loadReadIds, NOTIFICATION_STORAGE_KEY } from '@/features/notifications/
 function renderApp(route = '/dashboard') {
   return render(<PrototypeProvider repository={localStorageRepository}><MemoryRouter initialEntries={[route]}><AppRouter /></MemoryRouter></PrototypeProvider>)
 }
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-11-13T04:00:00.000Z'))
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 describe('notification center', () => {
   it('shows the sample digest, marks items read, and persists that state', async () => {
@@ -58,16 +67,18 @@ describe('notification center', () => {
     expect(loadReadIds()).toEqual([])
   })
 
-  it('clears read state when the sample records are restored', async () => {
+  it('clears read state when all records are cleared', async () => {
     localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify({ version: 1, readIds: ['overdue:8:1105600:2'] }))
     const user = userEvent.setup()
     renderApp('/reports')
     expect(await screen.findByRole('button', { name: 'Notifications, 3 unread' })).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Restore sample records' }))
-    await user.click(within(screen.getByRole('dialog', { name: 'Restore the sample records?' })).getByRole('button', { name: 'Yes, restore records' }))
+    await user.click(screen.getByRole('button', { name: 'Clear All Records' }))
+    const dialog = screen.getByRole('dialog', { name: 'Clear all records?' })
+    await user.type(within(dialog).getByLabelText(/Type RESET to confirm/), 'RESET')
+    await user.click(within(dialog).getByRole('button', { name: 'Clear All Records' }))
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Notifications, 4 unread' })).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('All tenant and financial records were cleared. Room configuration was preserved.')).toBeInTheDocument())
     expect(loadReadIds()).toEqual([])
   })
 })

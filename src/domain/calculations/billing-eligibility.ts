@@ -1,5 +1,6 @@
 import type { BillingPeriod, Charge, PrototypeAppState, Room, RoomAssignment } from '@/domain/types/models'
 import { activeWashingRate, activeWaterRate } from './billing-rates'
+import { resolveBillingPeriod } from './billing-periods'
 import { chargeRoom } from './room-finance'
 import { issuedCharges, unresolvedElectricity } from './summary'
 
@@ -16,7 +17,7 @@ export function periodAssignments(data: PrototypeAppState, roomId: string, perio
  * newly occupied rooms before their first charge exists.
  */
 export function selectBillingEligibleRooms(data: PrototypeAppState, periodId: string, asOf: string): Room[] {
-  const period = data.billingPeriods.find(item => item.id === periodId)
+  const period = resolveBillingPeriod(data, periodId)
   if (!period) return []
   const eligible = new Set<string>()
   for (const assignment of data.roomAssignments) {

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createDemoData, DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
+import { createEmptyData } from '@/data/fixtures/empty'
 import { isPrototypeData } from '@/domain/validation/prototype-data'
 import { localStorageRepository, STORAGE_KEY } from '@/data/repositories/local-storage-repository'
 import { prototypeReducer } from '@/app/state/prototype-reducer'
@@ -136,13 +137,13 @@ describe('prototype reducer and persistence', () => {
     const historicalRoom = prototypeReducer(data, { type: 'room/statusToggled', roomId: 'room-5' })
     expect(isPrototypeData(historicalRoom)).toBe(true)
     expect(historicalRoom.roomAssignments).toEqual(data.roomAssignments)
-    expect(prototypeReducer(changed, { type: 'demo/reset' })).toEqual(createDemoData())
   })
 
   it.each(['{broken', JSON.stringify({ version: 1, data: { tenants: [] } }), JSON.stringify({ version: 2, data: createDemoData() }), JSON.stringify({ version: 3, data: createDemoData() }), JSON.stringify({ version: 4, data: createDemoData() }), JSON.stringify({ version: 99, data: createDemoData() }), JSON.stringify({ version: 5, data: createDemoData() }), JSON.stringify({ version: 6, data: createDemoData() }), JSON.stringify({ version: 7, data: {} })])('preserves malformed or unsupported storage until an explicit reset: %s', async raw => {
     localStorage.setItem(STORAGE_KEY, raw)
     const loaded = await localStorageRepository.load()
-    expect(loaded.data).toEqual(createDemoData())
+    expect(loaded.data).toEqual(createEmptyData())
+    expect(loaded.data.tenants).toEqual([])
     expect(loaded.canPersist).toBe(false)
     expect(loaded.warning).toContain('could not be opened')
     expect(localStorage.getItem(STORAGE_KEY)).toBe(raw)

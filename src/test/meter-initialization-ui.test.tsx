@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppRouter } from '@/app/router/app-router'
 import { PrototypeProvider } from '@/app/providers/prototype-provider'
 import { createDemoData, DEMO_DATE } from '@/data/fixtures/demo'
@@ -13,6 +13,15 @@ function renderRooms(repository: PrototypeRepository = localStorageRepository) {
   return render(<PrototypeProvider repository={repository}><MemoryRouter initialEntries={['/rooms']}><AppRouter /></MemoryRouter></PrototypeProvider>)
 }
 function savedData(): PrototypeAppState { return JSON.parse(localStorage.getItem(STORAGE_KEY)!).data }
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-11-13T04:00:00.000Z'))
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 describe('initial meter reading setup in room details', () => {
   it('defaults to locked, isolates each room, and never mutates financial data on activate/deactivate', async () => {

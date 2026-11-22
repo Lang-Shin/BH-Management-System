@@ -12,7 +12,6 @@ import { RoomElectricityMeter } from './room-electricity-meter'
 import { roomDeletionBlockers, validateRoomDraft, type RoomDraft, type RoomDraftErrors } from '@/domain/calculations/room-management'
 import { futureRoomReservations } from '@/domain/calculations/room-capacity'
 import { activeRoomRentRate, activeWashingRate, roomMonthlyRentCents, ROOM_RATE_CATEGORY_IDS } from '@/domain/calculations/billing-rates'
-import { DEMO_DATE } from '@/data/fixtures/demo'
 import { formatDate, formatMoney } from '@/lib/format'
 import { roomCategoryLabel } from '@/lib/room-rates'
 import type { RoomCategoryId } from '@/domain/types/models'
@@ -46,10 +45,10 @@ export function RoomDetailsDialog({ roomId, onClose, onReturnFocus, onNotice }: 
   const status = roomOccupancy(data, room, occupancyDate)
   const tenants = roomOccupants(data, room.id, occupancyDate)
   const reservations = futureRoomReservations(data, room.id, occupancyDate)
-  const monthlyRentCents = roomMonthlyRentCents(data, room, DEMO_DATE)
-  const washingRateCents = activeWashingRate(data, DEMO_DATE)?.rateCents ?? null
+  const monthlyRentCents = roomMonthlyRentCents(data, room, occupancyDate)
+  const washingRateCents = activeWashingRate(data, occupancyDate)?.rateCents ?? null
   const dirty = washingEnabled !== room.washingMachineEnabled
-  const deleteBlockers = roomDeletionBlockers(data, room.id, DEMO_DATE)
+  const deleteBlockers = roomDeletionBlockers(data, room.id, occupancyDate)
 
   function save() {
     if (!dirty || saving) return
@@ -75,7 +74,7 @@ export function RoomDetailsDialog({ roomId, onClose, onReturnFocus, onNotice }: 
     event.preventDefault()
     if (submitting.current) return
     const draft: RoomDraft = { name, capacity: capacity.trim() === '' ? null : Number(capacity), categoryId, kind, status: roomStatus }
-    const nextErrors = validateRoomDraft(data, draft, { roomId: room!.id, asOf: DEMO_DATE })
+    const nextErrors = validateRoomDraft(data, draft, { roomId: room!.id, asOf: occupancyDate })
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
     submitting.current = true
@@ -85,7 +84,7 @@ export function RoomDetailsDialog({ roomId, onClose, onReturnFocus, onNotice }: 
   }
 
   function confirmDelete() {
-    if (deleting || submitting.current || roomDeletionBlockers(data, room!.id, DEMO_DATE).length > 0) return
+    if (deleting || submitting.current || roomDeletionBlockers(data, room!.id, occupancyDate).length > 0) return
     submitting.current = true
     setDeleting(true)
     dispatch({ type: 'room/deleted', roomId: room!.id })
@@ -179,7 +178,7 @@ export function RoomDetailsDialog({ roomId, onClose, onReturnFocus, onNotice }: 
               <label htmlFor="edit-room-rate" className="text-sm font-semibold">Monthly rental rate</label>
               <select id="edit-room-rate" value={categoryId} onChange={event => { setCategoryId(event.target.value as RoomCategoryId); setErrors({}) }} aria-invalid={Boolean(errors.categoryId)} className={fieldClass}>
                 {ROOM_RATE_CATEGORY_IDS.map(id => {
-                  const rate = activeRoomRentRate(data, id, DEMO_DATE)
+                  const rate = activeRoomRentRate(data, id, occupancyDate)
                   return <option key={id} value={id}>{roomCategoryLabel(id)} · {rate ? formatMoney(rate.monthlyRentCents) : 'Rate needs review'}/month</option>
                 })}
               </select>
@@ -219,7 +218,7 @@ export function RoomDetailsDialog({ roomId, onClose, onReturnFocus, onNotice }: 
         <section className="room-details-section mt-5">
           {deleteBlockers.length > 0
             ? <div role="alert"><p className="font-semibold text-destructive">This room cannot be deleted yet.</p><ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-muted-foreground">{deleteBlockers.map(blocker => <li key={blocker}>{blocker}</li>)}</ul><p className="mt-3 text-sm text-muted-foreground">No linked records will be removed or changed.</p></div>
-            : <><p className="font-semibold">Delete Room {room.name}?</p><p className="mt-2 text-sm text-muted-foreground">This room has no tenant assignments, bills, payments, receipts, meter history, or outstanding financial references. Deletion cannot be undone in the current demonstration data.</p></>}
+            : <><p className="font-semibold">Delete Room {room.name}?</p><p className="mt-2 text-sm text-muted-foreground">This room has no tenant assignments, bills, payments, receipts, meter history, or outstanding financial references. This action cannot be undone.</p></>}
         </section>
         <DialogFooter className="room-details-footer mt-5">
           <Button type="button" variant="outline" onClick={() => setMode('details')}>Cancel</Button>

@@ -5,11 +5,10 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 import { usePrototype } from '@/hooks/use-prototype'
 import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { validateTenantDraft, type TenantDraft, type TenantDraftErrors } from '@/domain/calculations/tenant-management'
-import { DEMO_DATE } from '@/data/fixtures/demo'
 import { TenantFormFields } from './tenant-form-fields'
 
-const emptyTenantForm: TenantDraft = {
-  name: '', email: '', phone: '', address: '', roomId: null, moveInDate: DEMO_DATE, notes: '',
+function emptyTenantForm(occupancyDate: string): TenantDraft {
+  return { name: '', email: '', phone: '', address: '', roomId: null, moveInDate: occupancyDate, notes: '' }
 }
 
 export function AddTenantDialog({ onSaved }: { onSaved?: (message: string) => void }) {
@@ -18,14 +17,14 @@ export function AddTenantDialog({ onSaved }: { onSaved?: (message: string) => vo
 
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState<'form' | 'success'>('form')
-  const [values, setValues] = useState<TenantDraft>(emptyTenantForm)
+  const [values, setValues] = useState<TenantDraft>(() => emptyTenantForm(occupancyDate))
   const [errors, setErrors] = useState<TenantDraftErrors>({})
   const [savedName, setSavedName] = useState('')
   const submitting = useRef(false)
 
   function reset() {
     setStep('form')
-    setValues(emptyTenantForm)
+    setValues(emptyTenantForm(occupancyDate))
     setErrors({})
     setSavedName('')
     submitting.current = false

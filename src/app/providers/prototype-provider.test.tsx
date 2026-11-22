@@ -38,6 +38,7 @@ function CommitConsumer() {
 
 describe('repository injection boundary', () => {
   it('waits for asynchronous loading and serializes saves through an injected adapter', async () => {
+    localStorage.clear()
     let resolveLoad!: (snapshot: PrototypeSnapshot) => void
     let finishFirstSave!: (warning: string | null) => void
     const load = vi.fn(() => new Promise<PrototypeSnapshot>(resolve => { resolveLoad = resolve }))

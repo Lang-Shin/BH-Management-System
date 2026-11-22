@@ -3,7 +3,7 @@ import { Gauge, LockKeyhole, Unlock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { usePrototype } from '@/hooks/use-prototype'
-import { DEMO_DATE } from '@/data/fixtures/demo'
+import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { parseMeterReadingMilliKwh } from '@/domain/calculations/electricity-calculation'
 import { latestSettledReading, meterInitializationStatus } from '@/domain/calculations/meter-baseline'
 import { prepareMeterInitialization } from '@/domain/calculations/meter-initialization'
@@ -12,9 +12,10 @@ import { formatDate } from '@/lib/format'
 
 export function RoomElectricityMeter({ roomId }: { roomId: string }) {
   const { data, dispatch, persistSnapshot } = usePrototype()
+  const occupancyDate = useOccupancyDate()
   const [active, setActive] = useState(false)
   const [reading, setReading] = useState('')
-  const [readOn, setReadOn] = useState(DEMO_DATE)
+  const [readOn, setReadOn] = useState(occupancyDate)
   const [sourceNote, setSourceNote] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [notice, setNotice] = useState('')
@@ -35,12 +36,12 @@ export function RoomElectricityMeter({ roomId }: { roomId: string }) {
     const parsed = parseMeterReadingMilliKwh(reading.trim())
     const nextErrors: Record<string, string> = {}
     if (parsed === null) nextErrors.reading = 'Enter a non-negative kWh reading with up to three decimal places.'
-    if (!isIsoDate(readOn) || readOn > DEMO_DATE) nextErrors.date = 'Enter a valid reading date no later than the current sample date.'
+    if (!isIsoDate(readOn) || readOn > occupancyDate) nextErrors.date = 'Enter a valid reading date no later than the current date.'
     if (sourceNote.trim().length > 500) nextErrors.source = 'Keep the source note within 500 characters.'
     setErrors(nextErrors)
     setNotice('')
     if (Object.keys(nextErrors).length > 0 || parsed === null) return
-    const input = { roomId, readingMilliKwh: parsed, readOn, sourceNote, initializedOn: DEMO_DATE }
+    const input = { roomId, readingMilliKwh: parsed, readOn, sourceNote, initializedOn: occupancyDate }
     const result = prepareMeterInitialization(data, input)
     if (!result.ok) {
       setErrors({ save: result.reason === 'NOT_ELIGIBLE' ? 'This meter is no longer eligible. Its existing history has not been changed.' : 'The initial reading could not be saved. Review the input and try again.' })
@@ -90,7 +91,7 @@ export function RoomElectricityMeter({ roomId }: { roomId: string }) {
         <p className="room-meter-setup-warning">Use only a verified previous settled reading. This is a starting baseline, not proof that an electricity bill was paid. Saved history cannot be overwritten through setup.</p>
         <div className="room-meter-setup-fields">
           <div><label htmlFor={`meter-initial-reading-${roomId}`}>Previous settled meter reading (kWh)</label><Input id={`meter-initial-reading-${roomId}`} inputMode="decimal" value={reading} onChange={event => setReading(event.target.value)} disabled={saving} aria-invalid={Boolean(errors.reading)} aria-describedby={errors.reading ? `meter-reading-error-${roomId}` : undefined} />{errors.reading && <p id={`meter-reading-error-${roomId}`} role="alert">{errors.reading}</p>}</div>
-          <div><label htmlFor={`meter-initial-date-${roomId}`}>Date of previous settled reading</label><Input id={`meter-initial-date-${roomId}`} type="date" value={readOn} max={DEMO_DATE} onChange={event => setReadOn(event.target.value)} disabled={saving} aria-invalid={Boolean(errors.date)} aria-describedby={errors.date ? `meter-date-error-${roomId}` : undefined} />{errors.date && <p id={`meter-date-error-${roomId}`} role="alert">{errors.date}</p>}</div>
+          <div><label htmlFor={`meter-initial-date-${roomId}`}>Date of previous settled reading</label><Input id={`meter-initial-date-${roomId}`} type="date" value={readOn} max={occupancyDate} onChange={event => setReadOn(event.target.value)} disabled={saving} aria-invalid={Boolean(errors.date)} aria-describedby={errors.date ? `meter-date-error-${roomId}` : undefined} />{errors.date && <p id={`meter-date-error-${roomId}`} role="alert">{errors.date}</p>}</div>
         </div>
         <div><label htmlFor={`meter-initial-source-${roomId}`}>Source note (optional)</label><textarea id={`meter-initial-source-${roomId}`} value={sourceNote} onChange={event => setSourceNote(event.target.value)} maxLength={500} disabled={saving} rows={3} placeholder="For example: landlord’s handwritten records" />{errors.source && <p role="alert">{errors.source}</p>}</div>
         {errors.save && <p role="alert">{errors.save}</p>}

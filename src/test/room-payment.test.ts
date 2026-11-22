@@ -70,7 +70,7 @@ describe('room-based checkbox payment calculator', () => {
     expect(result.totalCents).toBe(402_500)
     expect(result.payments).toHaveLength(1)
     expect(result.payments[0]).toMatchObject({ scope: 'ROOM', tenantId: null, roomId: 'room-4', method: null, amountCents: 402_500 })
-    expect(result.receipts.map(receipt => receipt.receiptNumber)).toEqual(['DEMO-RCT-015'])
+    expect(result.receipts.map(receipt => receipt.receiptNumber)).toEqual(['BHMS-RCT-015'])
     expect(isPrototypeData(result.data)).toBe(true)
     expect(latestSettledReading(result.data, 'meter-room-4')).toMatchObject({ readingMilliKwh: 325_000 })
     expect(result.data.electricityBillObligations.some(item => item.roomId === 'room-4')).toBe(false)

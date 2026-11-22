@@ -113,14 +113,10 @@ describe('administrative meter initialization', () => {
     expect(parsePrototypeSnapshot(raw)).toEqual({ ok: true, data: result.data })
   })
 
-  it('rejects duplicate or invalid persisted baselines and restores canonical sample records explicitly', () => {
+  it('rejects duplicate or invalid persisted baselines', () => {
     const result = initialize()
     expect(isPrototypeData({ ...result.data, meterReadings: [...result.data.meterReadings, { ...result.reading, id: 'duplicate-initial' }] })).toBe(false)
     expect(isPrototypeData({ ...result.data, electricityMeters: result.data.electricityMeters.map(meter => meter.id === result.meter.id ? { ...meter, roomId: 'missing-room' } : meter) })).toBe(false)
-    const reset = prototypeReducer(result.data, { type: 'demo/reset' })
-    expect(reset).toEqual(createDemoData())
-    expect(reset.meterReadings.some(reading => reading.status === 'INITIAL')).toBe(false)
-    expect(isPrototypeData(reset)).toBe(true)
   })
 })
 

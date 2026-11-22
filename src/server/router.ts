@@ -40,7 +40,7 @@ export async function handleRequest(request: Request, env: WorkerEnv): Promise<R
 
     if (route === '/bootstrap' && request.method === 'GET') {
       await repo.ensureSeed(env.ENVIRONMENT === 'development' || env.ENVIRONMENT === 'staging')
-      const state = await repo.load()
+      const state = await repo.maintain(serverDate)
       return json({
         data: state.data, revision: state.revision, serverDate, timezone,
         workspaceId: env.WORKSPACE_ID ?? 'demo-workspace',
@@ -52,6 +52,7 @@ export async function handleRequest(request: Request, env: WorkerEnv): Promise<R
           rentPrepaymentCommand: true,
           importDryRun: true,
           importApplyGated: env.ALLOW_IMPORT_APPLY === 'true',
+          clearAllRecords: env.ENVIRONMENT !== 'production' && env.ALLOW_TEST_RESET === 'true',
         },
       }, {}, requestKey)
     }
@@ -61,6 +62,18 @@ export async function handleRequest(request: Request, env: WorkerEnv): Promise<R
       const action = parseAction(body.action)
       const outcome = await repo.command(action, actor, idempotencyKey(request), requestKey, serverDate)
       return json({ ...outcome, requestId: requestKey }, {}, requestKey)
+    }
+
+    if (route === '/admin/clear-records' && request.method === 'POST') {
+      if (env.ENVIRONMENT === 'production' || env.ALLOW_TEST_RESET !== 'true') {
+        throw new ApiError(423, 'RESET_DISABLED', 'Clearing records is disabled for this workspace.')
+      }
+      const body = await readJson(request)
+      if (body.confirmation !== 'RESET') throw new ApiError(400, 'RESET_CONFIRMATION_REQUIRED', 'Type RESET to confirm clearing records.')
+      const expectedRevision = Number(body.expectedRevision)
+      if (!Number.isSafeInteger(expectedRevision)) throw new ApiError(400, 'INVALID_REVISION', 'A valid workspace revision is required.')
+      const cleared = await repo.clearAllRecords(actor, requestKey, expectedRevision, serverDate, idempotencyKey(request))
+      return json({ ...cleared, replayed: false, requestId: requestKey }, {}, requestKey)
     }
 
     if (route === '/rent/quote' && request.method === 'POST') {

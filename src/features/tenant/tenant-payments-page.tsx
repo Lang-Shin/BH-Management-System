@@ -110,7 +110,7 @@ export default function TenantPayments() {
       : <EmptyState
         title={receipts.length === 0 ? 'No receipts yet' : `No receipts for ${period?.label ?? 'this billing month'}`}
         description={receipts.length === 0
-          ? 'This demo tenant has no receipts in the sample records yet.'
+          ? 'This tenant has no receipts yet.'
           : 'This tenant has receipts in other billing months. Choose a different month to view them.'}
       />}
     {history.length > 0 && <details className="mt-6">

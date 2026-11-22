@@ -58,21 +58,21 @@ describe('room numbering across billing and payments', () => {
     expect(data.electricityBillObligations.filter(obligation => obligation.roomId === 'room-15')).toHaveLength(0)
 
     const room2Receipts = selectTenantReceipts(data, 'tenant-2')
-    expect(room2Receipts.receipts.map(view => view.receipt.receiptNumber).sort()).toEqual(['DEMO-RCT-003', 'DEMO-RCT-004', 'DEMO-RCT-008', 'DEMO-RCT-009', 'DEMO-RCT-012', 'DEMO-RCT-013'])
+    expect(room2Receipts.receipts.map(view => view.receipt.receiptNumber).sort()).toEqual(['BHMS-RCT-003', 'BHMS-RCT-004', 'BHMS-RCT-008', 'BHMS-RCT-009', 'BHMS-RCT-012', 'BHMS-RCT-013'])
     for (const view of room2Receipts.receipts) {
       expect(view.rooms.label).toBe('Room 2')
       for (const allocation of view.rooms.allocations) expect(allocation.context.roomId).toBe('room-2')
     }
     expect(room2Receipts.receipts.some(view => view.rooms.label.includes('02'))).toBe(false)
 
-    const originalReceipt = data.receipts.find(receipt => receipt.receiptNumber === 'DEMO-RCT-008')!
+    const originalReceipt = data.receipts.find(receipt => receipt.receiptNumber === 'BHMS-RCT-008')!
     const result = preparePaymentCorrection(data, {
       paymentId: 'payment-2-water', selectedCategories: ['WATER'], correctedElectricityReadingMilliKwh: null,
       reason: 'Verify Room 2 numbering', settlementStatus: 'CORRECTED', correctedAt: DEMO_DATE,
     })
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.receipt.receiptNumber).toBe('DEMO-RCT-008-R2')
+    expect(result.receipt.receiptNumber).toBe('BHMS-RCT-008-R2')
     expect(result.data.charges).toEqual(data.charges)
 
     const views = selectTenantReceipts(result.data, 'tenant-2').receipts
@@ -84,7 +84,7 @@ describe('room numbering across billing and payments', () => {
     expect(superseded.rooms.label).toBe('Room 2')
     expect(superseded.receipt.amountCents).toBe(originalReceipt.amountCents)
     expect(superseded.receipt.allocationIds).toEqual(originalReceipt.allocationIds)
-    expect(views.filter(view => view.effective).map(view => view.receipt.receiptNumber).sort()).toEqual(['DEMO-RCT-003', 'DEMO-RCT-004', 'DEMO-RCT-008-R2', 'DEMO-RCT-009', 'DEMO-RCT-012', 'DEMO-RCT-013'])
+    expect(views.filter(view => view.effective).map(view => view.receipt.receiptNumber).sort()).toEqual(['BHMS-RCT-003', 'BHMS-RCT-004', 'BHMS-RCT-008-R2', 'BHMS-RCT-009', 'BHMS-RCT-012', 'BHMS-RCT-013'])
     expect(views.some(view => view.rooms.label === 'Room 02')).toBe(false)
     expect(selectTenantReceipts(result.data, 'tenant-4').receipts.some(view => view.receipt.id === result.receipt.id)).toBe(true)
   })

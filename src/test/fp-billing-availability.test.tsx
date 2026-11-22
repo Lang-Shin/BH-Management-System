@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppRouter } from '@/app/router/app-router'
 import { PrototypeProvider } from '@/app/providers/prototype-provider'
 import { createDemoData, DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
@@ -30,6 +30,15 @@ function addTenant(data: ReturnType<typeof createDemoData>, name: string, roomId
   if (!result.ok) throw new Error(`tenant creation failed: ${JSON.stringify(result.errors)}`)
   return { ...result, data: reconcileOccupancy(data, result.data, DEMO_DATE, { createMoveInObligations: true }) }
 }
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-11-13T04:00:00.000Z'))
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 describe('dynamic Billing room availability', () => {
   it('keeps anniversary rent out of the legacy room calculator and records only applicable water', () => {
@@ -237,12 +246,12 @@ describe('Billing selector UI after tenant creation', () => {
 
     await user.click(screen.getByRole('button', { name: 'Switch to Tenant UI' }))
     await screen.findByRole('heading', { level: 1, name: 'Overview' })
-    const demoTenant = screen.getByLabelText('Demo tenant')
+    const demoTenant = screen.getByLabelText('Preview tenant')
     const tenantId = JSON.parse(localStorage.getItem(STORAGE_KEY)!).data.tenants.find((tenant: { name: string }) => tenant.name === 'New Billing Tenant').id
     await user.selectOptions(demoTenant, tenantId)
     expect(within(await screen.findByRole('region', { name: 'Monthly room billing' })).getByRole('status')).toHaveTextContent('PAID')
     await user.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('link', { name: 'My Payments & Receipts' }))
-    const receipts = await screen.findAllByRole('article', { name: /Receipt DEMO-RCT-/ })
+    const receipts = await screen.findAllByRole('article', { name: /Receipt BHMS-RCT-/ })
     const waterReceipt = receipts.find(receipt => receipt.textContent?.includes('Water'))
     expect(waterReceipt).toBeDefined()
     expect(waterReceipt).toHaveTextContent('Room 908')

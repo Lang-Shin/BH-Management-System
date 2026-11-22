@@ -20,7 +20,7 @@ describe('tenant workspace layout', () => {
     expect(within(main).getAllByText('Active').length).toBeGreaterThan(0)
     expect(screen.getByLabelText('Billing month')).toHaveValue('period-nov')
     expect(within(screen.getByRole('region', { name: 'Monthly room billing' })).getByRole('status')).toHaveTextContent('PAID')
-    expect(screen.getByText(/previews one fictional tenant’s existing records/)).toBeInTheDocument()
+    expect(screen.getByText(/previews one tenant's existing records/)).toBeInTheDocument()
     expect(screen.getByText(/Tenant sign-in is not part of this phase/)).toBeInTheDocument()
   })
 
@@ -60,7 +60,7 @@ describe('tenant workspace layout', () => {
     renderTenantApp('/tenant/payments')
     expect(await screen.findByRole('heading', { level: 1, name: 'My Payments & Receipts' })).toBeInTheDocument()
     expect(screen.getByLabelText('Billing month')).toHaveValue('period-nov')
-    expect(screen.getByRole('article', { name: 'Receipt DEMO-RCT-006' })).toBeInTheDocument()
+    expect(screen.getByRole('article', { name: 'Receipt BHMS-RCT-006' })).toBeInTheDocument()
   })
 
   it('shows the sample tenant room details without landlord controls', async () => {

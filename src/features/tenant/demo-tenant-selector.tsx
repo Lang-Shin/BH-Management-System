@@ -19,7 +19,7 @@ export function DemoTenantSelector() {
   const selectedRoom = selectedAssignment ? data.rooms.find(item => item.id === selectedAssignment.roomId) : undefined
 
   return <div className="mt-6 rounded-[16px] border bg-card/70 p-3 shadow-[inset_0_1px_0_#ffffff40]">
-    <label htmlFor={selectId} className="block px-1 pb-2 text-xs font-semibold text-muted-foreground">Demo tenant</label>
+    <label htmlFor={selectId} className="block px-1 pb-2 text-xs font-semibold text-muted-foreground">Preview tenant</label>
     <select id={selectId} value={tenantId} onChange={event => selectTenant(event.target.value)} className="h-11 w-full min-w-0 rounded-xl border border-input bg-card px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50">
       {data.tenants.map(tenant => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
     </select>

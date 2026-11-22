@@ -6,8 +6,9 @@ import { activeAssignments, chargePaid } from './summary'
 import { activeMoveInPolicy } from './move-in-policy'
 import { nextReceiptNumbers } from './receipt-numbering'
 import { dateParts, rentObligationForPeriod, rentObligationPaidCents, rentalPeriodsForCycle } from './rental-periods'
-import { ensureFirstRentalPeriod, openFinancialReviewCase } from './rent-schedule'
+import { ensureFirstRentalPeriod, ensureRegularRentPeriodsThrough, openFinancialReviewCase } from './rent-schedule'
 import { internalTransferContext } from './internal-transfer'
+import { ensureBillingPeriodForDate } from './billing-periods'
 
 export type MoveInSettlementStatus = 'NOT PAID' | 'PARTLY PAID' | 'PAID' | 'REFUNDED'
 export type MoveInCategory = 'ADVANCE' | 'SECURITY_DEPOSIT'
@@ -20,17 +21,13 @@ function activeOccupantIds(data: PrototypeAppState, roomId: string, asOf: string
   return activeAssignments(data, asOf).filter(assignment => assignment.roomId === roomId).map(assignment => assignment.tenantId)
 }
 
-function billingPeriodFor(data: PrototypeAppState, date: string) {
-  return data.billingPeriods.find(period => period.startDate <= date && period.endDate >= date)
-    ?? data.billingPeriods.find(period => period.status === 'OPEN')
-    ?? data.billingPeriods.at(-1)
-}
-
 export function ensureMoveInObligation(data: PrototypeAppState, cycle: OccupancyCycle, asOf: string): PrototypeAppState {
   if (data.moveInObligations.some(obligation => obligation.occupancyCycleId === cycle.id)) return data
   const room = data.rooms.find(item => item.id === cycle.roomId)
-  const period = billingPeriodFor(data, cycle.startedAt)
-  if (!room || !period) return data
+  if (!room) return data
+  const ensured = ensureBillingPeriodForDate(data, cycle.startedAt)
+  data = ensured.data
+  const period = ensured.period
   const occupants = activeAssignments(data, asOf).filter(assignment => assignment.roomId === room.id)
   const roomPayer = [...occupants].sort((a, b) => a.startDate.localeCompare(b.startDate) || a.id.localeCompare(b.id))[0]
   if (!roomPayer) return data
@@ -156,7 +153,7 @@ export function reconcileOccupancy(
       }
     }
   }
-  return data
+  return ensureRegularRentPeriodsThrough(data, asOf)
 }
 
 /** Repairs newly created active cycles that missed their move-in obligation; legacy cycles are untouched. */

@@ -65,12 +65,14 @@ async function request(path: string, init: RequestInit): Promise<Record<string, 
 
 function snapshotFromBootstrap(body: Record<string, unknown>): PrototypeSnapshot {
   if (!isPrototypeData(body.data)) throw new ApiRepositoryError('The server returned invalid workspace records.', 200, 'INVALID_STATE')
+  const capabilities = body.capabilities && typeof body.capabilities === 'object' ? body.capabilities as Record<string, unknown> : {}
   return {
     data: body.data,
     warning: null,
     canPersist: true,
     revision: typeof body.revision === 'number' ? body.revision : undefined,
     serverDate: typeof body.serverDate === 'string' ? body.serverDate : undefined,
+    capabilities: { clearAllRecords: capabilities.clearAllRecords === true },
   }
 }
 
@@ -95,6 +97,13 @@ export function createApiRepository(): PrototypeRepository {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'idempotency-key': idempotencyKey },
         body: JSON.stringify({ action }),
+      }))
+    },
+    async clearAllRecords(expectedRevision) {
+      return commandResult(await request('/admin/clear-records', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() },
+        body: JSON.stringify({ confirmation: 'RESET', expectedRevision }),
       }))
     },
   }

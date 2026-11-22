@@ -5,6 +5,7 @@ import {
   anniversaryCycleForBillingPeriod, selectBillingRent, type BillingRentLine,
 } from '@/domain/calculations/billing-rent'
 import { chargeBalance } from '@/domain/calculations/summary'
+import { resolveBillingPeriod } from '@/domain/calculations/billing-periods'
 import { rentObligationPaidCents } from '@/domain/calculations/rental-periods'
 
 export const billingCategories: ChargeCategory[] = ['RENT', 'ELECTRICITY', 'WATER', 'WASHING_MACHINE']
@@ -30,7 +31,7 @@ export function billingRoomStatus(room: RoomFinance): BillingRoomStatus {
  * Missing applicable utility charges are projected read-only and never written here.
  */
 export function selectBillingRooms(data: PrototypeAppState, periodId: string, asOf: string, outstandingOnly: boolean): BillingRoom[] {
-  const period = data.billingPeriods.find(item => item.id === periodId)
+  const period = resolveBillingPeriod(data, periodId)
   if (!period) return []
   const persisted = new Map(selectRoomFinance(data, asOf, periodId)
     .flatMap(row => row.context.roomId ? [[row.context.roomId, row] as const] : []))

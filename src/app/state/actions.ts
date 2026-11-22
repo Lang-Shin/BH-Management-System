@@ -31,7 +31,6 @@ export type PrototypeAction =
   | { type: 'roomChange/reservationCancelled'; requestId: string; reason: string; asOf: string }
   | { type: 'roomChange/reservationRescheduled'; requestId: string; effectiveDate: string; reason: string; asOf: string }
   | { type: 'occupancy/dateChanged'; asOf: string }
-  | { type: 'demo/reset' }
 
 export type StateAction = PrototypeAction
   | { type: 'data/loaded'; data: PrototypeData; occupancyDate: string }

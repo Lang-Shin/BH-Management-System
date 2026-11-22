@@ -28,12 +28,12 @@ export default function TenantRoom() {
     {!room || !assignment ? <EmptyState
       title={movedOut ? 'Moved out of Halili BH' : 'No room to show'}
       description={movedOut
-        ? 'This sample tenant no longer has an active room assignment. Historical room details arrive in a later phase.'
-        : 'The selected sample tenant does not have an active room assignment yet. Restore sample records in the landlord workspace to preview this view.'}
+        ? 'This tenant no longer has an active room assignment. Historical room details arrive in a later phase.'
+        : 'The selected tenant does not have an active room assignment yet.'}
     /> : <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><DoorOpen className="size-5 text-[var(--tint)]" aria-hidden="true" />Room {room.name} at a glance</CardTitle>
-        <CardDescription>Existing sample details for the room you are staying in.</CardDescription>
+        <CardDescription>Existing details for the room you are staying in.</CardDescription>
       </CardHeader>
       <CardContent>
         <dl className="room-details-grid">

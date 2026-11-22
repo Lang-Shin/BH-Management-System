@@ -5,9 +5,9 @@ import { DataTable, type Column } from './data-table'
 import { TablePagination } from './table-pagination'
 import { useTablePagination } from './use-table-pagination'
 import { formatDate, formatMoney } from '@/lib/format'
+import { civilDateInTimeZone } from '@/lib/business-date'
 import { StatusBadge } from './status-badge'
 import { paymentRooms } from '@/domain/calculations/room-finance'
-import { DEMO_DATE } from '@/data/fixtures/demo'
 import { Button } from '@/components/ui/button'
 import { TransactionDialog } from './transaction-dialog'
 
@@ -44,7 +44,7 @@ function PaymentCategoryBoxes({ data, payment, asOf }: { data: PrototypeAppState
   </details>
 }
 
-export function PaymentHistoryTable({ data, payments, caption = 'Payment history', compact = false, asOf = DEMO_DATE, transactionDisplay = 'button', onEditPayment, paginated = false, recordLabel = 'transactions' }: { data: PrototypeAppState; payments: Payment[]; caption?: string; compact?: boolean; asOf?: string; transactionDisplay?: 'button' | 'categories'; onEditPayment?: (payment: Payment, trigger: HTMLButtonElement) => void; paginated?: boolean; recordLabel?: string }) {
+export function PaymentHistoryTable({ data, payments, caption = 'Payment history', compact = false, asOf = civilDateInTimeZone(), transactionDisplay = 'button', onEditPayment, paginated = false, recordLabel = 'transactions' }: { data: PrototypeAppState; payments: Payment[]; caption?: string; compact?: boolean; asOf?: string; transactionDisplay?: 'button' | 'categories'; onEditPayment?: (payment: Payment, trigger: HTMLButtonElement) => void; paginated?: boolean; recordLabel?: string }) {
   const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null)
   const [transactionSession, setTransactionSession] = useState(0)
   const transactionTrigger = useRef<HTMLButtonElement | null>(null)

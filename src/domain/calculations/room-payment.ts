@@ -8,6 +8,7 @@ import { nextReceiptNumbers } from './receipt-numbering'
 import { activeCycleForRoom } from './move-in'
 import { proposedRoomCharges } from './billing-eligibility'
 import { anniversaryCycleForBillingPeriod, selectBillingRent } from './billing-rent'
+import { ensureBillingPeriod, resolveBillingPeriod } from './billing-periods'
 
 export const roomPaymentCategories: ChargeCategory[] = ['RENT', 'ELECTRICITY', 'WATER', 'WASHING_MACHINE']
 
@@ -76,7 +77,7 @@ function finalizedOption(category: ChargeCategory, charges: Charge[], data: Prot
 }
 
 export function buildRoomPaymentQuote(data: PrototypeAppState, input: RoomPaymentInput): RoomPaymentQuote {
-  const period = data.billingPeriods.find(item => item.id === input.periodId)
+  const period = resolveBillingPeriod(data, input.periodId)
   const room = data.rooms.find(item => item.id === input.roomId)
   const context = room ? roomContext(data, room.id, 'period-assignment', 'Selected room') : null
   const proposed = room && period ? proposedRoomCharges(data, room, period, input.asOf) : []
@@ -167,6 +168,9 @@ export function prepareRoomPayment(data: PrototypeAppState, input: RoomPaymentIn
   const quote = buildRoomPaymentQuote(data, input)
   if (quote.selected.length === 0) return { ok: false, reason: 'NO_SELECTION' }
   if (!quote.canConfirm) return { ok: false, reason: quote.pendingElectricity || quote.options.some(option => option.state === 'INVALID_READING') ? 'ELECTRICITY_READING_REQUIRED' : 'STALE_SELECTION' }
+  const period = resolveBillingPeriod(data, input.periodId)
+  if (!period) return { ok: false, reason: 'STALE_SELECTION' }
+
 
   const lines: { charge: Charge; amountCents: number }[] = []
   for (const category of quote.selected) {
@@ -232,8 +236,9 @@ export function prepareRoomPayment(data: PrototypeAppState, input: RoomPaymentIn
     ...quote.selected.flatMap(category => quote.options.find(option => option.category === category)?.proposedCharges ?? []),
   ]
   const extraReadings: MeterReading[] = quote.electricity?.currentReading ? [quote.electricity.currentReading] : []
+  const withPeriod = ensureBillingPeriod(data, period)
   const next: PrototypeAppState = {
-    ...data,
+    ...withPeriod,
     occupancyCycles,
     meterReadings: [...data.meterReadings, ...extraReadings],
     charges: [...data.charges, ...extraCharges],

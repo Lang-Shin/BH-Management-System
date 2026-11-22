@@ -2,7 +2,7 @@
 import { ChevronRight, Droplets, House, Pencil, WashingMachine, Zap, type LucideIcon } from 'lucide-react'
 import { Dialog, DialogTrigger } from '@/components/ui/dialog'
 import { usePrototype } from '@/hooks/use-prototype'
-import { DEMO_DATE } from '@/data/fixtures/demo'
+import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import {
   activeElectricityRate, activeRoomRentRates, activeWashingRate, activeWaterRate,
   scheduledElectricityRate, scheduledRoomRentRates, scheduledWashingRate, scheduledWaterRate,
@@ -47,15 +47,16 @@ function RateCard({ title, icon: Icon, value, unit, detail, scheduled, renderDia
 
 export function BillingRatesSection() {
   const { data } = usePrototype()
+  const occupancyDate = useOccupancyDate()
   const [notice, setNotice] = useState('')
-  const rentRates = activeRoomRentRates(data, DEMO_DATE)
-  const rentScheduled = scheduledRoomRentRates(data, DEMO_DATE)
-  const electricity = activeElectricityRate(data, DEMO_DATE)
-  const electricityScheduled = scheduledElectricityRate(data, DEMO_DATE)
-  const water = activeWaterRate(data, DEMO_DATE)
-  const waterScheduled = scheduledWaterRate(data, DEMO_DATE)
-  const washing = activeWashingRate(data, DEMO_DATE)
-  const washingScheduled = scheduledWashingRate(data, DEMO_DATE)
+  const rentRates = activeRoomRentRates(data, occupancyDate)
+  const rentScheduled = scheduledRoomRentRates(data, occupancyDate)
+  const electricity = activeElectricityRate(data, occupancyDate)
+  const electricityScheduled = scheduledElectricityRate(data, occupancyDate)
+  const water = activeWaterRate(data, occupancyDate)
+  const waterScheduled = scheduledWaterRate(data, occupancyDate)
+  const washing = activeWashingRate(data, occupancyDate)
+  const washingScheduled = scheduledWashingRate(data, occupancyDate)
 
   const rentValue = rentRates.length > 0 ? rentRates.map(rate => formatMoney(rate.monthlyRentCents)).join(' · ') : 'No rate set'
   const rentSchedule = rentScheduled.length > 0

@@ -1,4 +1,4 @@
 import { createContext } from 'react'
-import { resolveOccupancyDate } from '@/data/fixtures/demo'
+import { civilDateInTimeZone } from '@/lib/business-date'
 
-export const ApplicationDateContext = createContext(resolveOccupancyDate())
+export const ApplicationDateContext = createContext(civilDateInTimeZone())

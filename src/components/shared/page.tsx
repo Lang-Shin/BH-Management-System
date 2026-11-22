@@ -19,5 +19,5 @@ export function StatCard({ label, value, detail, icon: Icon }: { label: string; 
 }
 
 export function PreviewNotice({ children }: { children: ReactNode }) {
-  return <p className="mb-6 max-w-3xl text-sm leading-relaxed text-muted-foreground"><strong className="font-semibold text-foreground">Sample records.</strong> {children}</p>
+  return <p className="mb-6 max-w-3xl text-sm leading-relaxed text-muted-foreground">{children}</p>
 }

@@ -163,6 +163,7 @@ describe('short-stay advance refunds', () => {
   })
 
   it('rejects corrections dated before the original payment', async () => {
+    localStorage.clear()
     const { buildPaymentCorrectionQuote } = await import('@/domain/calculations/payment-correction')
     const data = createDemoData()
     expect(buildPaymentCorrectionQuote(data, {

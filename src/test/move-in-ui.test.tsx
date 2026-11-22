@@ -192,7 +192,7 @@ describe('move-in advance and security deposit UI', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Record payment' }))
 
     expect(await within(dialog).findByText('Move-in payment saved.')).toBeInTheDocument()
-    expect(within(dialog).getByText(/DEMO-RCT-/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/BHMS-RCT-/)).toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Done' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Record a move-in payment.' })).not.toBeInTheDocument())
 

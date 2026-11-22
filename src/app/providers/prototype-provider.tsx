@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react'
-import { createDemoData, resolveOccupancyDate } from '@/data/fixtures/demo'
+import { civilDateInTimeZone } from '@/lib/business-date'
+import { createEmptyData } from '@/data/fixtures/empty'
 import type { PrototypeRepository } from '@/data/repositories/prototype-repository'
 import { ErrorState, LoadingState } from '@/components/shared/states'
 import { PrototypeContext } from '@/app/state/prototype-context'
@@ -28,11 +29,12 @@ function OccupancyDateSync({ children }: { children: ReactNode }) {
 }
 
 export function PrototypeProvider({ children, repository, now }: { children: ReactNode; repository: PrototypeRepository; now?: ApplicationClock }) {
-  const [data, reduce] = useReducer(prototypeReducer, undefined, createDemoData)
+  const [data, reduce] = useReducer(prototypeReducer, undefined, () => createEmptyData(civilDateInTimeZone(now ? now() : new Date())))
   const [storageWarning, setStorageWarning] = useState<string | null>(null)
   const [commandError, setCommandError] = useState<string | null>(null)
   const [pendingCommands, setPendingCommands] = useState(0)
   const [canPersist, setCanPersist] = useState(false)
+  const [canClearRecords, setCanClearRecords] = useState(repository.mode !== 'server')
   const [ready, setReady] = useState(false)
   const [loadFailed, setLoadFailed] = useState(false)
   const saveQueue = useRef<Promise<void>>(Promise.resolve())
@@ -54,9 +56,10 @@ export function PrototypeProvider({ children, repository, now }: { children: Rea
       confirmedRevision.current = snapshot.revision ?? null
       reduce(serverRepository
         ? { type: 'data/serverSynced', data: snapshot.data }
-        : { type: 'data/loaded', data: snapshot.data, occupancyDate: resolveOccupancyDate(clock()) })
+        : { type: 'data/loaded', data: snapshot.data, occupancyDate: civilDateInTimeZone(clock()) })
       setStorageWarning(snapshot.warning)
       setCanPersist(serverRepository ? true : snapshot.canPersist)
+      setCanClearRecords(serverRepository ? snapshot.capabilities?.clearAllRecords === true : repository.mode !== 'server')
       setReady(true)
     }).catch(() => { if (!cancelled) setLoadFailed(true) })
     return () => { cancelled = true }
@@ -142,7 +145,7 @@ export function PrototypeProvider({ children, repository, now }: { children: Rea
   const persistSnapshot = useCallback((snapshot: PrototypeData): Promise<string | null> => {
     if (serverRepository) return Promise.resolve(null)
     if (!canPersist) {
-      const warning = 'Saving is disabled because the saved records could not be opened. Restore sample records before recording changes.'
+      const warning = 'Saving is disabled because the saved records could not be opened. Clear the records in Reports & Settings before making new changes.'
       setStorageWarning(warning)
       return Promise.resolve(warning)
     }
@@ -162,46 +165,44 @@ export function PrototypeProvider({ children, repository, now }: { children: Rea
     return operation
   }, [canPersist, repository, serverRepository])
 
-  const resetToSample = useCallback((): Promise<string | null> => {
-    if (serverRepository?.command) {
-      if (pendingActions.current.length > 0) return Promise.resolve('Wait for pending server changes to finish before restoring sample records.')
-      try {
-        const key = crypto.randomUUID()
-        const operation = serverRepository.command({ type: 'demo/reset' }, key).then(result => {
-          confirmedData.current = result.data
-          confirmedRevision.current = result.revision
-          failedCommand.current = null
-          pendingActions.current = []
-          setPendingCommands(0)
-          setCommandError(null)
-          setStorageWarning(null)
-          setCanPersist(true)
-          reduce({ type: 'data/serverSynced', data: result.data })
-          return null
-        }).catch(error => {
-          const warning = error instanceof Error ? error.message : 'The server could not restore sample records.'
-          setCommandError(warning)
-          return warning
-        })
-        return operation
-      } catch (error) {
-        return Promise.resolve(error instanceof Error ? error.message : 'The server could not restore sample records.')
-      }
+  const clearAllRecords = useCallback((): Promise<string | null> => {
+    if (!canClearRecords) return Promise.resolve('Clearing records is disabled for this workspace.')
+    if (pendingActions.current.length > 0) return Promise.resolve('Wait for pending changes to finish before clearing records.')
+    const empty = createEmptyData(civilDateInTimeZone(clock()), data)
+    if (serverRepository?.clearAllRecords) {
+      const expectedRevision = confirmedRevision.current
+      if (expectedRevision === null) return Promise.resolve('The workspace revision is not available. Refresh and try again.')
+      return serverRepository.clearAllRecords(expectedRevision).then(result => {
+        syncGeneration.current += 1
+        confirmedData.current = result.data
+        confirmedRevision.current = result.revision
+        failedCommand.current = null
+        pendingActions.current = []
+        setPendingCommands(0)
+        setCommandError(null)
+        setStorageWarning(null)
+        setCanPersist(true)
+        reduce({ type: 'data/serverSynced', data: result.data })
+        return null
+      }).catch(error => {
+        const warning = error instanceof Error ? error.message : 'The server could not clear the records.'
+        setCommandError(warning)
+        return warning
+      })
     }
-    const snapshot = createDemoData()
-    const json = JSON.stringify(snapshot)
+    const json = JSON.stringify(empty)
     const operation = saveQueue.current.then(async () => {
       try {
-        const warning = await repository.save(snapshot)
+        const warning = await repository.save(empty)
         if (warning) {
           setStorageWarning(warning)
           return warning
         }
-        // Only replace in-memory state after the canonical dataset is durable.
         lastSavedJson.current = json
         setStorageWarning(null)
         setCanPersist(true)
-        reduce({ type: 'data/loaded', data: snapshot, occupancyDate: resolveOccupancyDate(clock()) })
+        setCommandError(null)
+        reduce({ type: 'data/serverSynced', data: empty })
         return null
       } catch {
         setStorageWarning(SAVE_FAILURE)
@@ -210,7 +211,7 @@ export function PrototypeProvider({ children, repository, now }: { children: Rea
     })
     saveQueue.current = operation.then(() => undefined)
     return operation
-  }, [repository, clock, serverRepository])
+  }, [canClearRecords, clock, data, repository, serverRepository])
 
   const dispatch = useCallback((action: PrototypeAction) => {
     if (serverRepository?.command) {
@@ -218,7 +219,6 @@ export function PrototypeProvider({ children, repository, now }: { children: Rea
       sendServerAction(action)
       return
     }
-    if (action.type === 'demo/reset') setCanPersist(true)
     reduce(action)
   }, [sendServerAction, serverRepository])
 
@@ -244,7 +244,7 @@ export function PrototypeProvider({ children, repository, now }: { children: Rea
   if (loadFailed) return <div className="p-6"><ErrorState title="Your records could not be opened" onRetry={() => window.location.reload()} /></div>
   if (!ready) return <div className="p-6"><LoadingState /></div>
   return <PrototypeContext.Provider value={{
-    data, dispatch, commitAction, persistSnapshot, resetToSample, storageWarning,
+    data, dispatch, commitAction, persistSnapshot, clearAllRecords, canClearRecords, storageWarning,
     pendingCommands, commandError, retryCommand, refreshFromServer,
     repositoryMode: serverRepository ? 'server' : 'local',
   }}>

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeftRight, Bell, CalendarClock, CheckCheck, CircleAlert, Wallet, Wrench, type LucideIcon } from 'lucide-react'
 import { usePrototype } from '@/hooks/use-prototype'
-import { DEMO_DATE } from '@/data/fixtures/demo'
+import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { selectNotifications, type NotificationKind } from '@/features/notifications/select-notifications'
 import { useNotificationReadState } from '@/features/notifications/use-notification-read-state'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -19,7 +19,8 @@ const icons: Record<NotificationKind, LucideIcon> = {
 
 export function NotificationCenter() {
   const { data } = usePrototype()
-  const notifications = selectNotifications(data, DEMO_DATE)
+  const occupancyDate = useOccupancyDate()
+  const notifications = selectNotifications(data, occupancyDate)
   const { readIds, markRead, markAllRead } = useNotificationReadState()
   const [open, setOpen] = useState(false)
   const unreadCount = notifications.filter(notification => !readIds.includes(notification.id)).length
@@ -36,7 +37,7 @@ export function NotificationCenter() {
       <div className="flex items-start justify-between gap-3 border-b px-4 py-3">
         <div>
           <p id="notifications-heading" className="font-semibold">Notifications</p>
-          <p className="text-xs text-muted-foreground">From the current sample records</p>
+          <p className="text-xs text-muted-foreground">From your current records</p>
         </div>
         <Button
           variant="ghost"
@@ -75,7 +76,7 @@ export function NotificationCenter() {
               </li>
             })}
           </ul>}
-      <p className="border-t px-4 py-2 text-xs text-muted-foreground">Sample alerts only. No reminders are sent.</p>
+      <p className="border-t px-4 py-2 text-xs text-muted-foreground">Alerts only. No reminders are sent.</p>
     </PopoverContent>
   </Popover>
 }

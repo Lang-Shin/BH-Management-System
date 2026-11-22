@@ -61,7 +61,7 @@ describe('shared room financial visibility', () => {
     renderTenantApp(first.tenant.id)
     const charlesSection = await screen.findByRole('region', { name: 'Move-in advance and security deposit' })
     expect(within(charlesSection).getAllByText('PAID')).toHaveLength(2)
-    await userEvent.setup().selectOptions(screen.getByLabelText('Demo tenant'), second.tenant.id)
+    await userEvent.setup().selectOptions(screen.getByLabelText('Preview tenant'), second.tenant.id)
     await waitFor(() => expect(within(screen.getByRole('region', { name: 'Move-in advance and security deposit' })).getAllByText('PAID')).toHaveLength(2))
   })
 

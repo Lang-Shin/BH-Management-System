@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowUpRight, Calculator, Check, Droplets, House, ShieldChec
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { usePrototype } from '@/hooks/use-prototype'
-import { DEMO_DATE } from '@/data/fixtures/demo'
+import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import type { ChargeCategory } from '@/domain/types/models'
 import { selectBillingEligibleRooms } from '@/domain/calculations/billing-eligibility'
 import { buildRoomPaymentQuote, prepareRoomPayment, roomPaymentCategories, type RoomPaymentResult } from '@/domain/calculations/room-payment'
@@ -28,6 +28,7 @@ function electricityError(code: string | undefined) {
 
 export function PaymentCalculator({ periodId, periodLabel }: { periodId: string; periodLabel: string }) {
   const { data, dispatch, persistSnapshot } = usePrototype()
+  const occupancyDate = useOccupancyDate()
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState<'calculator' | 'confirm' | 'success'>('calculator')
   const [roomId, setRoomId] = useState('')
@@ -36,10 +37,10 @@ export function PaymentCalculator({ periodId, periodLabel }: { periodId: string;
   const [preview, setPreview] = useState<Extract<RoomPaymentResult, { ok: true }> | null>(null)
   const [submitError, setSubmitError] = useState('')
   const [saving, setSaving] = useState(false)
-  const rooms = selectBillingEligibleRooms(data, periodId, DEMO_DATE)
+  const rooms = selectBillingEligibleRooms(data, periodId, occupancyDate)
   const parsedReading = reading === '' ? null : parseMeterReadingMilliKwh(reading)
   const readingError = reading !== '' && parsedReading === null ? 'Enter a non-negative reading with up to three decimal places.' : null
-  const quote = roomId ? buildRoomPaymentQuote(data, { roomId, periodId, selected, electricityReadingMilliKwh: parsedReading, asOf: DEMO_DATE }) : null
+  const quote = roomId ? buildRoomPaymentQuote(data, { roomId, periodId, selected, electricityReadingMilliKwh: parsedReading, asOf: occupancyDate }) : null
   const electricityOption = quote?.options.find(option => option.category === 'ELECTRICITY')
   const electricityErrorText = electricityOption?.state === 'INVALID_READING'
     ? electricityError(quote?.electricity?.error) : null
@@ -76,7 +77,7 @@ export function PaymentCalculator({ periodId, periodLabel }: { periodId: string;
 
   function review() {
     if (!quote || !roomId) return
-    const result = prepareRoomPayment(data, { roomId, periodId, selected, electricityReadingMilliKwh: parsedReading, asOf: DEMO_DATE })
+    const result = prepareRoomPayment(data, { roomId, periodId, selected, electricityReadingMilliKwh: parsedReading, asOf: occupancyDate })
     if (!result.ok) {
       setSubmitError(result.reason === 'ELECTRICITY_READING_REQUIRED' ? 'Enter a valid current electricity reading before continuing.' : 'These bills changed. Close and reopen the calculator.')
       return
@@ -87,7 +88,7 @@ export function PaymentCalculator({ periodId, periodLabel }: { periodId: string;
 
   async function confirm() {
     if (!roomId || saving) return
-    const result = prepareRoomPayment(data, { roomId, periodId, selected, electricityReadingMilliKwh: parsedReading, asOf: DEMO_DATE })
+    const result = prepareRoomPayment(data, { roomId, periodId, selected, electricityReadingMilliKwh: parsedReading, asOf: occupancyDate })
     if (!result.ok) {
       setSubmitError('This payment could not be recorded because the underlying bills changed. Cancelling has not advanced the meter.')
       return
@@ -100,7 +101,7 @@ export function PaymentCalculator({ periodId, periodLabel }: { periodId: string;
       setSubmitError(`Payment was not saved. ${warning}`)
       return
     }
-    dispatch({ type: 'room/paymentConfirmed', roomId, periodId, selected, electricityReadingMilliKwh: parsedReading, asOf: DEMO_DATE })
+    dispatch({ type: 'room/paymentConfirmed', roomId, periodId, selected, electricityReadingMilliKwh: parsedReading, asOf: occupancyDate })
     setPreview(result)
     setStep('success')
   }
@@ -118,7 +119,7 @@ export function PaymentCalculator({ periodId, periodLabel }: { periodId: string;
         <div className="payment-calculator-heading">
           <span className="payment-eyebrow">PAYMENT STUDIO · PHP</span>
           <DialogTitle className="mt-2 text-2xl">Choose a room and its bills.</DialogTitle>
-          <DialogDescription id="payment-calculator-description" className="mt-2">Select the bills this room is paying. Amounts are calculated from the sample billing rules.</DialogDescription>
+          <DialogDescription id="payment-calculator-description" className="mt-2">Select the bills this room is paying. Amounts are calculated from the workspace billing rules.</DialogDescription>
           <p className="mt-2 text-xs text-muted-foreground">{periodLabel} · Only this billing period is included; older pending periods remain in Pending Payments.</p>
         </div>
         <div className="payment-calculator-body">

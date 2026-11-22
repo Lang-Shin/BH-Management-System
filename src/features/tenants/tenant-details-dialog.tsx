@@ -116,7 +116,7 @@ export function TenantDetailsDialog({ tenant, onClose, onReturnFocus, onNotice }
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="max-h-[85dvh] overflow-y-auto" onAnimationEnd={onAnimationEnd} onCloseAutoFocus={event => { event.preventDefault(); onReturnFocus() }}>
       {mode === 'details' && <>
-        <DialogHeader className="pr-6"><DialogTitle>{tenant.name}</DialogTitle><DialogDescription>Tenant details · Sample record</DialogDescription></DialogHeader>
+        <DialogHeader className="pr-6"><DialogTitle>{tenant.name}</DialogTitle><DialogDescription>Tenant details</DialogDescription></DialogHeader>
         <dl className="grid gap-5 rounded-lg border bg-muted/40 p-4 text-base sm:grid-cols-2">
           <div><dt className="text-muted-foreground">Tenant status</dt><dd className="mt-2"><StatusBadge status={TENANT_STATUS_LABELS[tenant.status]} /></dd></div>
           <div><dt className="text-muted-foreground">Payments</dt><dd className="mt-2"><StatusBadge status={ACCOUNT_STATUS_LABELS[account.status] ?? account.status} /></dd></div>
@@ -131,7 +131,7 @@ export function TenantDetailsDialog({ tenant, onClose, onReturnFocus, onNotice }
           <Button type="button" variant="outline" className="text-destructive hover:text-destructive" onClick={() => { submitting.current = false; setMode('delete') }}><Trash2 aria-hidden="true" />Delete Tenant</Button>
         </div>
         <form onSubmit={event => { event.preventDefault(); dispatch({ type: 'tenant/noteUpdated', tenantId: tenant.id, notes }); onNotice(`Note saved for ${tenant.name}.`); requestClose() }}>
-          <label htmlFor="tenant-notes" className="text-base font-semibold">Notes</label><p id="notes-help" className="mt-2 text-sm text-muted-foreground">Write a short reminder. Try this using sample information.</p>
+          <label htmlFor="tenant-notes" className="text-base font-semibold">Notes</label><p id="notes-help" className="mt-2 text-sm text-muted-foreground">Write a short reminder for this tenant.</p>
           <textarea id="tenant-notes" aria-describedby="notes-help" value={notes} onChange={e => setNotes(e.target.value)} maxLength={500} rows={3} className="mt-3 w-full resize-y rounded-lg border bg-card p-4 text-base" placeholder="For example: prefers a text reminder." />
           <p className="mt-1 text-right text-sm text-muted-foreground">{notes.length} / 500 characters</p>
           <DialogFooter className="mt-5"><Button type="button" variant="outline" onClick={requestClose}>Cancel</Button><Button type="submit">Save note</Button></DialogFooter>
@@ -187,7 +187,7 @@ export function TenantDetailsDialog({ tenant, onClose, onReturnFocus, onNotice }
           </dl>
           {deletionBlockers.length > 0
             ? <div role="alert" className="mt-4"><p className="font-semibold text-destructive">This tenant cannot be permanently deleted.</p><ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-muted-foreground">{deletionBlockers.map(blocker => <li key={blocker}>{blocker}</li>)}</ul><p className="mt-3 text-sm text-muted-foreground">Use Move Out / Archive to retain historical records.</p></div>
-            : <p className="mt-4 text-sm text-muted-foreground">This tenant has no room assignment, bills, payments, receipts, credits, or outstanding balance. Deletion cannot be undone in the current demonstration data.</p>}
+            : <p className="mt-4 text-sm text-muted-foreground">This tenant has no room assignment, bills, payments, receipts, credits, or outstanding balance. This action cannot be undone.</p>}
         </section>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => setMode('details')}>Cancel</Button>

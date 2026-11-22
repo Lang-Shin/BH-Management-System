@@ -18,7 +18,7 @@ function paymentSummary() {
 describe('demo tenant context', () => {
   it('lists every fictional tenant once using stable ids and defaults to the first active tenant', async () => {
     renderTenantApp()
-    const select = await screen.findByLabelText('Demo tenant')
+    const select = await screen.findByLabelText('Preview tenant')
     expect(select).toHaveValue('tenant-1')
     const options = within(select).getAllByRole('option')
     expect(options).toHaveLength(10)
@@ -37,7 +37,7 @@ describe('demo tenant context', () => {
   it('updates the overview, selector summary, and record list when the demo tenant changes', async () => {
     const user = userEvent.setup()
     renderTenantApp()
-    const select = await screen.findByLabelText('Demo tenant')
+    const select = await screen.findByLabelText('Preview tenant')
     await user.selectOptions(select, 'tenant-2')
     const main = screen.getByRole('main')
     expect(within(main).getByText('Sam Navarro')).toBeInTheDocument()
@@ -51,7 +51,7 @@ describe('demo tenant context', () => {
   it('shares room payment history with both occupants', async () => {
     const user = userEvent.setup()
     renderTenantApp()
-    const select = await screen.findByLabelText('Demo tenant')
+    const select = await screen.findByLabelText('Preview tenant')
     await user.selectOptions(select, 'tenant-2')
     expect(within(paymentSummary()).getByText('Nov 12, 2026')).toBeInTheDocument()
     await user.selectOptions(select, 'tenant-4')
@@ -64,7 +64,7 @@ describe('demo tenant context', () => {
   it('handles moved-out tenants without an assigned room', async () => {
     const user = userEvent.setup()
     renderTenantApp()
-    await user.selectOptions(await screen.findByLabelText('Demo tenant'), 'tenant-7')
+    await user.selectOptions(await screen.findByLabelText('Preview tenant'), 'tenant-7')
     const main = screen.getByRole('main')
     expect(within(main).getByText('Casey Ramos')).toBeInTheDocument()
     expect(within(main).getByText('Not assigned')).toBeInTheDocument()
@@ -83,25 +83,25 @@ describe('demo tenant context', () => {
   it('persists the demo selection across reloads and workspace switches', async () => {
     const user = userEvent.setup()
     const first = renderTenantApp()
-    await user.selectOptions(await screen.findByLabelText('Demo tenant'), 'tenant-3')
+    await user.selectOptions(await screen.findByLabelText('Preview tenant'), 'tenant-3')
     expect(localStorage.getItem(TENANT_DEMO_STORAGE_KEY)).toBe('tenant-3')
     first.unmount()
 
     renderTenantApp('/tenant/room')
-    expect(await screen.findByLabelText('Demo tenant')).toHaveValue('tenant-3')
+    expect(await screen.findByLabelText('Preview tenant')).toHaveValue('tenant-3')
     expect(within(screen.getByRole('main')).getByText('Room 3 at a glance')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Switch to Landlord UI' }))
     await screen.findByRole('button', { name: 'Switch to Tenant UI' })
     await user.click(screen.getByRole('button', { name: 'Switch to Tenant UI' }))
-    expect(await screen.findByLabelText('Demo tenant')).toHaveValue('tenant-3')
+    expect(await screen.findByLabelText('Preview tenant')).toHaveValue('tenant-3')
     expect(within(screen.getByRole('main')).getByText('Jamie Santos')).toBeInTheDocument()
   })
 
   it('falls back to the first active tenant when the stored selection is invalid', async () => {
     localStorage.setItem(TENANT_DEMO_STORAGE_KEY, 'tenant-does-not-exist')
     renderTenantApp()
-    const select = await screen.findByLabelText('Demo tenant')
+    const select = await screen.findByLabelText('Preview tenant')
     expect(select).toHaveValue('tenant-1')
     expect(within(screen.getByRole('main')).getByText('Alex Rivera')).toBeInTheDocument()
     expect(within(select).getAllByRole('option')).toHaveLength(10)

@@ -64,7 +64,7 @@ export function LogoutDialog({ open, onOpenChange, triggerRef }: { open: boolean
       <DialogHeader className="items-center">
         <span className="mb-1 flex size-12 items-center justify-center rounded-full bg-primary/15 text-[var(--tint)]"><LogOut className="size-6" aria-hidden="true" /></span>
         <DialogTitle>Log out of BHMS?</DialogTitle>
-        <DialogDescription className="text-base leading-relaxed">Signing out is not available in this sample yet. Your saved sample records will stay in this browser.</DialogDescription>
+        <DialogDescription className="text-base leading-relaxed">Signing out is not available in this version yet. Your saved records will stay in this browser.</DialogDescription>
       </DialogHeader>
       <DialogFooter className="sm:justify-center"><Button onClick={() => onOpenChange(false)}>Got it</Button></DialogFooter>
     </DialogContent>

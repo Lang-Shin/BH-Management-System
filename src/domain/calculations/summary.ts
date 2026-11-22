@@ -2,6 +2,7 @@ import type { Charge, ChargeStatus, PrototypeAppState, Room, RoomAssignment, Ten
 import { electricityObligations } from './electricity-obligations'
 import { futureReservationCount } from './room-capacity'
 import { rentObligationPaidCents } from './rental-periods'
+import { resolveBillingPeriod } from './billing-periods'
 
 export function unresolvedElectricity(data: PrototypeAppState, asOf: string, periodId?: string, roomId?: string) {
   return electricityObligations(data, asOf).filter(item => item.state === 'AWAITING_READING' && item.createdAt <= asOf
@@ -82,7 +83,7 @@ export function paymentCashReceived(data: PrototypeAppState, payment: { id: stri
 
 /** Billing-period charges and cash received during that period are distinct. */
 export function selectSummary(data: PrototypeAppState, asOf: string, periodId?: string, occupancyAsOf = asOf) {
-  const period = data.billingPeriods.find(p => p.id === periodId)
+  const period = periodId ? resolveBillingPeriod(data, periodId) : undefined
   // A room on anniversary rent is represented by its rent ledger, not a duplicate legacy rent charge.
   const anniversaryRoomIds = new Set(data.occupancyCycles
     .filter(cycle => cycle.rentSchedule === 'ANNIVERSARY'

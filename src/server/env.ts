@@ -8,6 +8,7 @@ export interface WorkerEnv {
   ACCESS_TEAM_DOMAIN?: string
   BHMS_DEV_TOKEN?: string
   ALLOW_IMPORT_APPLY?: string
+  ALLOW_TEST_RESET?: string
 }
 
 export interface Actor {

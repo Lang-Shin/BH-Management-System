@@ -74,7 +74,7 @@ describe('owner payment rules', () => {
     if (!result.ok) return
     expect(JSON.stringify(data)).toBe(before)
     expect(result.payment).toMatchObject({ amountCents: 32_500, tenantId: 'tenant-5' })
-    expect(result.receipt).toMatchObject({ receiptNumber: 'DEMO-RCT-015', amountCents: 32_500 })
+    expect(result.receipt).toMatchObject({ receiptNumber: 'BHMS-RCT-015', amountCents: 32_500 })
     expect(isPrototypeData(result.data)).toBe(true)
     expect(result.data.electricityBillObligations.some(item => item.id === 'electricity-nov-room-4-awaiting')).toBe(false)
     expect(latestSettledReading(result.data, 'meter-room-4')).toMatchObject({ readingMilliKwh: 325_000 })

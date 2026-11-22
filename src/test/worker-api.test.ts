@@ -43,6 +43,7 @@ beforeAll(async () => {
       WORKSPACE_ID: 'test-workspace',
       APP_TIMEZONE: 'Asia/Manila',
       ALLOW_IMPORT_APPLY: 'false',
+      ALLOW_TEST_RESET: 'true',
     },
   })
   const db = await worker.getD1Database('DB')
@@ -98,9 +99,11 @@ describe('Worker and D1 integration', () => {
     await expect(response.json()).resolves.toMatchObject({ status: 'ok', service: 'bhms-api' })
   })
 
-  it('seeds a validated workspace and rejects non-local unauthenticated access', async () => {
+  it('seeds a validated empty workspace and rejects non-local unauthenticated access', async () => {
     const seeded = await bootstrap()
-    expect(seeded.data.tenants.length).toBeGreaterThan(0)
+    expect(seeded.data.tenants).toEqual([])
+    expect(seeded.data.rooms).toHaveLength(15)
+    expect(seeded.data.billingPeriods.length).toBeGreaterThan(0)
     expect(seeded.revision).toBe(1)
 
     const rejected = await request('/api/v1/bootstrap', undefined, 'https://public.example.com')
@@ -111,21 +114,27 @@ describe('Worker and D1 integration', () => {
   it('enforces the approved due-date policy in the D1 schema', async () => {
     await bootstrap()
     const db = await worker.getD1Database('DB')
+    await db.prepare(`INSERT INTO occupancy_cycles
+      (id, workspace_id, room_id, started_at, ended_at, status, rent_schedule, rent_anchor_date, rent_anchor_day,
+       cycle_origin, created_at, updated_at)
+      VALUES ('cycle-guard', 'test-workspace', 'room-1', '2026-01-01', NULL, 'ACTIVE', 'ANNIVERSARY',
+       '2026-01-01', 1, 'NEW_MOVE_IN', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`).run()
     await expect(db.prepare(`INSERT INTO rental_periods
       (id, workspace_id, occupancy_cycle_id, room_id, sequence_no, start_date, end_date_exclusive, due_date, status, origin)
-      VALUES ('guard-bad-period', 'test-workspace', 'cycle-room-1', 'room-1', 99, '2026-01-01', '2026-02-01', '2026-01-02', 'OPEN', 'ANNIVERSARY')`).run())
+      VALUES ('guard-bad-period', 'test-workspace', 'cycle-guard', 'room-1', 99, '2026-01-01', '2026-02-01', '2026-01-02', 'OPEN', 'ANNIVERSARY')`).run())
       .rejects.toThrow(/rent due date must equal period start date/)
 
     await db.prepare(`INSERT INTO rental_periods
       (id, workspace_id, occupancy_cycle_id, room_id, sequence_no, start_date, end_date_exclusive, due_date, status, origin)
-      VALUES ('guard-good-period', 'test-workspace', 'cycle-room-1', 'room-1', 98, '2026-01-01', '2026-02-01', '2026-01-01', 'OPEN', 'ANNIVERSARY')`).run()
+      VALUES ('guard-good-period', 'test-workspace', 'cycle-guard', 'room-1', 98, '2026-01-01', '2026-02-01', '2026-01-01', 'OPEN', 'ANNIVERSARY')`).run()
     await expect(db.prepare(`INSERT INTO rent_obligations
       (id, workspace_id, occupancy_cycle_id, rental_period_id, room_id, amount_cents, rate_id, rate_effective_from,
        rate_snapshot_cents, issued_on, due_date, source, state)
-      VALUES ('guard-bad-obligation', 'test-workspace', 'cycle-room-1', 'guard-good-period', 'room-1', 100000,
+      VALUES ('guard-bad-obligation', 'test-workspace', 'cycle-guard', 'guard-good-period', 'room-1', 100000,
        'rate-test', '2026-01-01', 100000, '2026-01-01', '2026-01-02', 'REGULAR', 'ISSUED')`).run())
       .rejects.toThrow(/rent obligation due date must equal rental period start date/)
     await db.prepare("DELETE FROM rental_periods WHERE id = 'guard-good-period'").run()
+    await db.prepare("DELETE FROM occupancy_cycles WHERE id = 'cycle-guard'").run()
   })
 
   it('settles the first anniversary period from the paid advance without duplicate cash', async () => {
@@ -260,12 +269,73 @@ describe('Worker and D1 integration', () => {
     expect(apply.status).toBe(423)
 
     const noEffect = await jsonRequest('/api/v1/commands', 'POST', {
-      action: { type: 'room/statusToggled', roomId: 'room-1' },
+      action: {
+        type: 'tenant/updated', tenantId: 'tenant-missing',
+        draft: { name: 'Missing Tenant', email: '', phone: '', address: '', roomId: null, moveInDate: '2026-11-01', notes: '' },
+      },
     }, { 'idempotency-key': 'worker-noop-command-0001' })
     expect(noEffect.status).toBe(422)
 
     const after = await bootstrap()
     expect(after.revision).toBe(before.revision)
     expect(after.data).toEqual(before.data)
+  }, 30_000)
+
+  it('clears all records atomically while preserving room configuration and rejecting sample restoration', async () => {
+    const before = await bootstrap()
+    expect(before.data.tenants.length).toBeGreaterThan(0)
+
+    const roomResponse = await jsonRequest('/api/v1/commands', 'POST', {
+      action: {
+        type: 'room/created',
+        draft: { name: 'TEST-ROOM', capacity: 1, categoryId: 'RATE_5000', kind: 'PRIVATE', status: 'available' },
+      },
+    }, { 'idempotency-key': 'worker-reset-room-0001' })
+    expect(roomResponse.status).toBe(200)
+    const configured = await bootstrap()
+    const customRoom = configured.data.rooms.find(room => room.name === 'TEST-ROOM')
+    expect(customRoom).toBeDefined()
+
+    const stale = await jsonRequest('/api/v1/admin/clear-records', 'POST', {
+      confirmation: 'RESET', expectedRevision: before.revision,
+    }, { 'idempotency-key': 'worker-reset-stale-0001' })
+    expect(stale.status).toBe(409)
+
+    const missingConfirmation = await jsonRequest('/api/v1/admin/clear-records', 'POST', {
+      confirmation: 'CLEAR', expectedRevision: configured.revision,
+    }, { 'idempotency-key': 'worker-reset-confirmation-0001' })
+    expect(missingConfirmation.status).toBe(400)
+
+    const sampleRestore = await jsonRequest('/api/v1/commands', 'POST', { action: { type: 'demo/reset' } },
+      { 'idempotency-key': 'worker-sample-restore-0001' })
+    expect(sampleRestore.status).toBe(400)
+
+    const response = await jsonRequest('/api/v1/admin/clear-records', 'POST', {
+      confirmation: 'RESET', expectedRevision: configured.revision,
+    }, { 'idempotency-key': 'worker-reset-0001' })
+    expect(response.status).toBe(200)
+    const cleared = await response.json() as {
+      data: ReturnType<typeof createDemoData>; revision: number
+    }
+    expect(cleared.revision).toBe(configured.revision + 1)
+    expect(cleared.data.tenants).toEqual([])
+    expect(cleared.data.payments).toEqual([])
+    expect(cleared.data.charges).toEqual([])
+    expect(cleared.data.rentObligations).toEqual([])
+    expect(cleared.data.rooms.map(room => room.id)).toEqual(configured.data.rooms.map(room => room.id))
+    expect(cleared.data.rooms.some(room => room.name === 'TEST-ROOM')).toBe(true)
+    expect(cleared.data.roomRentRates).toEqual(configured.data.roomRentRates)
+    expect(cleared.data.moveInPolicy).toEqual(configured.data.moveInPolicy)
+    expect(cleared.data.auditEvents).toHaveLength(1)
+    expect(cleared.data.auditEvents[0]).toMatchObject({ action: 'WORKSPACE_RESET', entityId: 'test-workspace' })
+
+    const replay = await jsonRequest('/api/v1/admin/clear-records', 'POST', {
+      confirmation: 'RESET', expectedRevision: configured.revision,
+    }, { 'idempotency-key': 'worker-reset-0001' })
+    expect(replay.status).toBe(200)
+    await expect(replay.json()).resolves.toMatchObject({ revision: cleared.revision, data: { tenants: [] } })
+    const after = await bootstrap()
+    expect(after.revision).toBe(cleared.revision)
+    expect(after.data.rooms.some(room => room.name === 'TEST-ROOM')).toBe(true)
   }, 30_000)
 })

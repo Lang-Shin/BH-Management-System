@@ -1,10 +1,11 @@
-import type { Charge, MeterReading, Payment, PaymentAllocation, PaymentCorrection, PrototypeAppState, RoomAssignment, RoomCategoryId } from '@/domain/types/models'
+import type { Charge, MeterReading, Payment, PaymentAllocation, PaymentCorrection, PrototypeAppState, RoomAssignment } from '@/domain/types/models'
 import {
   DEFAULT_ELECTRICITY_RATE_CENTS, DEFAULT_RENT_CENTS, DEFAULT_WASHING_RATE_CENTS, DEFAULT_WATER_RATE_CENTS,
   initialRoomRentRates, initialWashingRates, initialWaterRates,
 } from '@/domain/calculations/billing-rates'
 import { DEFAULT_MOVE_IN_POLICY } from '@/domain/calculations/move-in-policy'
 import { civilDateInTimeZone } from '@/lib/business-date'
+import { initialRooms } from '@/data/room-defaults'
 
 export const DEMO_DATE = '2026-11-13'
 export const DEMO_PERIOD = 'period-nov'
@@ -30,6 +31,10 @@ function electricityCents(consumptionMilliKwh: number) {
   return consumptionMilliKwh * DEMO_RATES.electricityCentsPerKwh / 1000
 }
 
+/**
+ * Actual Halili BH room configuration: room numbers are strings and keep leading zeros.
+ * IDs stay opaque and stable; "2" and "02" are different rooms with different IDs.
+ */
 /** Fictional fixtures only. This is not bill-generation or allocation logic. */
 export function createDemoData(): PrototypeAppState {
   const tenants = names.map((name, index) => {
@@ -41,31 +46,7 @@ export function createDemoData(): PrototypeAppState {
       status: movedOutTenantNumbers.has(number) ? 'MOVED_OUT' as const : 'ACTIVE' as const, notes: '',
     }
   })
-  /**
-   * Actual Halili BH room configuration: room numbers are strings and keep leading zeros.
-   * IDs stay opaque and stable; "2" and "02" are different rooms with different IDs.
-   */
-  const roomSpecs: {
-    id: string; name: string; capacity: number; kind: 'PRIVATE' | 'SHARED'; status: 'available' | 'maintenance'
-    categoryId: RoomCategoryId; washingMachineEnabled: boolean
-  }[] = [
-    { id: 'room-1', name: '1', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_3500', washingMachineEnabled: true },
-    { id: 'room-2', name: '2', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_3500', washingMachineEnabled: true },
-    { id: 'room-3', name: '3', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_3500', washingMachineEnabled: false },
-    { id: 'room-4', name: '4', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_3500', washingMachineEnabled: false },
-    { id: 'room-5', name: '5', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_3500', washingMachineEnabled: false },
-    { id: 'room-6', name: '6', capacity: 1, kind: 'PRIVATE', status: 'maintenance', categoryId: 'RATE_3500', washingMachineEnabled: false },
-    { id: 'room-7', name: '7', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_3500', washingMachineEnabled: false },
-    { id: 'room-8', name: '8', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_3500', washingMachineEnabled: false },
-    { id: 'room-9', name: '01', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_4000', washingMachineEnabled: false },
-    { id: 'room-10', name: '03', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_4000', washingMachineEnabled: false },
-    { id: 'room-11', name: '04', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_4000', washingMachineEnabled: false },
-    { id: 'room-12', name: '05', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_4000', washingMachineEnabled: false },
-    { id: 'room-13', name: '06', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_4000', washingMachineEnabled: false },
-    { id: 'room-14', name: '07', capacity: 2, kind: 'SHARED', status: 'available', categoryId: 'RATE_4000', washingMachineEnabled: false },
-    { id: 'room-15', name: '02', capacity: 1, kind: 'PRIVATE', status: 'available', categoryId: 'RATE_5000', washingMachineEnabled: false },
-  ]
-  const rooms = roomSpecs.map(({ id, name, ...room }) => ({ id, name, floor: 1, ...room }))
+  const rooms = initialRooms()
   const assignmentSpecs: { tenant: number; room: number; endDate: string | null }[] = [
     { tenant: 1, room: 1, endDate: null },
     { tenant: 2, room: 2, endDate: null },
@@ -199,7 +180,7 @@ export function createDemoData(): PrototypeAppState {
   })
   payments.push({ id: 'payment-advance', scope: 'TENANT', tenantId: 'tenant-6', roomId: null, occupancyCycleId: null, amountCents: 50_000, paidOn: '2026-11-12', method: 'cash', state: 'RECORDED', correction: null })
   const tenantCredits = [{ id: 'credit-6', tenantId: 'tenant-6', sourcePaymentId: 'payment-advance', amountCents: 50_000, createdOn: '2026-11-12' }]
-  const receipts = payments.map((payment, index) => ({ id: `receipt-${index + 1}`, paymentId: payment.id, receiptNumber: `DEMO-RCT-${String(index + 1).padStart(3, '0')}`, issuedOn: payment.paidOn, amountCents: payment.amountCents, allocationIds: paymentAllocations.filter(a => a.paymentId === payment.id).map(a => a.id), state: 'ISSUED' as const, revision: 1, supersedesReceiptId: null }))
+  const receipts = payments.map((payment, index) => ({ id: `receipt-${index + 1}`, paymentId: payment.id, receiptNumber: `BHMS-RCT-${String(index + 1).padStart(3, '0')}`, issuedOn: payment.paidOn, amountCents: payment.amountCents, allocationIds: paymentAllocations.filter(a => a.paymentId === payment.id).map(a => a.id), state: 'ISSUED' as const, revision: 1, supersedesReceiptId: null }))
   const paymentCorrections: PaymentCorrection[] = []
   const auditEvents = [{ id: 'audit-seed', actorId: 'demo-admin', occurredOn: DEMO_DATE, action: 'DEMO_SEEDED' as const, entityType: 'PROTOTYPE' as const, entityId: 'demo-workspace', reason: 'Fictional fixture snapshot prepared; no real transaction or authenticated actor.', beforeSnapshot: null, afterSnapshot: 'Sample records loaded' }]
   const occupancyCycles = [...new Set(roomAssignments.filter(assignment => assignment.endDate === null).map(assignment => assignment.roomId))]

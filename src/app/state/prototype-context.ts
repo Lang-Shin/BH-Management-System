@@ -9,8 +9,9 @@ export interface PrototypeContextValue {
   commitAction: (action: PrototypeAction) => Promise<boolean>
   /** Saves an already-validated next snapshot through the shared write queue before success is shown. */
   persistSnapshot: (snapshot: PrototypeData) => Promise<string | null>
-  /** Persists and installs the canonical sample dataset as one replace operation. */
-  resetToSample: () => Promise<string | null>
+  /** Clears transactional records while preserving room configuration. */
+  clearAllRecords: () => Promise<string | null>
+  canClearRecords: boolean
   storageWarning: string | null
   /** Server-authoritative mode exposes sync state and safe recovery controls. */
   pendingCommands: number

@@ -2,3 +2,4 @@
 # BHMS_DEV_TOKEN=replace-with-a-long-random-local-token
 # ENVIRONMENT=development
 # ALLOW_IMPORT_APPLY=false
+# ALLOW_TEST_RESET=true

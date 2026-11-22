@@ -48,7 +48,7 @@ describe('server-authoritative API repository', () => {
   it('surfaces safe retry metadata for network failures', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')))
     const repository = createApiRepository()
-    await expect(repository.command!({ type: 'demo/reset' })).rejects.toMatchObject({
+    await expect(repository.command!({ type: 'tenant/noteUpdated', tenantId: 'tenant-1', notes: 'Retry' })).rejects.toMatchObject({
       name: 'ApiRepositoryError', code: 'NETWORK_ERROR', retryable: true,
     })
   })
@@ -58,11 +58,11 @@ describe('server-authoritative API repository', () => {
       error: { code: 'COMMAND_REJECTED', message: 'The command was rejected.' },
     }, 422)))
     const repository = createApiRepository()
-    await expect(repository.command!({ type: 'demo/reset' })).rejects.toMatchObject({
+    await expect(repository.command!({ type: 'tenant/noteUpdated', tenantId: 'tenant-1', notes: 'Retry' })).rejects.toMatchObject({
       code: 'COMMAND_REJECTED', status: 422, retryable: false,
       message: 'The command was rejected.',
     })
-    await expect(repository.command!({ type: 'demo/reset' })).rejects.toBeInstanceOf(ApiRepositoryError)
+    await expect(repository.command!({ type: 'tenant/noteUpdated', tenantId: 'tenant-1', notes: 'Retry' })).rejects.toBeInstanceOf(ApiRepositoryError)
   })
 
   it('loads a rent prepayment quote through the typed endpoint', async () => {

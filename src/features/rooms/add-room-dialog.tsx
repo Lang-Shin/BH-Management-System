@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { usePrototype } from '@/hooks/use-prototype'
+import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { validateRoomDraft, type RoomDraft, type RoomDraftErrors } from '@/domain/calculations/room-management'
 import { activeRoomRentRate, ROOM_RATE_CATEGORY_IDS } from '@/domain/calculations/billing-rates'
 import { roomCategoryLabel } from '@/lib/room-rates'
-import { DEMO_DATE } from '@/data/fixtures/demo'
 import { formatMoney } from '@/lib/format'
 import type { RoomCategoryId } from '@/domain/types/models'
 
@@ -15,6 +15,7 @@ const fieldClass = 'h-12 w-full rounded-xl border border-input bg-card px-3 text
 
 export function AddRoomDialog({ onSaved }: { onSaved?: (message: string) => void }) {
   const { data, dispatch } = usePrototype()
+  const occupancyDate = useOccupancyDate()
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState<'form' | 'success'>('form')
   const [name, setName] = useState('')
@@ -47,7 +48,7 @@ export function AddRoomDialog({ onSaved }: { onSaved?: (message: string) => void
     event.preventDefault()
     if (submitting.current) return
     const draft: RoomDraft = { name, capacity: capacity.trim() === '' ? null : Number(capacity), categoryId, kind, status }
-    const nextErrors = validateRoomDraft(data, draft, { asOf: DEMO_DATE })
+    const nextErrors = validateRoomDraft(data, draft, { asOf: occupancyDate })
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
     submitting.current = true
@@ -79,7 +80,7 @@ export function AddRoomDialog({ onSaved }: { onSaved?: (message: string) => void
                 <label htmlFor="add-room-rate" className="text-sm font-semibold">Monthly rental rate</label>
                 <select id="add-room-rate" value={categoryId} onChange={event => { setCategoryId(event.target.value as RoomCategoryId); setErrors({}) }} aria-invalid={Boolean(errors.categoryId)} className={fieldClass}>
                   {ROOM_RATE_CATEGORY_IDS.map(id => {
-                    const rate = activeRoomRentRate(data, id, DEMO_DATE)
+                    const rate = activeRoomRentRate(data, id, occupancyDate)
                     return <option key={id} value={id}>{roomCategoryLabel(id)} · {rate ? formatMoney(rate.monthlyRentCents) : 'Rate needs review'}/month</option>
                   })}
                 </select>

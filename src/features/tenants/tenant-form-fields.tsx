@@ -19,7 +19,7 @@ export function TenantFormFields({ idPrefix, values, errors, onChange, tenantId 
   return <>
     <div className="grid gap-2">
       <label htmlFor={`${idPrefix}-name`} className="text-sm font-semibold">Full name</label>
-      <Input id={`${idPrefix}-name`} value={values.name} onChange={event => onChange('name', event.target.value)} autoComplete="name" placeholder="For example: Alex Rivera" maxLength={1000} aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? `${idPrefix}-name-error` : undefined} className="h-12 bg-card" />
+      <Input id={`${idPrefix}-name`} value={values.name} onChange={event => onChange('name', event.target.value)} autoComplete="name" placeholder="Full name" maxLength={1000} aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? `${idPrefix}-name-error` : undefined} className="h-12 bg-card" />
       {errors.name && <p id={`${idPrefix}-name-error`} role="alert" className="text-sm text-destructive">{errors.name}</p>}
     </div>
     <div className="grid gap-4 sm:grid-cols-2">
@@ -30,13 +30,13 @@ export function TenantFormFields({ idPrefix, values, errors, onChange, tenantId 
       </div>
       <div className="grid gap-2">
         <label htmlFor={`${idPrefix}-phone`} className="text-sm font-semibold">Phone number</label>
-        <Input id={`${idPrefix}-phone`} value={values.phone} onChange={event => onChange('phone', event.target.value)} type="tel" autoComplete="tel" placeholder="Sample phone number" aria-invalid={Boolean(errors.phone)} aria-describedby={errors.phone ? `${idPrefix}-phone-error` : undefined} className="h-12 bg-card" />
+        <Input id={`${idPrefix}-phone`} value={values.phone} onChange={event => onChange('phone', event.target.value)} type="tel" autoComplete="tel" placeholder="e.g. +63 917 000 0000" aria-invalid={Boolean(errors.phone)} aria-describedby={errors.phone ? `${idPrefix}-phone-error` : undefined} className="h-12 bg-card" />
         {errors.phone && <p id={`${idPrefix}-phone-error`} role="alert" className="text-sm text-destructive">{errors.phone}</p>}
       </div>
     </div>
     <div className="grid gap-2">
       <label htmlFor={`${idPrefix}-address`} className="text-sm font-semibold">Home address</label>
-      <Input id={`${idPrefix}-address`} value={values.address} onChange={event => onChange('address', event.target.value)} autoComplete="street-address" placeholder="Sample address" maxLength={1000} className="h-12 bg-card" />
+      <Input id={`${idPrefix}-address`} value={values.address} onChange={event => onChange('address', event.target.value)} autoComplete="street-address" placeholder="Street address" maxLength={1000} className="h-12 bg-card" />
       {errors.address && <p role="alert" className="text-sm text-destructive">{errors.address}</p>}
     </div>
     <div className="grid gap-4 sm:grid-cols-2">

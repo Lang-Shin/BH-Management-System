@@ -112,12 +112,52 @@ export function ensureFirstRentalPeriod(
   }
 }
 
+/**
+ * Materializes every regular anniversary rent period whose start date has arrived. This keeps
+ * the next month visible in Bills without requiring a payment or a special user action.
+ */
+export function ensureRegularRentPeriodsThrough(data: PrototypeAppState, asOf: string): PrototypeAppState {
+  let next = data
+  for (const cycle of data.occupancyCycles) {
+    if (cycle.status !== 'ACTIVE' || cycle.rentSchedule !== 'ANNIVERSARY' || !cycle.rentAnchorDate) continue
+    if (next.financialReviewCases.some(review => review.occupancyCycleId === cycle.id
+      && review.status === 'OPEN' && review.type === 'TRANSFER_PREPAID_RENT')) continue
+    const room = next.rooms.find(item => item.id === cycle.roomId)
+    if (!room) continue
+    for (let sequence = 1; sequence <= 240; sequence += 1) {
+      const bounds = rentalPeriodBounds(cycle.rentAnchorDate, sequence)
+      if (bounds.startDate > asOf) break
+      const periodId = rentalPeriodId(cycle.id, sequence)
+      const hasPeriod = next.rentalPeriods.some(period => period.id === periodId)
+      const hasObligation = next.rentObligations.some(obligation => obligation.rentalPeriodId === periodId)
+      if (hasPeriod && hasObligation) continue
+      const rate = activeRoomRentRate(next, room.categoryId, bounds.startDate)
+        ?? activeRoomRentRate(next, room.categoryId, asOf)
+      if (!rate) break
+      if (!hasPeriod) {
+        next = materializePeriod(next, cycle, sequence, rate, bounds.startDate, 'REGULAR')
+      } else if (!hasObligation) {
+        const period = next.rentalPeriods.find(item => item.id === periodId)!
+        const obligation: RentObligation = {
+          id: rentObligationId(cycle.id, sequence), occupancyCycleId: cycle.id, rentalPeriodId: periodId,
+          roomId: cycle.roomId, amountCents: roomMonthlyRentCents(next, room, bounds.startDate),
+          rateId: rate.id, rateEffectiveFrom: rate.effectiveFrom, rateSnapshotCents: roomMonthlyRentCents(next, room, bounds.startDate),
+          issuedOn: bounds.startDate, dueDate: rentDueDate(period.startDate), source: 'REGULAR', state: 'ISSUED', correction: null,
+        }
+        next = { ...next, rentObligations: [...next.rentObligations, obligation] }
+      }
+    }
+  }
+  return next
+}
+
 function materializePeriod(
   data: PrototypeAppState,
   cycle: OccupancyCycle,
   sequence: number,
   rate: { id: string; effectiveFrom: string; monthlyRentCents: number },
   issuedOn: string,
+  source: RentObligation['source'] = 'PREPAYMENT',
 ): PrototypeAppState {
   if (!cycle.rentAnchorDate) return data
   if (rentalPeriodsForCycle(data, cycle.id).some(period => period.sequence === sequence)) return data
@@ -132,7 +172,7 @@ function materializePeriod(
     id: rentObligationId(cycle.id, sequence), occupancyCycleId: cycle.id, rentalPeriodId: periodId, roomId: cycle.roomId,
     amountCents: rate.monthlyRentCents, rateId: rate.id, rateEffectiveFrom: rate.effectiveFrom,
     rateSnapshotCents: rate.monthlyRentCents, issuedOn, dueDate: rentDueDate(bounds.startDate),
-    source: 'PREPAYMENT', state: 'ISSUED', correction: null,
+    source, state: 'ISSUED', correction: null,
   }
   return {
     ...data,

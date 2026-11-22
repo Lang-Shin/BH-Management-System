@@ -1,4 +1,4 @@
-import { createDemoData } from '@/data/fixtures/demo'
+import { createEmptyData } from '@/data/fixtures/empty'
 import { isPrototypeData } from '@/domain/validation/prototype-data'
 import type { PrototypeRepository } from './prototype-repository'
 import { parsePrototypeSnapshot, STORAGE_SCHEMA_VERSION } from './prototype-storage'
@@ -11,14 +11,14 @@ export const localStorageRepository: PrototypeRepository = {
   async load() {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY)
-      if (raw === null) return { data: createDemoData(), warning: null, canPersist: true }
+      if (raw === null) return { data: createEmptyData(), warning: null, canPersist: true }
       const parsed = parsePrototypeSnapshot(raw)
       if (!parsed.ok) throw new Error(parsed.reason)
       return { data: parsed.data, warning: null, canPersist: true }
     } catch {
       return {
-        data: createDemoData(),
-        warning: 'Your saved sample records could not be opened. Fresh sample records are shown for now. In Reports & Settings, choose “Restore sample records” to start again.',
+        data: createEmptyData(),
+        warning: 'Your saved records could not be opened. A blank workspace is shown; existing saved data has not been overwritten.',
         canPersist: false,
       }
     }
