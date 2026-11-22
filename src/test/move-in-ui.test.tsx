@@ -218,11 +218,12 @@ describe('move-in advance and security deposit UI', () => {
     expect(within(section).queryByRole('button', { name: 'Record payment' })).not.toBeInTheDocument()
   })
 
-  it('shows move-in reporting outside the collapsed settings disclosure', async () => {
+  it('does not show the move-in reporting section in Reports & Settings', async () => {
     renderApp('/reports')
-    expect(await screen.findByRole('heading', { name: 'Advance & security deposit' })).toBeVisible()
-    expect(screen.getByText('Move-in outstanding')).toBeVisible()
-    expect(screen.getByText('No move-in obligations are recorded yet.')).toBeVisible()
+    expect(await screen.findByRole('heading', { name: 'Monthly summary' })).toBeVisible()
+    expect(screen.queryByRole('heading', { name: 'Advance & security deposit' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Move-in outstanding')).not.toBeInTheDocument()
+    expect(screen.queryByText('No move-in obligations are recorded yet.')).not.toBeInTheDocument()
   })
 
   it('shows the room-level move-in balances to an assigned tenant', async () => {
