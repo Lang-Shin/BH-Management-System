@@ -5,6 +5,8 @@ import type { PrototypeAction } from './actions'
 export interface PrototypeContextValue {
   data: PrototypeData
   dispatch: (action: PrototypeAction) => void
+  /** Applies a local action or waits for authoritative server confirmation before returning true. */
+  commitAction: (action: PrototypeAction) => Promise<boolean>
   /** Saves an already-validated next snapshot through the shared write queue before success is shown. */
   persistSnapshot: (snapshot: PrototypeData) => Promise<string | null>
   /** Persists and installs the canonical sample dataset as one replace operation. */

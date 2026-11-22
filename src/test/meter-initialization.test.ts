@@ -166,10 +166,10 @@ describe('billing from an initial meter reading', () => {
 
   it('preserves unpaid carryover when a recorded electricity payment is reversed by correction', () => {
     const result = initialize()
-    const paid = prepareRoomPayment(result.data, { ...quoteInput, selected: ['RENT', 'ELECTRICITY'] })
+    const paid = prepareRoomPayment(result.data, { ...quoteInput, selected: ['WATER', 'ELECTRICITY'] })
     if (!paid.ok) throw new Error(paid.reason)
     const corrected = preparePaymentCorrection(paid.data, {
-      paymentId: paid.payments[0]!.id, selectedCategories: ['RENT'], correctedElectricityReadingMilliKwh: null,
+      paymentId: paid.payments[0]!.id, selectedCategories: ['WATER'], correctedElectricityReadingMilliKwh: null,
       reason: 'Electricity was not received', settlementStatus: 'CORRECTED', correctedAt: DEMO_DATE,
     })
     if (!corrected.ok) throw new Error(corrected.reason)

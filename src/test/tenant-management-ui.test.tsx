@@ -6,6 +6,7 @@ import { AppRouter } from '@/app/router/app-router'
 import { PrototypeProvider } from '@/app/providers/prototype-provider'
 import { localStorageRepository, STORAGE_KEY } from '@/data/repositories/local-storage-repository'
 import { createDemoData, DEMO_DATE, OCCUPANCY_DATE } from '@/data/fixtures/demo'
+import { previousCalendarDate } from '@/lib/format'
 
 function renderApp(route = '/') {
   return render(<PrototypeProvider repository={localStorageRepository}><MemoryRouter initialEntries={[route]}><AppRouter /></MemoryRouter></PrototypeProvider>)
@@ -147,7 +148,7 @@ describe('tenant management UI', { timeout: 15000 }, () => {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null').data
       const oldAssignment = saved.roomAssignments.find((assignment: { id: string }) => assignment.id === 'assignment-1')
       const newAssignment = saved.roomAssignments.find((assignment: { tenantId: string; roomId: string }) => assignment.tenantId === 'tenant-1' && assignment.roomId === 'room-7')
-      expect(oldAssignment.endDate).toBe('2026-11-21')
+      expect(oldAssignment.endDate).toBe(previousCalendarDate(OCCUPANCY_DATE))
       expect(newAssignment).toMatchObject({ startDate: OCCUPANCY_DATE, endDate: null })
       expect(saved.charges).toEqual(original.charges)
       expect(saved.payments).toEqual(original.payments)

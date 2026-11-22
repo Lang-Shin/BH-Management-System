@@ -1,5 +1,6 @@
 import type { ChargeCategory, PrototypeAppState } from '@/domain/types/models'
 import { proposedRoomCharges } from '@/domain/calculations/billing-eligibility'
+import { anniversaryCycleForBillingPeriod, selectBillingRent } from '@/domain/calculations/billing-rent'
 import { chargeRoom } from '@/domain/calculations/room-finance'
 import { chargeBalance, chargePaid, issuedCharges, unresolvedElectricity } from '@/domain/calculations/summary'
 
@@ -37,24 +38,41 @@ export function tenantRoomBilling(data: PrototypeAppState, tenantId: string, roo
     && data.roomAssignments.some(item => item.tenantId === charge.tenantId && item.roomId === room.id
       && item.startDate <= period.endDate && (item.endDate === null || item.endDate >= period.startDate)))
   if (ambiguous) return empty('UNAVAILABLE', 'Some bills have ambiguous historical room attribution. Room billing needs review.')
-  const charges = allCharges.filter(charge => chargeRoom(data, charge).roomId === room.id)
+  const anniversaryCycle = anniversaryCycleForBillingPeriod(data, room.id, period)
+  const issuedRoomCharges = allCharges.filter(charge => chargeRoom(data, charge).roomId === room.id)
+  const allProjected = proposedRoomCharges(data, room, period, asOf)
+  const legacyRentCharges = anniversaryCycle ? [] : issuedRoomCharges.filter(charge => charge.category === 'RENT')
+  const charges = issuedRoomCharges.filter(charge => charge.category !== 'RENT')
+  const projected = allProjected.filter(charge => charge.category !== 'RENT')
+  const projectedLegacyRent = anniversaryCycle ? [] : allProjected.filter(charge => charge.category === 'RENT')
+  const rent = selectBillingRent(data, room.id, period, asOf, legacyRentCharges, projectedLegacyRent)
   const awaiting = unresolvedElectricity(data, asOf, periodId, room.id)
-  const projected = proposedRoomCharges(data, room, period, asOf)
-  if (charges.length === 0 && projected.length === 0) {
+  if (charges.length === 0 && projected.length === 0 && rent.billedCents === 0) {
     return awaiting.length > 0
       ? { ...empty('PENDING CALCULATION', 'Electricity awaits a valid payment-time meter reading; no issued amount is available.'), pendingCalculation: true }
       : empty('NOT YET BILLED', 'No applicable issued bills are recorded for this room and month.')
   }
-  const billedCents = charges.reduce((sum, charge) => sum + charge.amountCents, 0)
+  const utilityBilled = charges.reduce((sum, charge) => sum + charge.amountCents, 0)
     + projected.reduce((sum, charge) => sum + charge.amountCents, 0)
-  const appliedCents = charges.reduce((sum, charge) => sum + chargePaid(data, charge.id, asOf), 0)
-  const outstandingCents = charges.reduce((sum, charge) => sum + chargeBalance(data, charge, asOf), 0)
+  const utilityApplied = charges.reduce((sum, charge) => sum + chargePaid(data, charge.id, asOf), 0)
+  const utilityOutstanding = charges.reduce((sum, charge) => sum + chargeBalance(data, charge, asOf), 0)
     + projected.reduce((sum, charge) => sum + charge.amountCents, 0)
+  const billedCents = rent.billedCents + utilityBilled
+  const appliedCents = rent.paidCents + utilityApplied
+  const outstandingCents = rent.outstandingCents + utilityOutstanding
   const pendingCalculation = awaiting.length > 0
   const status: TenantRoomPaymentStatus = outstandingCents === 0 && !pendingCalculation ? 'PAID'
     : appliedCents > 0 ? 'PARTLY PAID' : 'NOT PAID'
   const categories: ChargeCategory[] = ['RENT', 'WATER', 'ELECTRICITY', 'WASHING_MACHINE']
   const categoryLines: TenantRoomCategoryLine[] = categories.map(category => {
+    if (category === 'RENT') {
+      return {
+        category, billedCents: rent.billedCents, paidCents: rent.paidCents, outstandingCents: rent.outstandingCents,
+        status: rent.status === 'NO_BILL' ? 'NO BILL'
+          : rent.outstandingCents === 0 ? 'PAID'
+            : rent.paidCents > 0 ? 'PARTLY PAID' : 'NOT PAID',
+      }
+    }
     const categoryCharges = charges.filter(charge => charge.category === category)
     const categoryProjected = projected.filter(charge => charge.category === category)
     const categoryPaid = categoryCharges.reduce((sum, charge) => sum + chargePaid(data, charge.id, asOf), 0)
@@ -73,16 +91,18 @@ export function tenantRoomBilling(data: PrototypeAppState, tenantId: string, roo
     }
   })
   const unsettled = categories.flatMap(category => {
-    const amount = charges.filter(charge => charge.category === category)
-      .reduce((sum, charge) => sum + chargeBalance(data, charge, asOf), 0)
-      + projected.filter(charge => charge.category === category).reduce((sum, charge) => sum + charge.amountCents, 0)
+    const amount = category === 'RENT'
+      ? rent.outstandingCents
+      : charges.filter(charge => charge.category === category)
+        .reduce((sum, charge) => sum + chargeBalance(data, charge, asOf), 0)
+        + projected.filter(charge => charge.category === category).reduce((sum, charge) => sum + charge.amountCents, 0)
     const pending = category === 'ELECTRICITY' && pendingCalculation
     return amount > 0 || pending ? [{ category, outstandingCents: amount, pendingCalculation: pending }] : []
   })
   return {
     status, detail: tenancy.startDate > period.startDate || (tenancy.endDate !== null && tenancy.endDate < period.endDate)
       ? 'Room-level billing totals for this period. A partial-period tenancy is billed for the applicable period without a proration rule.'
-      : 'Room-level billing totals across applicable issued charges. These are not an individual tenant balance.',
+      : 'Room-level billing totals across applicable charges and anniversary rent obligations. These are not an individual tenant balance.',
     billedCents, appliedCents, outstandingCents, pendingCalculation, unsettled, categories: categoryLines,
   }
 }

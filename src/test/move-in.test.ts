@@ -34,8 +34,9 @@ function viewFor(data: PrototypeAppState, tenant: Tenant) {
 }
 
 describe('room-level move-in advance and security deposit', () => {
-  it('creates one obligation for a vacant room and excludes it from monthly billed totals', () => {
+  it('creates one obligation for a vacant room and bills the first anniversary rent without double-counting advance and deposit cash', () => {
     const base = createDemoData()
+    const baseSummary = selectSummary(base, DEMO_DATE, DEMO_PERIOD)
     const { data, tenant } = createInRoom(base)
     const view = viewFor(data, tenant)
     expect(view).toBeDefined()
@@ -53,10 +54,10 @@ describe('room-level move-in advance and security deposit', () => {
     expect(data.charges.filter(charge => charge.category === 'ADVANCE' || charge.category === 'SECURITY_DEPOSIT')).toHaveLength(2)
     expect(data.charges.find(charge => charge.category === 'ADVANCE')?.tenantId).toBe(tenant.id)
     expect(selectSummary(data, DEMO_DATE, DEMO_PERIOD)).toMatchObject({
-      billed: selectSummary(base, DEMO_DATE, DEMO_PERIOD).billed,
-      applied: selectSummary(base, DEMO_DATE, DEMO_PERIOD).applied,
-      outstanding: selectSummary(base, DEMO_DATE, DEMO_PERIOD).outstanding,
-      received: selectSummary(base, DEMO_DATE, DEMO_PERIOD).received,
+      billed: baseSummary.billed + 400_000,
+      applied: baseSummary.applied,
+      outstanding: baseSummary.outstanding + 400_000,
+      received: baseSummary.received,
     })
   })
 
@@ -290,8 +291,8 @@ describe('room-level move-in advance and security deposit', () => {
     const beforeMoveOutPayments = paid.data.payments.length
     const beforeMoveOutCredits = paid.data.tenantCredits.length
     const beforeSummary = selectSummary(paid.data, DEMO_DATE, DEMO_PERIOD)
-    expect(beforeSummary.billed).toBe(baseSummary.billed)
-    expect(beforeSummary.applied).toBe(baseSummary.applied)
+    expect(beforeSummary.billed).toBe(baseSummary.billed + 400_000)
+    expect(beforeSummary.applied).toBe(baseSummary.applied + 400_000)
     expect(beforeSummary.received - baseSummary.received).toBe(800_000)
     const movedOut = prototypeReducer(paid.data, { type: 'tenant/movedOut', tenantId: tenant.id })
     const closed = movedOut.occupancyCycles.find(cycle => cycle.roomId === 'room-9' && cycle.status === 'CLOSED')

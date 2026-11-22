@@ -188,15 +188,16 @@ describe('shared room financial visibility', () => {
   it('corrects a room-level monthly transaction for both occupants without duplicating receipts', () => {
     const room = createRoom(createDemoData(), { name: '908', capacity: 2, categoryId: 'RATE_4000', kind: 'PRIVATE', status: 'available' }, DEMO_DATE)
     if (!room.ok) throw new Error('Room creation failed')
+    room.data.rooms.find(item => item.id === room.room.id)!.washingMachineEnabled = true
     const first = addTenant(room.data, room.room.id, 'Correction One')
     const second = addTenant(first.data, room.room.id, 'Correction Two')
-    const paid = prepareRoomPayment(second.data, { roomId: room.room.id, periodId: DEMO_PERIOD, selected: ['RENT', 'WATER'], electricityReadingMilliKwh: null, asOf: DEMO_DATE })
+    const paid = prepareRoomPayment(second.data, { roomId: room.room.id, periodId: DEMO_PERIOD, selected: ['WATER', 'WASHING_MACHINE'], electricityReadingMilliKwh: null, asOf: DEMO_DATE })
     expect(paid.ok).toBe(true)
     if (!paid.ok) return
     expect(paid.payments).toHaveLength(1)
     expect(paid.receipts).toHaveLength(1)
     const corrected = preparePaymentCorrection(paid.data, {
-      paymentId: paid.payments[0]!.id, selectedCategories: ['RENT'], correctedElectricityReadingMilliKwh: null,
+      paymentId: paid.payments[0]!.id, selectedCategories: ['WASHING_MACHINE'], correctedElectricityReadingMilliKwh: null,
       reason: 'Water was recorded incorrectly', settlementStatus: 'CORRECTED', correctedAt: DEMO_DATE,
     })
     expect(corrected.ok).toBe(true)

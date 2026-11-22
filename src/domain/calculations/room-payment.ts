@@ -7,6 +7,7 @@ import { activeElectricityRate } from './billing-rates'
 import { nextReceiptNumbers } from './receipt-numbering'
 import { activeCycleForRoom } from './move-in'
 import { proposedRoomCharges } from './billing-eligibility'
+import { anniversaryCycleForBillingPeriod, selectBillingRent } from './billing-rent'
 
 export const roomPaymentCategories: ChargeCategory[] = ['RENT', 'ELECTRICITY', 'WATER', 'WASHING_MACHINE']
 
@@ -83,6 +84,13 @@ export function buildRoomPaymentQuote(data: PrototypeAppState, input: RoomPaymen
   let electricity: RoomElectricityQuote | undefined
 
   for (const category of roomPaymentCategories) {
+    if (category === 'RENT' && room && period && anniversaryCycleForBillingPeriod(data, room.id, period)) {
+      const rent = selectBillingRent(data, room.id, period, input.asOf)
+      options.push(rent.billedCents > 0 && rent.outstandingCents === 0
+        ? { category, state: 'PAID', amountCents: 0, chargeIds: [], detail: 'Paid through anniversary rent billing' }
+        : { category, state: 'UNAVAILABLE', amountCents: null, chargeIds: [], detail: rent.billedCents > 0 ? 'Rent is due in anniversary billing' : 'No anniversary rent due' })
+      continue
+    }
     if (category !== 'ELECTRICITY') {
       options.push(finalizedOption(category, categoryCharges(data, input.roomId, input.periodId, input.asOf, category), data, input.asOf, proposed.filter(charge => charge.category === category)))
       continue

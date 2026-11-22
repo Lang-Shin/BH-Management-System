@@ -39,7 +39,7 @@ export default function TenantOverview() {
   const occupants = persona?.room ? roomOccupants(data, persona.room.id, occupancyDate).filter(tenant => tenant.status === 'ACTIVE') : []
   const occupantTitle = occupants.length === 0 ? 'No current tenants' : occupants.length === 1 ? 'Tenant' : 'Tenants'
   const occupancy = persona?.room ? roomOccupancy(data, persona.room, occupancyDate) : null
-  const billing = tenantRoomBilling(data, tenantId, persona?.room?.id ?? null, period?.id ?? '', DEMO_DATE)
+  const billing = tenantRoomBilling(data, tenantId, persona?.room?.id ?? null, period?.id ?? '', occupancyDate)
   const moveIn = persona?.room ? selectMoveInObligations(data, occupancyDate, persona.room.id).find(view => view.cycle.status === 'ACTIVE') : undefined
   const statusTone = billing.status === 'PAID' ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
     : billing.status === 'NOT PAID' ? 'border-rose-200 bg-rose-50 text-rose-900' : 'border-amber-200 bg-amber-50 text-amber-950'

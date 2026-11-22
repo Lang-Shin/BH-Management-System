@@ -80,15 +80,21 @@ export function isRentObligationId(data: PrototypeAppState, id: string): boolean
   return data.rentObligations.some(obligation => obligation.id === id)
 }
 
-export function rentObligationPaidCents(data: PrototypeAppState, obligationId: string, asOf: string): number {
-  const cash = data.paymentAllocations
+export function rentObligationCashPaidCents(data: PrototypeAppState, obligationId: string, asOf: string): number {
+  return data.paymentAllocations
     .filter(allocation => allocation.chargeId === obligationId && allocation.state === 'ACTIVE' && allocation.allocatedOn <= asOf
       && data.payments.some(payment => payment.id === allocation.paymentId && payment.state === 'RECORDED' && payment.paidOn <= asOf))
     .reduce((sum, allocation) => sum + allocation.amountCents, 0)
-  const advance = data.advanceApplications
+}
+
+export function rentObligationAdvanceAppliedCents(data: PrototypeAppState, obligationId: string, asOf: string): number {
+  return data.advanceApplications
     .filter(application => application.rentObligationId === obligationId && application.state === 'ACTIVE' && application.appliedOn <= asOf)
     .reduce((sum, application) => sum + application.amountCents, 0)
-  return cash + advance
+}
+
+export function rentObligationPaidCents(data: PrototypeAppState, obligationId: string, asOf: string): number {
+  return rentObligationCashPaidCents(data, obligationId, asOf) + rentObligationAdvanceAppliedCents(data, obligationId, asOf)
 }
 
 export function rentObligationStatus(data: PrototypeAppState, obligation: RentObligation, asOf: string): ChargeStatus {

@@ -82,17 +82,17 @@ export function PrototypeProvider({ children, repository, now }: { children: Rea
     return () => { cancelled = true }
   }, [data, ready, canPersist, repository, serverRepository])
 
-  const runServerCommand = useCallback((action: PrototypeAction, key: string, generation: number) => {
-    if (!serverRepository?.command) return
+  const runServerCommand = useCallback((action: PrototypeAction, key: string, generation: number): Promise<boolean> => {
+    if (!serverRepository?.command) return Promise.resolve(false)
     const operation = commandQueue.current.then(async () => {
-      if (generation !== syncGeneration.current) return
+      if (generation !== syncGeneration.current) return false
       try {
         const result = await serverRepository.command!(action, key)
-        if (generation !== syncGeneration.current) return
+        if (generation !== syncGeneration.current) return false
         pendingActions.current = pendingActions.current.filter(item => item.key !== key)
         if (confirmedRevision.current !== null && result.revision < confirmedRevision.current) {
           setPendingCommands(pendingActions.current.length)
-          return
+          return true
         }
         confirmedData.current = result.data
         confirmedRevision.current = result.revision
@@ -101,17 +101,20 @@ export function PrototypeProvider({ children, repository, now }: { children: Rea
         failedCommand.current = null
         const optimistic = pendingActions.current.reduce((state, item) => prototypeReducer(state, item.action), result.data)
         reduce({ type: 'data/serverSynced', data: optimistic })
+        return true
       } catch (error) {
-        if (generation !== syncGeneration.current) return
+        if (generation !== syncGeneration.current) return false
         syncGeneration.current += 1
         pendingActions.current = []
         failedCommand.current = { action, key }
         setPendingCommands(0)
         setCommandError(error instanceof Error ? error.message : 'The server could not save this change. Refresh and try again.')
         if (confirmedData.current) reduce({ type: 'data/serverSynced', data: confirmedData.current })
+        return false
       }
     })
     commandQueue.current = operation.then(() => undefined, () => undefined)
+    return operation
   }, [serverRepository])
 
   const sendServerAction = useCallback((action: PrototypeAction, key: string = crypto.randomUUID()) => {
@@ -122,6 +125,19 @@ export function PrototypeProvider({ children, repository, now }: { children: Rea
     reduce(action)
     runServerCommand(action, key, syncGeneration.current)
   }, [runServerCommand])
+
+  const commitAction = useCallback((action: PrototypeAction): Promise<boolean> => {
+    if (!serverRepository?.command) {
+      reduce(action)
+      return Promise.resolve(true)
+    }
+    const key = crypto.randomUUID()
+    pendingActions.current = [...pendingActions.current, { action, key }]
+    setPendingCommands(pendingActions.current.length)
+    failedCommand.current = null
+    setCommandError(null)
+    return runServerCommand(action, key, syncGeneration.current)
+  }, [runServerCommand, serverRepository])
 
   const persistSnapshot = useCallback((snapshot: PrototypeData): Promise<string | null> => {
     if (serverRepository) return Promise.resolve(null)
@@ -228,7 +244,7 @@ export function PrototypeProvider({ children, repository, now }: { children: Rea
   if (loadFailed) return <div className="p-6"><ErrorState title="Your records could not be opened" onRetry={() => window.location.reload()} /></div>
   if (!ready) return <div className="p-6"><LoadingState /></div>
   return <PrototypeContext.Provider value={{
-    data, dispatch, persistSnapshot, resetToSample, storageWarning,
+    data, dispatch, commitAction, persistSnapshot, resetToSample, storageWarning,
     pendingCommands, commandError, retryCommand, refreshFromServer,
     repositoryMode: serverRepository ? 'server' : 'local',
   }}>

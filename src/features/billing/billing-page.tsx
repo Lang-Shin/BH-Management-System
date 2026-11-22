@@ -3,31 +3,31 @@ import { ReceiptText, CircleAlert, Wallet } from 'lucide-react'
 import { PageHeader, PreviewNotice, StatCard } from '@/components/shared/page'
 import { AnimatedNumber } from '@/components/shared/animated-number'
 import { usePrototype } from '@/hooks/use-prototype'
-import { selectSummary } from '@/domain/calculations/summary'
-import { DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
+import { useOccupancyDate } from '@/hooks/use-occupancy-date'
+import { DEMO_PERIOD } from '@/data/fixtures/demo'
 import { formatDate, formatMoney } from '@/lib/format'
 import { BillingStatusMatrix } from './billing-status-matrix'
 import { BillingRatesSection } from './billing-rates-section'
 import { PaymentCalculator } from './payment-calculator'
 import { MoveInSection } from './move-in-section'
-import { AnniversaryRentSection } from './anniversary-rent-section'
 import { BillingStatusChart } from './billing-status-chart'
-import { selectBillingRooms } from './billing-room-status'
+import { billingOverview, selectBillingRooms } from './billing-room-status'
 import { BillingFiltersMenu } from './billing-filters-menu'
 import type { BillingRoomStatus } from './billing-room-status'
 import { approvedRoomChangeBillingReviews } from '@/domain/calculations/room-change-requests'
 
 export default function Billing() {
   const { data } = usePrototype()
+  const occupancyDate = useOccupancyDate()
   const [periodId, setPeriodId] = useState(DEMO_PERIOD)
   const [statusFilter, setStatusFilter] = useState<BillingRoomStatus | null>(null)
-  const summary = selectSummary(data, DEMO_DATE, periodId)
-  const billingRooms = selectBillingRooms(data, periodId, DEMO_DATE, false)
+  const billingRooms = selectBillingRooms(data, periodId, occupancyDate, false)
+  const summary = billingOverview(billingRooms)
   const billingReviews = approvedRoomChangeBillingReviews(data, periodId)
 
   return <>
     <PageHeader title="Billing" description="Check rent, electricity, water, and washing payments in one place." />
-    <PreviewNotice>Electricity bills are created only when you confirm a payment-time meter reading. Calculate Payment settles existing rent, water, washing, and electricity bills. Advance and security deposit are separate room-level balances below. Recorded payment corrections are available from Payments &amp; Receipts.</PreviewNotice>
+    <PreviewNotice>Rent shows the anniversary period due in the selected month; electricity, water, and washing use the selected calendar month. Electricity bills are created only when you confirm a payment-time meter reading. Advance and security deposit remain separate room-level balances. Recorded payment corrections are available from Payments &amp; Receipts.</PreviewNotice>
     <div className="mb-6"><div className="max-w-full"><label htmlFor="billing-period" className="mb-2 block text-base font-semibold">Choose a month</label><select id="billing-period" value={periodId} onChange={e => { setPeriodId(e.target.value); setStatusFilter(null) }} className="min-h-14 max-w-full rounded-lg border bg-card px-4 py-3 text-base">{data.billingPeriods.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}</select></div></div>
     {billingReviews.length > 0 && <div className="room-change-billing-review" role="note">
       <strong>Room change billing review</strong>
@@ -36,7 +36,7 @@ export default function Billing() {
     </div>}
     <section className="mb-7 grid gap-5 xl:grid-cols-3" aria-label="Bills overview">
       <StatCard label="Total bills" value={formatMoney(summary.billed)} detail="All bills for the month you chose." icon={ReceiptText} />
-      <StatCard label="Already paid" value={formatMoney(summary.applied)} detail="Payments used to pay these bills." icon={Wallet} />
+      <StatCard label="Already paid" value={formatMoney(summary.paid)} detail="Payments and advance applications used to pay these bills." icon={Wallet} />
       <StatCard label={summary.unresolved > 0 ? 'Known outstanding' : 'Still to pay'} value={formatMoney(summary.outstanding)} detail={<><AnimatedNumber value={summary.overdue} /> bills are past their due date.{summary.unresolved > 0 && <> Plus <AnimatedNumber value={summary.unresolved} /> electricity {summary.unresolved === 1 ? 'bill' : 'bills'} awaiting a meter reading.</>}</>} icon={CircleAlert} />
     </section>
     <BillingStatusChart key={periodId} rooms={billingRooms} periodLabel={data.billingPeriods.find(period => period.id === periodId)?.label ?? 'Selected billing period'} outstandingOnly={false} />
@@ -45,9 +45,8 @@ export default function Billing() {
       <PaymentCalculator key={periodId} periodId={periodId} periodLabel={data.billingPeriods.find(period => period.id === periodId)?.label ?? 'Sample billing period'} />
     </div>
     <div key={statusFilter ?? 'ALL'} className="billing-table-enter">
-      <BillingStatusMatrix data={data} periodId={periodId} asOf={DEMO_DATE} outstandingOnly={false} statusFilter={statusFilter} />
+      <BillingStatusMatrix data={data} periodId={periodId} asOf={occupancyDate} outstandingOnly={false} statusFilter={statusFilter} />
     </div>
-    <div className="mt-8"><AnniversaryRentSection /></div>
     <div className="mt-8"><MoveInSection /></div>
     <BillingRatesSection />
   </>

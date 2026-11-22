@@ -13,7 +13,7 @@ export function MoveInPaymentDialog({ view, onClose, onSaved }: {
   onClose: () => void
   onSaved: (message: string) => void
 }) {
-  const { data, dispatch, persistSnapshot } = usePrototype()
+  const { data, commitAction, persistSnapshot } = usePrototype()
   const occupancyDate = useOccupancyDate()
   const initialSelection: MoveInCategory[] = [
     ...(view.advanceRemainingCents > 0 ? ['ADVANCE' as const] : []),
@@ -47,12 +47,17 @@ export function MoveInPaymentDialog({ view, onClose, onSaved }: {
     setSaving(true)
     setError('')
     const warning = await persistSnapshot(result.data)
-    setSaving(false)
     if (warning) {
+      setSaving(false)
       setError(`Payment was not saved. ${warning}`)
       return
     }
-    dispatch({ type: 'moveIn/paymentRecorded', obligationId: view.obligation.id, categories: selected, paidOn })
+    const confirmed = await commitAction({ type: 'moveIn/paymentRecorded', obligationId: view.obligation.id, categories: selected, paidOn })
+    setSaving(false)
+    if (!confirmed) {
+      setError('The payment was not confirmed by the server. Rent remains unpaid until a successful retry.')
+      return
+    }
     setSuccess({ receiptNumber: result.receipt.receiptNumber, amountCents: result.payment.amountCents })
     onSaved(`Room-level move-in payment recorded. Receipt ${result.receipt.receiptNumber}.`)
   }

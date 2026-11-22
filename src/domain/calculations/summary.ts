@@ -1,6 +1,7 @@
 import type { Charge, ChargeStatus, PrototypeAppState, Room, RoomAssignment, TenantCredit } from '@/domain/types/models'
 import { electricityObligations } from './electricity-obligations'
 import { futureReservationCount } from './room-capacity'
+import { rentObligationPaidCents } from './rental-periods'
 
 export function unresolvedElectricity(data: PrototypeAppState, asOf: string, periodId?: string, roomId?: string) {
   return electricityObligations(data, asOf).filter(item => item.state === 'AWAITING_READING' && item.createdAt <= asOf
@@ -81,21 +82,43 @@ export function paymentCashReceived(data: PrototypeAppState, payment: { id: stri
 
 /** Billing-period charges and cash received during that period are distinct. */
 export function selectSummary(data: PrototypeAppState, asOf: string, periodId?: string, occupancyAsOf = asOf) {
-  const charges = issuedCharges(data, asOf, periodId)
-  const billed = charges.reduce((sum, c) => sum + c.amountCents, 0)
-  const applied = charges.reduce((sum, c) => sum + chargePaid(data, c.id, asOf), 0)
-  const unresolved = unresolvedElectricity(data, asOf, periodId).length
   const period = data.billingPeriods.find(p => p.id === periodId)
+  // A room on anniversary rent is represented by its rent ledger, not a duplicate legacy rent charge.
+  const anniversaryRoomIds = new Set(data.occupancyCycles
+    .filter(cycle => cycle.rentSchedule === 'ANNIVERSARY'
+      && (!period || (cycle.startedAt <= period.endDate && (cycle.endedAt === null || cycle.endedAt >= period.startDate))))
+    .map(cycle => cycle.roomId))
+  const charges = issuedCharges(data, asOf, periodId).filter(charge => {
+    if (charge.category !== 'RENT') return true
+    const assignment = data.roomAssignments.find(item => item.id === charge.roomAssignmentId)
+    return !assignment || !anniversaryRoomIds.has(assignment.roomId)
+  })
+  const anniversaryRent = period ? data.rentObligations.filter(obligation => {
+    if (obligation.state !== 'ISSUED') return false
+    const rentalPeriod = data.rentalPeriods.find(item => item.id === obligation.rentalPeriodId)
+    return Boolean(rentalPeriod && rentalPeriod.dueDate >= period.startDate && rentalPeriod.dueDate <= period.endDate)
+  }) : []
+  const rentBilled = anniversaryRent.reduce((sum, obligation) => sum + obligation.amountCents, 0)
+  const rentApplied = anniversaryRent.reduce((sum, obligation) => sum + rentObligationPaidCents(data, obligation.id, asOf), 0)
+  const billed = charges.reduce((sum, c) => sum + c.amountCents, 0) + rentBilled
+  const applied = charges.reduce((sum, c) => sum + chargePaid(data, c.id, asOf), 0) + rentApplied
+  const unresolved = unresolvedElectricity(data, asOf, periodId).length
   const received = data.payments.filter(p => p.state === 'RECORDED' && p.paidOn <= asOf
     && (!period || (p.paidOn >= period.startDate && p.paidOn <= period.endDate))).reduce((sum, p) => sum + paymentCashReceived(data, p), 0)
+  const rentStatuses = anniversaryRent.map(obligation => {
+    const paid = rentObligationPaidCents(data, obligation.id, asOf)
+    return paid >= obligation.amountCents ? 'PAID' : paid > 0 ? 'PARTIALLY_PAID' : 'UNPAID'
+  })
   return {
     tenants: data.tenants.filter(t => t.status === 'ACTIVE').length,
     ...selectRoomSummary(data, occupancyAsOf),
     billed, applied, received, outstanding: billed - applied, unresolved,
     credit: data.tenantCredits.reduce((sum, c) => sum + creditRemaining(data, c, asOf), 0),
-    overdue: charges.filter(c => c.dueDate < asOf && chargeBalance(data, c, asOf) > 0).length,
-    paid: charges.filter(c => chargeStatus(data, c, asOf) === 'PAID').length,
-    partial: charges.filter(c => chargeStatus(data, c, asOf) === 'PARTIALLY_PAID').length,
-    unpaid: charges.filter(c => chargeStatus(data, c, asOf) === 'UNPAID').length,
+    overdue: charges.filter(c => c.dueDate < asOf && chargeBalance(data, c, asOf) > 0).length
+      + anniversaryRent.filter(obligation => obligation.dueDate < asOf
+        && rentObligationPaidCents(data, obligation.id, asOf) < obligation.amountCents).length,
+    paid: charges.filter(c => chargeStatus(data, c, asOf) === 'PAID').length + rentStatuses.filter(status => status === 'PAID').length,
+    partial: charges.filter(c => chargeStatus(data, c, asOf) === 'PARTIALLY_PAID').length + rentStatuses.filter(status => status === 'PARTIALLY_PAID').length,
+    unpaid: charges.filter(c => chargeStatus(data, c, asOf) === 'UNPAID').length + rentStatuses.filter(status => status === 'UNPAID').length,
   }
 }

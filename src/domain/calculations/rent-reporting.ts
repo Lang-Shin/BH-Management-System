@@ -1,5 +1,8 @@
 import type { ChargeStatus, PrototypeAppState, RentObligation, RentalPeriod } from '@/domain/types/models'
-import { rentObligationPaidCents, rentObligationStatus, rentalPeriodsForCycle } from './rental-periods'
+import {
+  rentObligationAdvanceAppliedCents, rentObligationCashPaidCents, rentObligationPaidCents, rentObligationStatus,
+  rentalPeriodsForCycle,
+} from './rental-periods'
 
 export interface RentPeriodReport {
   period: RentalPeriod
@@ -26,27 +29,14 @@ export interface RentCycleReport {
   outstandingCents: number
 }
 
-function cashPaid(data: PrototypeAppState, obligationId: string, asOf: string): number {
-  return data.paymentAllocations
-    .filter(allocation => allocation.chargeId === obligationId && allocation.state === 'ACTIVE' && allocation.allocatedOn <= asOf
-      && data.payments.some(payment => payment.id === allocation.paymentId && payment.state === 'RECORDED' && payment.paidOn <= asOf))
-    .reduce((sum, allocation) => sum + allocation.amountCents, 0)
-}
-
-function advanceApplied(data: PrototypeAppState, obligationId: string, asOf: string): number {
-  return data.advanceApplications
-    .filter(application => application.rentObligationId === obligationId && application.state === 'ACTIVE' && application.appliedOn <= asOf)
-    .reduce((sum, application) => sum + application.amountCents, 0)
-}
-
 export function selectRentCycleReport(data: PrototypeAppState, cycleId: string, asOf: string): RentCycleReport | null {
   const cycle = data.occupancyCycles.find(item => item.id === cycleId)
   const room = cycle && data.rooms.find(item => item.id === cycle.roomId)
   if (!cycle || !room || cycle.rentSchedule !== 'ANNIVERSARY' || !cycle.rentAnchorDate) return null
   const periods: RentPeriodReport[] = rentalPeriodsForCycle(data, cycle.id).map(period => {
     const obligation = data.rentObligations.find(item => item.rentalPeriodId === period.id) ?? null
-    const cashPaidCents = obligation ? cashPaid(data, obligation.id, asOf) : 0
-    const advanceAppliedCents = obligation ? advanceApplied(data, obligation.id, asOf) : 0
+    const cashPaidCents = obligation ? rentObligationCashPaidCents(data, obligation.id, asOf) : 0
+    const advanceAppliedCents = obligation ? rentObligationAdvanceAppliedCents(data, obligation.id, asOf) : 0
     const paidCents = obligation ? rentObligationPaidCents(data, obligation.id, asOf) : 0
     return {
       period, obligation,

@@ -34,6 +34,8 @@
 - One cash payment can cover multiple consecutive periods, with one allocation and one receipt.
 - The current rent rate at payment time is locked across newly prepaid periods. Later rate changes do not rewrite those obligations.
 - Fully prepaid periods display **PAID** and are excluded from later prepayment quotes and duplicate collection.
+- The Bills table shows the anniversary period due inside the selected calendar month in a dedicated **Period** column. Its visible date range omits years; full ISO dates remain in the rent ledger for sorting, calculations, receipts, and history. Multiple periods due in one month are aggregated and labeled as multiple periods.
+- Advance-covered and prepaid rent is included in the same room status as utilities: paid rent with unpaid utilities is **PARTLY PAID**, while the room becomes **PAID** only when every applicable component is settled.
 - Transfers do not move prepaid rent automatically; affected periods are flagged for review.
 
 ## Persistence and migration

@@ -1,5 +1,6 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { createDemoData } from '@/data/fixtures/demo'
 import type { PrototypeRepository, PrototypeSnapshot } from '@/data/repositories/prototype-repository'
@@ -19,6 +20,19 @@ function ServerConsumer() {
     <p>Pending: {pendingCommands}</p>
     <button onClick={() => dispatch({ type: 'tenant/noteUpdated', tenantId: 'tenant-1', notes: 'Injected adapter note' })}>Change note</button>
     <button onClick={retryCommand}>Retry command</button>
+  </>
+}
+
+function CommitConsumer() {
+  const { data, commitAction } = usePrototype()
+  const [result, setResult] = useState('idle')
+  return <>
+    <p>{data.tenants[0]?.notes || 'empty'}</p>
+    <p role="status">Commit: {result}</p>
+    <button onClick={async () => {
+      const confirmed = await commitAction({ type: 'tenant/noteUpdated', tenantId: 'tenant-1', notes: 'Server-confirmed note' })
+      setResult(confirmed ? 'confirmed' : 'failed')
+    }}>Commit note</button>
   </>
 }
 
@@ -84,6 +98,31 @@ describe('repository injection boundary', () => {
     expect(screen.getByRole('status')).toHaveTextContent('no command error')
     expect(command).toHaveBeenCalledTimes(2)
     expect(command.mock.calls[0]![1]).toBe(command.mock.calls[1]![1])
+  })
+
+  it('does not apply a committed financial-style action until the server confirms it', async () => {
+    const initial = createDemoData()
+    initial.tenants[0]!.notes = 'Original note'
+    const confirmed = createDemoData()
+    confirmed.tenants[0]!.notes = 'Server-confirmed note'
+    let resolveCommand!: (value: { data: typeof confirmed; revision: number; replayed: boolean }) => void
+    const command = vi.fn<NonNullable<PrototypeRepository['command']>>(() =>
+      new Promise(resolve => { resolveCommand = resolve }))
+    const repository: PrototypeRepository = {
+      mode: 'server',
+      load: async () => ({ data: initial, warning: null, canPersist: true, revision: 1 }),
+      save: vi.fn().mockResolvedValue(null),
+      command,
+    }
+    render(<PrototypeProvider repository={repository}><CommitConsumer /></PrototypeProvider>)
+    expect(await screen.findByText('Original note')).toBeInTheDocument()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Commit note' }))
+    expect(screen.getByText('Original note')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Commit: idle')
+    await act(async () => resolveCommand({ data: confirmed, revision: 2, replayed: false }))
+    await waitFor(() => expect(screen.getByText('Server-confirmed note')).toBeInTheDocument())
+    expect(screen.getByRole('status')).toHaveTextContent('Commit: confirmed')
   })
 
   it('retains the session and warns if an asynchronous adapter rejects saving', async () => {
