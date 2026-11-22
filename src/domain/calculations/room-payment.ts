@@ -1,7 +1,8 @@
 import type { Charge, ChargeCategory, MeterReading, Payment, PrototypeAppState, Receipt } from '@/domain/types/models'
 import { activeAssignments, chargeBalance, issuedCharges, unresolvedElectricity } from './summary'
 import { chargeRoom, roomContext } from './room-finance'
-import { calculateElectricityCharge, latestSettledReading, type ElectricityCharge } from './electricity-calculation'
+import { calculateElectricityCharge, type ElectricityCharge } from './electricity-calculation'
+import { electricityBaseline } from './meter-baseline'
 import { activeElectricityRate } from './billing-rates'
 import { nextReceiptNumbers } from './receipt-numbering'
 import { activeCycleForRoom } from './move-in'
@@ -91,7 +92,7 @@ export function buildRoomPaymentQuote(data: PrototypeAppState, input: RoomPaymen
       options.push(finalizedOption(category, categoryCharges(data, input.roomId, input.periodId, input.asOf, category), data, input.asOf, proposed.filter(charge => charge.category === category)))
       continue
     }
-    const previous = latestSettledReading(data, obligation.meterId)
+    const previous = electricityBaseline(data, obligation.meterId)
     const rate = activeElectricityRate(data, input.asOf)
     if (!previous || !rate) {
       options.push({ category, state: 'INVALID_READING', amountCents: null, chargeIds: [], detail: 'Meter baseline unavailable', obligationId: obligation.id })

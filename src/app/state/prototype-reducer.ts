@@ -4,6 +4,7 @@ import type { StateAction } from './actions'
 import { activeAssignments } from '@/domain/calculations/summary'
 import { applyRateChange } from '@/domain/calculations/billing-rates'
 import { prepareElectricityPayment } from '@/domain/calculations/electricity-payment'
+import { prepareMeterInitialization } from '@/domain/calculations/meter-initialization'
 import { prepareRoomPayment } from '@/domain/calculations/room-payment'
 import { preparePaymentCorrection } from '@/domain/calculations/payment-correction'
 import { prepareMoveInPayment, reconcileOccupancy } from '@/domain/calculations/move-in'
@@ -69,6 +70,10 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
           ? { ...room, washingMachineEnabled: action.enabled }
           : room),
       }
+    case 'electricity/meterInitialized': {
+      const result = prepareMeterInitialization(state, action)
+      return result.ok ? result.data : state
+    }
     case 'electricity/paymentConfirmed': {
       const result = prepareElectricityPayment(state, action.obligationId, action.currentReadingMilliKwh, action.paidOn)
       return result.ok ? result.data : state

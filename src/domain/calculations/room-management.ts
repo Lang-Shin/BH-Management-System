@@ -1,6 +1,7 @@
 import type { PrototypeAppState, Room, RoomCategoryId } from '@/domain/types/models'
 import { ROOM_RATE_CATEGORY_IDS } from './billing-rates'
 import { activeAssignments, chargeBalance } from './summary'
+import { metersForRoom } from './meter-baseline'
 
 export interface RoomDraft {
   name: string
@@ -30,8 +31,7 @@ function roomLabel(name: string): string {
 }
 
 function roomMeterIds(data: PrototypeAppState, room: Room): Set<string> {
-  const suffix = room.id.replace(/^room-/, '')
-  return new Set(data.electricityMeters.filter(meter => meter.id === `meter-room-${suffix}`).map(meter => meter.id))
+  return new Set(metersForRoom(data, room.id).map(meter => meter.id))
 }
 
 export function roomDeletionBlockers(data: PrototypeAppState, roomId: string, asOf: string): string[] {

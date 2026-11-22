@@ -28,9 +28,13 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     && oneOf(r.categoryId, ['RATE_3500', 'RATE_4000', 'RATE_5000']) && typeof r.washingMachineEnabled === 'boolean')) return false
   if (!rows(value, 'roomAssignments', r => id(r.tenantId) && id(r.roomId) && date(r.startDate)
     && (r.endDate === null || date(r.endDate)) && positive(r.agreedRentCents))) return false
-  if (!rows(value, 'electricityMeters', r => id(r.label) && id(r.serialNumber) && r.ownership === 'UNCONFIRMED')) return false
+  if (!rows(value, 'electricityMeters', r => id(r.label) && (r.serialNumber === null || id(r.serialNumber))
+    && (r.roomId === undefined || id(r.roomId)) && r.ownership === 'UNCONFIRMED')) return false
   if (!rows(value, 'meterReadings', r => id(r.meterId) && date(r.readOn) && money(r.readingMilliKwh)
-    && oneOf(r.status, ['DRAFT', 'CONFIRMED', 'SUPERSEDED']) && (r.confirmedBy === null || id(r.confirmedBy)) && correction(r.correction))) return false
+    && oneOf(r.status, ['DRAFT', 'INITIAL', 'CONFIRMED', 'SUPERSEDED']) && (r.confirmedBy === null || id(r.confirmedBy)) && correction(r.correction)
+    && (r.sourceNote === undefined || (text(r.sourceNote) && r.sourceNote.length <= 500))
+    && (r.initializedOn === undefined || date(r.initializedOn))
+    && (r.status !== 'INITIAL' || (r.confirmedBy === null && r.correction === null && date(r.initializedOn) && text(r.sourceNote))))) return false
   if (!rows(value, 'electricityBillObligations', r => id(r.roomId) && id(r.tenantId) && id(r.billingPeriodId)
     && id(r.meterId) && id(r.previousReadingId) && date(r.createdAt) && date(r.dueDate) && r.state === 'AWAITING_READING')) return false
   if (!rows(value, 'electricityRates', r => positive(r.rateCentsPerKwh) && date(r.effectiveFrom) && date(r.recordedOn) && text(r.label))) return false
@@ -88,7 +92,7 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     || value.moveInPolicy.transferDecrease !== 'MANUAL_REVIEW'
     || value.moveInPolicy.moveOutSettlement !== 'MANUAL_REVIEW') return false
   if (!rows(value, 'auditEvents', r => id(r.actorId) && date(r.occurredOn) && id(r.entityId) && text(r.reason)
-    && oneOf(r.action, ['DEMO_SEEDED', 'READING_CORRECTED', 'CHARGE_CORRECTED', 'PAYMENT_CORRECTED', 'ALLOCATION_REVERSED', 'ELECTRICITY_PAYMENT_RECORDED', 'ROOM_PAYMENT_RECORDED', 'MOVE_IN_PAYMENT_RECORDED', 'MOVE_IN_POLICY_UPDATED'])
+    && oneOf(r.action, ['DEMO_SEEDED', 'READING_CORRECTED', 'CHARGE_CORRECTED', 'PAYMENT_CORRECTED', 'ALLOCATION_REVERSED', 'ELECTRICITY_PAYMENT_RECORDED', 'ROOM_PAYMENT_RECORDED', 'MOVE_IN_PAYMENT_RECORDED', 'MOVE_IN_POLICY_UPDATED', 'METER_INITIALIZED'])
     && oneOf(r.entityType, ['PROTOTYPE', 'METER_READING', 'CHARGE', 'PAYMENT', 'PAYMENT_ALLOCATION'])
     && nullableText(r.beforeSnapshot) && nullableText(r.afterSnapshot))) return false
 
@@ -162,13 +166,19 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
   // Bed counts are room information, not a rule for renting or availability.
   if (!data.rooms.every(r => !(r.status === 'maintenance' && data.roomAssignments.some(a => a.roomId === r.id && a.endDate === null)))) return false
   if (!data.billingPeriods.every(p => p.startDate <= p.endDate)) return false
+  if (!data.electricityMeters.every(meter => meter.roomId === undefined || data.rooms.some(room => room.id === meter.roomId))) return false
+  const initialReadings = data.meterReadings.filter(reading => reading.status === 'INITIAL')
+  if (new Set(initialReadings.map(reading => reading.meterId)).size !== initialReadings.length) return false
+  if (!initialReadings.every(reading => reading.initializedOn! >= reading.readOn
+    && data.electricityMeters.some(meter => meter.id === reading.meterId && meter.roomId !== undefined)
+    && !data.charges.some(charge => charge.category === 'ELECTRICITY' && charge.electricity.currentReadingId === reading.id))) return false
   if (!data.meterReadings.every(r => {
     const original = r.correction && data.meterReadings.find(o => o.id === r.correction?.supersedesId)
-    return data.electricityMeters.some(m => m.id === r.meterId) && (r.status === 'DRAFT' || r.confirmedBy !== null)
+    return data.electricityMeters.some(m => m.id === r.meterId) && (r.status === 'DRAFT' || r.status === 'INITIAL' || r.confirmedBy !== null)
       && validCorrection(r.correction, r.id, 'METER_READING')
       && (!r.correction || (original && original.status === 'SUPERSEDED' && original.meterId === r.meterId))
       && (r.status !== 'CONFIRMED' || !data.meterReadings.some(previous => previous.meterId === r.meterId
-        && previous.status === 'CONFIRMED' && previous.readOn < r.readOn && previous.readingMilliKwh > r.readingMilliKwh))
+        && (previous.status === 'CONFIRMED' || previous.status === 'INITIAL') && previous.readOn <= r.readOn && previous.readingMilliKwh > r.readingMilliKwh))
   })) return false
   const electricityIntervals = data.charges.filter(c => c.category === 'ELECTRICITY').map(c => c.electricity.intervalId)
   if (new Set(electricityIntervals).size !== electricityIntervals.length) return false
@@ -179,6 +189,7 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     const latest = [...data.meterReadings]
       .filter(reading => reading.meterId === o.meterId && reading.status === 'CONFIRMED')
       .sort((a, b) => b.readOn.localeCompare(a.readOn) || b.id.localeCompare(a.id))[0]
+      ?? data.meterReadings.find(reading => reading.meterId === o.meterId && reading.status === 'INITIAL')
     return tenant(o.tenantId) && data.rooms.some(r => r.id === o.roomId) && period && meter && previous
       && previous.meterId === o.meterId && previous.status !== 'DRAFT' && previous.readOn <= o.createdAt
       && latest?.id === previous.id
@@ -206,8 +217,8 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     const product = e.consumptionMilliKwh * e.appliedRateCentsPerKwh
     // Demo readings produce exact-cent amounts. Fractional rounding policy is unconfirmed.
     return previous !== undefined && current !== undefined && rate !== undefined
-      && previous.meterId === e.meterId && current.meterId === e.meterId && previous.status !== 'DRAFT' && current.status !== 'DRAFT'
-      && previous.readOn < current.readOn && current.readOn <= c.issuedOn
+      && previous.meterId === e.meterId && current.meterId === e.meterId && previous.status !== 'DRAFT' && current.status !== 'DRAFT' && current.status !== 'INITIAL'
+      && (previous.readOn < current.readOn || (previous.status === 'INITIAL' && previous.readOn === current.readOn)) && current.readOn <= c.issuedOn
       && previous.readingMilliKwh === e.previousReadingMilliKwh && current.readingMilliKwh === e.currentReadingMilliKwh
       && e.currentReadingMilliKwh >= e.previousReadingMilliKwh && e.consumptionMilliKwh === e.currentReadingMilliKwh - e.previousReadingMilliKwh
       && e.appliedRateEffectiveFrom === rate.effectiveFrom && e.appliedRateEffectiveFrom <= c.issuedOn

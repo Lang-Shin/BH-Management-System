@@ -1,5 +1,8 @@
 import type { Charge, MeterReading, PrototypeAppState } from '@/domain/types/models'
 import { activeElectricityRate } from './billing-rates'
+import { electricityBaseline } from './meter-baseline'
+import { electricityObligations } from './electricity-obligations'
+export { latestSettledReading } from './meter-baseline'
 
 export type ElectricityCalculationError =
   | 'OBLIGATION_NOT_FOUND'
@@ -25,24 +28,18 @@ export function parseMeterReadingMilliKwh(value: string): number | null {
   return Number.isSafeInteger(milliKwh) ? milliKwh : null
 }
 
-/** The settled baseline is the latest confirmed reading for the room meter. */
-export function latestSettledReading(data: PrototypeAppState, meterId: string): MeterReading | null {
-  return [...data.meterReadings]
-    .filter(reading => reading.meterId === meterId && reading.status === 'CONFIRMED')
-    .sort((a, b) => b.readOn.localeCompare(a.readOn) || b.id.localeCompare(a.id))[0] ?? null
-}
-
 /**
  * Applies the landlord-entered current reading to an awaiting cumulative obligation.
  * Nothing is persisted here; confirmation is a separate atomic reducer action.
  */
 export function calculateElectricityCharge(data: PrototypeAppState, obligationId: string, current: { readingMilliKwh: number; readOn: string }): ElectricityCalculationResult {
-  const obligation = data.electricityBillObligations.find(item => item.id === obligationId && item.state === 'AWAITING_READING')
+  const obligation = electricityObligations(data, current.readOn).find(item => item.id === obligationId && item.state === 'AWAITING_READING')
   if (!obligation) return { ok: false, reason: 'OBLIGATION_NOT_FOUND' }
-  const previous = latestSettledReading(data, obligation.meterId)
+  const previous = electricityBaseline(data, obligation.meterId)
   if (!previous) return { ok: false, reason: 'STALE_BASELINE' }
   if (previous.id !== obligation.previousReadingId) return { ok: false, reason: 'STALE_BASELINE' }
-  if (current.readOn <= previous.readOn) return { ok: false, reason: 'READING_DATE_INVALID' }
+  if (current.readOn < previous.readOn || (previous.status !== 'INITIAL' && current.readOn === previous.readOn)) return { ok: false, reason: 'READING_DATE_INVALID' }
+  if (!Number.isSafeInteger(current.readingMilliKwh) || current.readingMilliKwh < 0) return { ok: false, reason: 'INVALID_AMOUNT' }
   if (current.readingMilliKwh < previous.readingMilliKwh) return { ok: false, reason: 'READING_BELOW_PREVIOUS' }
   if (current.readingMilliKwh === previous.readingMilliKwh) return { ok: false, reason: 'READING_NOT_ADVANCED' }
   const rate = activeElectricityRate(data, current.readOn)

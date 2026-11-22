@@ -27,6 +27,7 @@ const changeLabels: Record<AuditEvent['action'], string> = {
   ROOM_PAYMENT_RECORDED: 'Room payment recorded',
   MOVE_IN_PAYMENT_RECORDED: 'Move-in payment recorded',
   MOVE_IN_POLICY_UPDATED: 'Move-in policy updated',
+  METER_INITIALIZED: 'Initial meter reading recorded',
 }
 
 export default function Reports() {

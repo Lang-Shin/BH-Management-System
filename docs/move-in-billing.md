@@ -31,7 +31,7 @@ Deposit terms remain configurable from Billing. Switching to `MANUAL_REVIEW` aff
 
 ## Persistence and migration
 
-The localStorage key stays `bhms:prototype:v1`. Version 12 reads valid version 7/8/9/10/11 snapshots non-destructively. Existing occupied rooms receive an active cycle but **no invented deposits or advances**. Version 10 obligations keep their recorded provisional deposit terms and are not rewritten; only the current policy advances to v2. Existing rooms, labels, assignments, bills, payments, receipts, corrections, rates, meters, and readings are retained. Saving writes a version 12 envelope. Version 11 payments retain their historical tenant payer, method, and tenant-owned scope. Restore sample records remains an explicit replacement, not a migration.
+The localStorage key stays `bhms:prototype:v1`. Version 13 reads valid version 7–12 snapshots non-destructively. Existing occupied rooms receive an active cycle but **no invented deposits or advances**. Version 10 obligations keep their recorded provisional deposit terms and are not rewritten; only the current policy advances to v2. Existing rooms, labels, assignments, bills, payments, receipts, corrections, rates, meters, and readings are retained. Saving writes a version 13 envelope. Version 11 payments retain their historical tenant payer, method, and tenant-owned scope. Restore sample records remains an explicit replacement, not a migration.
 
 ## Verification
 

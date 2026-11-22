@@ -55,6 +55,6 @@ export default function Rooms() {
         <div className="mt-5 border-t pt-4">{status === 'OCCUPIED' ? <><p className="mb-2 text-sm text-muted-foreground">{tenants.length === 1 ? 'Tenant' : 'Tenants'}</p><ul className="space-y-2 text-base font-medium">{tenants.map(t => <li key={t.id}>{t.name}</li>)}</ul></> : <p className="text-base text-muted-foreground">{status === 'UNDER_REPAIR' ? 'Not available while repairs are being done.' : 'Ready for a new tenant.'}</p>}</div>
       </CardContent></Card>
     })}</div>}
-    {selectedRoom && <RoomDetailsDialog roomId={selectedRoom.id} onClose={() => setSelectedRoomId(null)} onReturnFocus={() => roomTrigger.current?.focus()} onNotice={setNotice} />}
+    {selectedRoom && <RoomDetailsDialog key={selectedRoom.id} roomId={selectedRoom.id} onClose={() => setSelectedRoomId(null)} onReturnFocus={() => roomTrigger.current?.focus()} onNotice={setNotice} />}
   </>
 }

@@ -50,7 +50,9 @@ export interface AuthorizedCorrection {
 export interface ElectricityMeter {
   id: string
   label: string
-  serialNumber: string
+  serialNumber: string | null
+  /** Explicit association for newly initialized meters; legacy IDs remain readable. */
+  roomId?: string
   ownership: 'UNCONFIRMED'
 }
 
@@ -60,9 +62,12 @@ export interface MeterReading {
   readOn: string
   /** Scaled integer: 1000 milli-kWh = 1 kWh; not floating-point currency. */
   readingMilliKwh: number
-  status: 'DRAFT' | 'CONFIRMED' | 'SUPERSEDED'
+  status: 'DRAFT' | 'INITIAL' | 'CONFIRMED' | 'SUPERSEDED'
   confirmedBy: string | null
   correction: AuthorizedCorrection | null
+  /** Administrative baseline provenance; never a payment confirmation. */
+  sourceNote?: string
+  initializedOn?: string
 }
 
 export interface ElectricityRate {
@@ -274,7 +279,7 @@ export interface AuditEvent {
   id: string
   actorId: string
   occurredOn: string
-  action: 'DEMO_SEEDED' | 'READING_CORRECTED' | 'CHARGE_CORRECTED' | 'PAYMENT_CORRECTED' | 'ALLOCATION_REVERSED' | 'ELECTRICITY_PAYMENT_RECORDED' | 'ROOM_PAYMENT_RECORDED' | 'MOVE_IN_PAYMENT_RECORDED' | 'MOVE_IN_POLICY_UPDATED'
+  action: 'DEMO_SEEDED' | 'READING_CORRECTED' | 'CHARGE_CORRECTED' | 'PAYMENT_CORRECTED' | 'ALLOCATION_REVERSED' | 'ELECTRICITY_PAYMENT_RECORDED' | 'ROOM_PAYMENT_RECORDED' | 'MOVE_IN_PAYMENT_RECORDED' | 'MOVE_IN_POLICY_UPDATED' | 'METER_INITIALIZED'
   entityType: 'PROTOTYPE' | 'METER_READING' | 'CHARGE' | 'PAYMENT' | 'PAYMENT_ALLOCATION'
   entityId: string
   reason: string

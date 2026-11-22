@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent } from 'react'
-import { Check, DoorOpen, Gauge, Pencil, Trash2, WashingMachine } from 'lucide-react'
+import { Check, DoorOpen, Pencil, Trash2, WashingMachine } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -7,11 +7,11 @@ import { useAnimatedDialogClose } from '@/components/ui/use-animated-dialog-clos
 import { StatusBadge } from '@/components/shared/status-badge'
 import { usePrototype } from '@/hooks/use-prototype'
 import { roomOccupancy, roomOccupants } from '@/domain/calculations/summary'
-import { latestSettledReading } from '@/domain/calculations/electricity-calculation'
+import { RoomElectricityMeter } from './room-electricity-meter'
 import { roomDeletionBlockers, validateRoomDraft, type RoomDraft, type RoomDraftErrors } from '@/domain/calculations/room-management'
 import { activeRoomRentRate, activeWashingRate, roomMonthlyRentCents, ROOM_RATE_CATEGORY_IDS } from '@/domain/calculations/billing-rates'
 import { DEMO_DATE } from '@/data/fixtures/demo'
-import { formatDate, formatMoney } from '@/lib/format'
+import { formatMoney } from '@/lib/format'
 import { roomCategoryLabel } from '@/lib/room-rates'
 import type { RoomCategoryId } from '@/domain/types/models'
 
@@ -44,10 +44,6 @@ export function RoomDetailsDialog({ roomId, onClose, onReturnFocus, onNotice }: 
   const tenants = roomOccupants(data, room.id, DEMO_DATE)
   const monthlyRentCents = roomMonthlyRentCents(data, room, DEMO_DATE)
   const washingRateCents = activeWashingRate(data, DEMO_DATE)?.rateCents ?? null
-  const meterNumber = room.id.replace('room-', '')
-  const meter = data.electricityMeters.find(item => item.id === `meter-room-${meterNumber}`)
-  const latest = meter ? latestSettledReading(data, meter.id) : null
-  const readings = meter ? [...data.meterReadings].filter(reading => reading.meterId === meter.id).sort((a, b) => b.readOn.localeCompare(a.readOn)).slice(0, 4) : []
   const dirty = washingEnabled !== room.washingMachineEnabled
   const deleteBlockers = roomDeletionBlockers(data, room.id, DEMO_DATE)
 
@@ -141,25 +137,7 @@ export function RoomDetailsDialog({ roomId, onClose, onReturnFocus, onNotice }: 
           <p className="room-details-note">Changes apply to future applicable billing periods only. Existing issued bills, payments, and unpaid obligations are not rewritten. Saving this checkbox does not record a payment.</p>
         </section>
 
-        <section className="room-details-section" aria-labelledby="room-meter-title">
-          <h2 id="room-meter-title" className="flex items-center gap-2"><Gauge className="size-5" aria-hidden="true" />Electricity meter</h2>
-          {meter && latest ? <>
-            <dl className="room-details-grid">
-              <div><dt>Meter</dt><dd>{meter.label}</dd></div>
-              <div><dt>Meter identifier</dt><dd className="break-all">{meter.serialNumber}</dd></div>
-              <div><dt>Last settled reading</dt><dd>{latest.readingMilliKwh / 1000} kWh</dd></div>
-              <div><dt>Last settled date</dt><dd>{formatDate(latest.readOn)}</dd></div>
-              <div><dt>Reading unit</dt><dd>kWh</dd></div>
-            </dl>
-            <h3 className="mt-5 text-sm font-semibold">Recent reading history</h3>
-            <ul className="room-details-readings">{readings.map(reading => <li key={reading.id}><span>{formatDate(reading.readOn)}</span><span className="font-semibold tabular-nums">{reading.readingMilliKwh / 1000} kWh</span></li>)}</ul>
-            <div className="room-details-note">
-              <p className="font-semibold">Authorized meter corrections</p>
-              <p className="mt-1">Editing a settled reading could invalidate historic consumption or payment history, so unrestricted correction is not available here. Meter corrections and payment-time readings require the authorized Billing workflow.</p>
-              <Button variant="outline" className="mt-3" disabled aria-label="Edit meter information unavailable">Edit meter information</Button>
-            </div>
-          </> : <p className="room-details-empty">No electricity meter is recorded for this room.</p>}
-        </section>
+        <RoomElectricityMeter key={room.id} roomId={room.id} />
 
         <DialogFooter className="room-details-footer">
           <Button variant="outline" onClick={requestClose}>Cancel</Button>

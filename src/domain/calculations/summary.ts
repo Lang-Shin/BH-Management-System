@@ -1,7 +1,8 @@
 import type { Charge, ChargeStatus, PrototypeAppState, Room, RoomAssignment, TenantCredit } from '@/domain/types/models'
+import { electricityObligations } from './electricity-obligations'
 
 export function unresolvedElectricity(data: PrototypeAppState, asOf: string, periodId?: string, roomId?: string) {
-  return data.electricityBillObligations.filter(item => item.state === 'AWAITING_READING' && item.createdAt <= asOf
+  return electricityObligations(data, asOf).filter(item => item.state === 'AWAITING_READING' && item.createdAt <= asOf
     && (!periodId || item.billingPeriodId === periodId) && (!roomId || item.roomId === roomId))
 }
 

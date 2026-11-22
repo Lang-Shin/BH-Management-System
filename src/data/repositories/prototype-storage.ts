@@ -3,7 +3,7 @@ import { initialRoomRentRates, initialWashingRates, initialWaterRates } from '@/
 import { DEFAULT_MOVE_IN_POLICY } from '@/domain/calculations/move-in-policy'
 import { isPrototypeData, isRecord } from '@/domain/validation/prototype-data'
 
-export const STORAGE_SCHEMA_VERSION = 12
+export const STORAGE_SCHEMA_VERSION = 13
 
 type ParseResult =
   | { ok: true; data: PrototypeAppState }
@@ -95,6 +95,11 @@ export function parsePrototypeSnapshot(raw: string): ParseResult {
     return { ok: false, reason: 'MALFORMED_JSON' }
   }
   if (!isRecord(parsed)) return { ok: false, reason: 'INVALID_DATA' }
+  // Version 13 adds optional explicit meter-room links and administrative initial readings.
+  // Existing v12 records retain every field and ID without relabeling legacy reading history.
+  if (parsed.version === 12) {
+    return isPrototypeData(parsed.data) ? { ok: true, data: parsed.data } : { ok: false, reason: 'INVALID_DATA' }
+  }
   if (parsed.version === 11) {
     const migrated = withPaymentScope(parsed.data)
     return isPrototypeData(migrated) ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }

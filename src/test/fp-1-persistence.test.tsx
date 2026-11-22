@@ -57,7 +57,7 @@ describe('single-source prototype persistence', () => {
     expect(await screen.findByLabelText('Demo tenant')).toHaveValue(tenantId)
     expect(within(await screen.findByRole('region', { name: 'Room overview' })).getByRole('heading', { name: 'Room 900' })).toBeInTheDocument()
     expect(savedData().rooms.filter((room: { name: string }) => room.name === '900')).toHaveLength(1)
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).version).toBe(12)
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).version).toBe(13)
   }, 30000)
 
   it('restores sample records through the shared reducer without leaving stale demo selection', async () => {
@@ -78,7 +78,7 @@ describe('single-source prototype persistence', () => {
     await waitFor(() => expect(savedData().rooms).toHaveLength(15))
     expect(savedData().rooms.some((room: { id: string }) => room.id === 'room-custom')).toBe(false)
     expect(savedData().rooms[0].name).toBe('1')
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).version).toBe(12)
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).version).toBe(13)
 
     await user.click(within(nav).getByRole('link', { name: 'Rooms' }))
     await screen.findByRole('button', { name: 'Room 1 details' })
