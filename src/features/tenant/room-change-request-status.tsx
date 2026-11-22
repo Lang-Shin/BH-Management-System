@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { DoorOpen, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { usePrototype } from '@/hooks/use-prototype'
-import { DEMO_DATE } from '@/data/fixtures/demo'
+import { OCCUPANCY_DATE } from '@/data/fixtures/demo'
 import { formatDate } from '@/lib/format'
 import type { Room, RoomChangeRequest } from '@/domain/types/models'
 import { cancelRoomChangeRequest, roomChangeRequestsForTenant } from '@/domain/calculations/room-change-requests'
@@ -41,7 +41,7 @@ export function RoomChangeRequestSection({ tenantId, room }: { tenantId: string;
 
   async function cancel(requestId: string) {
     if (saving) return
-    const result = cancelRoomChangeRequest(data, requestId, tenantId, 'Cancelled by tenant.', DEMO_DATE)
+    const result = cancelRoomChangeRequest(data, requestId, tenantId, 'Cancelled by tenant.', OCCUPANCY_DATE)
     if (!result.ok) {
       setNotice(result.errors.general ?? 'The request could not be cancelled.')
       return

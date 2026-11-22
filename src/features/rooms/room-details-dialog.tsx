@@ -10,7 +10,7 @@ import { roomOccupancy, roomOccupants } from '@/domain/calculations/summary'
 import { RoomElectricityMeter } from './room-electricity-meter'
 import { roomDeletionBlockers, validateRoomDraft, type RoomDraft, type RoomDraftErrors } from '@/domain/calculations/room-management'
 import { activeRoomRentRate, activeWashingRate, roomMonthlyRentCents, ROOM_RATE_CATEGORY_IDS } from '@/domain/calculations/billing-rates'
-import { DEMO_DATE } from '@/data/fixtures/demo'
+import { DEMO_DATE, OCCUPANCY_DATE } from '@/data/fixtures/demo'
 import { formatMoney } from '@/lib/format'
 import { roomCategoryLabel } from '@/lib/room-rates'
 import type { RoomCategoryId } from '@/domain/types/models'
@@ -40,8 +40,8 @@ export function RoomDetailsDialog({ roomId, onClose, onReturnFocus, onNotice }: 
   const { open, requestClose, onOpenChange, onAnimationEnd } = useAnimatedDialogClose(onClose)
   if (!room) return null
 
-  const status = roomOccupancy(data, room, DEMO_DATE)
-  const tenants = roomOccupants(data, room.id, DEMO_DATE)
+  const status = roomOccupancy(data, room, OCCUPANCY_DATE)
+  const tenants = roomOccupants(data, room.id, OCCUPANCY_DATE)
   const monthlyRentCents = roomMonthlyRentCents(data, room, DEMO_DATE)
   const washingRateCents = activeWashingRate(data, DEMO_DATE)?.rateCents ?? null
   const dirty = washingEnabled !== room.washingMachineEnabled

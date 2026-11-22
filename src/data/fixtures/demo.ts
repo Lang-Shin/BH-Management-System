@@ -8,6 +8,13 @@ import { DEFAULT_MOVE_IN_POLICY } from '@/domain/calculations/move-in-policy'
 export const DEMO_DATE = '2026-11-13'
 export const DEMO_PERIOD = 'period-nov'
 
+/** Occupancy follows the calendar, while sample financial records stay anchored to DEMO_DATE. */
+export function resolveOccupancyDate(now = new Date()): string {
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  return today > DEMO_DATE ? today : DEMO_DATE
+}
+export const OCCUPANCY_DATE = resolveOccupancyDate()
+
 export const DEMO_RATES = {
   rentCentsPerRoom: DEFAULT_RENT_CENTS.RATE_3500,
   waterCentsPerTenant: DEFAULT_WATER_RATE_CENTS,

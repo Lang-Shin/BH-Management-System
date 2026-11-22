@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { createDemoData, DEMO_DATE } from '@/data/fixtures/demo'
+import { createDemoData, DEMO_DATE, resolveOccupancyDate } from '@/data/fixtures/demo'
 import { roomOccupancy, roomOccupants, selectRoomSummary } from '@/domain/calculations/summary'
 import { isPrototypeData } from '@/domain/validation/prototype-data'
+
+describe('occupancy clock', () => {
+  it('uses the sample date before it and the calendar date after it', () => {
+    expect(resolveOccupancyDate(new Date(2026, 10, 13))).toBe(DEMO_DATE)
+    expect(resolveOccupancyDate(new Date(2026, 10, 22))).toBe('2026-11-22')
+    expect(resolveOccupancyDate(new Date(2025, 0, 1))).toBe(DEMO_DATE)
+  })
+})
 
 describe('room-based occupancy', () => {
   it.each([

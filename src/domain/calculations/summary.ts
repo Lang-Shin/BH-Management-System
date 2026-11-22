@@ -77,7 +77,7 @@ export function paymentCashReceived(data: PrototypeAppState, payment: { id: stri
 }
 
 /** Billing-period charges and cash received during that period are distinct. */
-export function selectSummary(data: PrototypeAppState, asOf: string, periodId?: string) {
+export function selectSummary(data: PrototypeAppState, asOf: string, periodId?: string, occupancyAsOf = asOf) {
   const charges = issuedCharges(data, asOf, periodId)
   const billed = charges.reduce((sum, c) => sum + c.amountCents, 0)
   const applied = charges.reduce((sum, c) => sum + chargePaid(data, c.id, asOf), 0)
@@ -87,7 +87,7 @@ export function selectSummary(data: PrototypeAppState, asOf: string, periodId?: 
     && (!period || (p.paidOn >= period.startDate && p.paidOn <= period.endDate))).reduce((sum, p) => sum + paymentCashReceived(data, p), 0)
   return {
     tenants: data.tenants.filter(t => t.status === 'ACTIVE').length,
-    ...selectRoomSummary(data, asOf),
+    ...selectRoomSummary(data, occupancyAsOf),
     billed, applied, received, outstanding: billed - applied, unresolved,
     credit: data.tenantCredits.reduce((sum, c) => sum + creditRemaining(data, c, asOf), 0),
     overdue: charges.filter(c => c.dueDate < asOf && chargeBalance(data, c, asOf) > 0).length,

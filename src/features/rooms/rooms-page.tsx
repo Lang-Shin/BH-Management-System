@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { usePrototype } from '@/hooks/use-prototype'
 import { roomOccupancy, roomOccupants, selectRoomSummary, type RoomOccupancy } from '@/domain/calculations/summary'
-import { DEMO_DATE } from '@/data/fixtures/demo'
+import { DEMO_DATE, OCCUPANCY_DATE } from '@/data/fixtures/demo'
 import { formatMoney } from '@/lib/format'
 import { roomMonthlyRentCents } from '@/domain/calculations/billing-rates'
 import { roomCategoryLabel } from '@/lib/room-rates'
@@ -30,8 +30,8 @@ export default function Rooms() {
   const [notice, setNotice] = useState('')
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
   const roomTrigger = useRef<HTMLElement | null>(null)
-  const summary = selectRoomSummary(data, DEMO_DATE)
-  const rooms = data.rooms.filter(room => filter === 'ALL' || roomOccupancy(data, room, DEMO_DATE) === filter)
+  const summary = selectRoomSummary(data, OCCUPANCY_DATE)
+  const rooms = data.rooms.filter(room => filter === 'ALL' || roomOccupancy(data, room, OCCUPANCY_DATE) === filter)
   const selectedRoom = data.rooms.find(room => room.id === selectedRoomId)
   const filterIndex = filters.findIndex(item => item.value === filter)
   const hasLegacyRoomNumbers = data.rooms.some(room => /^(10[1-9]|11[0-5])$/.test(room.name))
@@ -45,8 +45,8 @@ export default function Rooms() {
     <div className="mb-6 flex flex-wrap items-center justify-between gap-4"><div className="room-segmented-control" role="group" aria-label="Show rooms" style={{ '--filter-index': filterIndex, '--filter-column': filterIndex % 2, '--filter-row': Math.floor(filterIndex / 2) } as CSSProperties}>{filters.map(item => <Button key={item.value} variant="ghost" className="room-filter" aria-pressed={filter === item.value} onClick={() => setFilter(item.value)}>{item.label}</Button>)}</div><p role="status" className="text-sm text-muted-foreground">Showing <AnimatedNumber value={rooms.length} /> of <AnimatedNumber value={data.rooms.length} /> rooms</p></div>
     {notice ? <p role="status" className="room-management-notice">{notice}</p> : <p role="status" className="sr-only" />}
     {rooms.length === 0 ? <div key={filter} className="room-filter-empty"><EmptyState title="No rooms here" description="There are no rooms with this status." action={<Button variant="outline" onClick={() => setFilter('ALL')}>Show all rooms</Button>} /></div> : <div key={filter} className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">{rooms.map((room, index) => {
-      const tenants = roomOccupants(data, room.id, DEMO_DATE)
-      const status = roomOccupancy(data, room, DEMO_DATE)
+      const tenants = roomOccupants(data, room.id, OCCUPANCY_DATE)
+      const status = roomOccupancy(data, room, OCCUPANCY_DATE)
       return <Card role="button" tabIndex={0} aria-haspopup="dialog" aria-label={`Room ${room.name} details`} key={room.id} className="room-result-card shadow-none" style={{ '--room-card-delay': `${Math.min(index, 5) * 45}ms` } as CSSProperties} onClick={event => { roomTrigger.current = event.currentTarget; setSelectedRoomId(room.id) }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); roomTrigger.current = event.currentTarget; setSelectedRoomId(room.id) } }}><CardContent>
         <div className="flex flex-wrap items-center justify-between gap-3"><span className="rounded-xl bg-accent p-3 text-[var(--tint)]"><DoorOpen className="size-6" aria-hidden="true" /></span><StatusBadge status={statusLabels[status]} /></div>
         <h2 className="mt-5 text-xl font-bold">Room {room.name}</h2><p className="mt-1 text-lg font-bold text-[var(--tint)]">{formatMoney(roomMonthlyRentCents(data, room, DEMO_DATE))}<span className="text-sm font-medium text-muted-foreground">/month</span></p><p className="mt-2 text-sm text-muted-foreground">Floor {room.floor} · <AnimatedNumber value={room.capacity} /> {room.capacity === 1 ? 'bed' : 'beds'}{room.capacity > 1 ? ' · Shared-capacity room' : ' · Single room'}</p>

@@ -25,3 +25,9 @@ When an approved transfer starts after the first day of a billing period, the re
 ## Schema and Phase 2
 
 Schema v14 adds `roomChangeRequests`; v15 adds persisted `billingReviewPeriodIds` and derives them for approved v14 requests during migration. The current browser implementation uses the shared reducer and repository. A future backend must enforce tenant ownership, landlord authorization, room capacity, idempotency, concurrency, and decision transitions server-side.
+
+## Effective dates and occupancy
+
+Room occupancy is derived from active room assignments using stable room IDs, not from stored room-status labels. Landlord rooms, tenant selection, and tenant room views share one occupancy date: the later of the sample financial date and the local calendar date. A transfer effective today is visible immediately after approval and after a browser refresh. A future-dated transfer remains scheduled until its effective date, then becomes active when the refreshed app loads.
+
+Financial reporting and receipt history remain anchored to the documented sample date so the demonstration totals stay deterministic.

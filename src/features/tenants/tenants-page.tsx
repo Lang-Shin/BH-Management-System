@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { usePrototype } from '@/hooks/use-prototype'
 import { activeAssignments } from '@/domain/calculations/summary'
-import { DEMO_DATE } from '@/data/fixtures/demo'
+import { OCCUPANCY_DATE } from '@/data/fixtures/demo'
 import { TENANT_STATUS_LABELS } from '@/lib/labels'
 import { AddTenantDialog } from './add-tenant-dialog'
 import { TenantDetailsDialog } from './tenant-details-dialog'
@@ -21,7 +21,7 @@ export default function Tenants() {
   const [notice, setNotice] = useState('')
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const selected = data.tenants.find(tenant => tenant.id === selectedId)
-  const assignments = activeAssignments(data, DEMO_DATE)
+  const assignments = activeAssignments(data, OCCUPANCY_DATE)
   const roomName = (tenantId: string) => data.rooms.find(room => room.id === assignments.find(assignment => assignment.tenantId === tenantId)?.roomId)?.name
   const query = search.trim().toLowerCase()
   const activeTenants = data.tenants.filter(tenant => tenant.status === 'ACTIVE')

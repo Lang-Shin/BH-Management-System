@@ -1,4 +1,4 @@
-import { createDemoData, DEMO_DATE } from '@/data/fixtures/demo'
+import { createDemoData, DEMO_DATE, OCCUPANCY_DATE } from '@/data/fixtures/demo'
 import type { PrototypeData } from '@/domain/types/models'
 import type { StateAction } from './actions'
 import { activeAssignments } from '@/domain/calculations/summary'
@@ -16,7 +16,7 @@ import { createTenant, deleteTenant, moveOutTenant, updateTenant } from '@/domai
 export function prototypeReducer(state: PrototypeData, action: StateAction): PrototypeData {
   switch (action.type) {
     case 'data/loaded':
-      return action.data
+      return reconcileOccupancy(action.data, action.data, OCCUPANCY_DATE, { createMoveInObligations: false })
     case 'tenant/noteUpdated':
       return {
         ...state,
@@ -128,11 +128,11 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
       }
     }
     case 'roomChange/requested': {
-      const result = submitRoomChangeRequest(state, action.draft, DEMO_DATE)
+      const result = submitRoomChangeRequest(state, action.draft, OCCUPANCY_DATE)
       return result.ok ? result.data : state
     }
     case 'roomChange/cancelled': {
-      const result = cancelRoomChangeRequest(state, action.requestId, action.tenantId, action.reason, DEMO_DATE)
+      const result = cancelRoomChangeRequest(state, action.requestId, action.tenantId, action.reason, OCCUPANCY_DATE)
       return result.ok ? result.data : state
     }
     case 'roomChange/rejected': {
@@ -142,7 +142,7 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
     case 'roomChange/approved': {
       const result = approveRoomChangeRequest(state, action.requestId, action)
       if (!result.ok) return state
-      return reconcileOccupancy(state, result.data, DEMO_DATE, { createMoveInObligations: false })
+      return reconcileOccupancy(state, result.data, OCCUPANCY_DATE, { createMoveInObligations: false })
     }
     case 'demo/reset':
       return createDemoData()

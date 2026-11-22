@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createDemoData, DEMO_DATE } from '@/data/fixtures/demo'
+import { createDemoData, DEMO_DATE, OCCUPANCY_DATE } from '@/data/fixtures/demo'
 import { prototypeReducer } from '@/app/state/prototype-reducer'
 import {
   approveRoomChangeRequest, approvedRoomChangeBillingReviews, cancelRoomChangeRequest, latestRoomChangeRequest, pendingRoomChangeRequests,
@@ -9,9 +9,16 @@ import { selectNotifications } from '@/features/notifications/select-notificatio
 import { localStorageRepository, STORAGE_KEY } from '@/data/repositories/local-storage-repository'
 import { parsePrototypeSnapshot, STORAGE_SCHEMA_VERSION } from '@/data/repositories/prototype-storage'
 import { isPrototypeData } from '@/domain/validation/prototype-data'
+import { roomOccupancy, roomOccupants } from '@/domain/calculations/summary'
+import { reconcileOccupancy } from '@/domain/calculations/move-in'
 
 const draft = { tenantId: 'tenant-1', requestedRoomId: 'room-13', requestedStartDate: DEMO_DATE, reason: 'Need more space' }
 const approval = (ack = true) => ({ effectiveDate: DEMO_DATE, note: 'Approved after review', billingReviewAcknowledged: ack, decidedAt: DEMO_DATE })
+const addDays = (date: string, days: number) => {
+  const value = new Date(`${date}T00:00:00Z`)
+  value.setUTCDate(value.getUTCDate() + days)
+  return value.toISOString().slice(0, 10)
+}
 
 describe('tenant room change requests', () => {
   it('submits a pending request without financial or assignment changes', () => {
@@ -222,6 +229,47 @@ describe('tenant room change requests', () => {
     expect(approved.data.occupancyCycles.find(cycle => cycle.id === targetCycle.id)).toEqual(targetCycle)
     expect(approved.data.roomAssignments.filter(item => item.roomId === 'room-10' && item.endDate === null)).toHaveLength(2)
     expect(approved.data.occupancyCycles.find(cycle => cycle.roomId === 'room-9')).toMatchObject({ status: 'CLOSED' })
+  })
+
+  it('makes Room 02 occupied immediately when a Room 06 occupant transfers effective today', () => {
+    let data = prototypeReducer(createDemoData(), { type: 'tenant/created', draft: { name: 'Room 06 First', email: 'r06first@example.com', phone: '+63 900 555 0101', address: 'Test', roomId: 'room-13', moveInDate: '2026-11-01', notes: '' } })
+    data = prototypeReducer(data, { type: 'tenant/created', draft: { name: 'Room 06 Second', email: 'r06second@example.com', phone: '+63 900 555 0102', address: 'Test', roomId: 'room-13', moveInDate: '2026-11-01', notes: '' } })
+    const room06 = data.rooms.find(room => room.name === '06')!
+    const room02 = data.rooms.find(room => room.name === '02')!
+    const occupants = roomOccupants(data, room06.id, DEMO_DATE)
+    expect(occupants).toHaveLength(2)
+    const [mover, remaining] = occupants
+    const request = submitRoomChangeRequest(data, { tenantId: mover!.id, requestedRoomId: room02.id, requestedStartDate: DEMO_DATE, reason: 'Move to Room 02' }, DEMO_DATE)
+    if (!request.ok) throw new Error(JSON.stringify(request.errors))
+    const approved = approveRoomChangeRequest(request.data, request.request.id, approval())
+    expect(approved.ok).toBe(true)
+    if (!approved.ok) return
+    expect(roomOccupants(approved.data, room02.id, DEMO_DATE).map(tenant => tenant.id)).toEqual([mover!.id])
+    expect(roomOccupancy(approved.data, room02, DEMO_DATE)).toBe('OCCUPIED')
+    expect(roomOccupants(approved.data, room06.id, DEMO_DATE).map(tenant => tenant.id)).toEqual([remaining!.id])
+    expect(roomOccupancy(approved.data, room06, DEMO_DATE)).toBe('OCCUPIED')
+  })
+
+  it('keeps a future-dated Room 02 transfer inactive until its effective date', () => {
+    let data = prototypeReducer(createDemoData(), { type: 'tenant/created', draft: { name: 'Future Mover', email: 'future.mover@example.com', phone: '+63 900 555 0103', address: 'Test', roomId: 'room-13', moveInDate: '2026-11-01', notes: '' } })
+    data = prototypeReducer(data, { type: 'tenant/created', draft: { name: 'Future Remaining', email: 'future.remaining@example.com', phone: '+63 900 555 0104', address: 'Test', roomId: 'room-13', moveInDate: '2026-11-01', notes: '' } })
+    const room06 = data.rooms.find(room => room.name === '06')!
+    const room02 = data.rooms.find(room => room.name === '02')!
+    const mover = roomOccupants(data, room06.id, DEMO_DATE).find(tenant => tenant.name === 'Future Mover')!
+    const futureDate = addDays(OCCUPANCY_DATE, 5)
+    const request = submitRoomChangeRequest(data, { tenantId: mover.id, requestedRoomId: room02.id, requestedStartDate: futureDate, reason: 'Future move' }, DEMO_DATE)
+    if (!request.ok) throw new Error(JSON.stringify(request.errors))
+    const approved = approveRoomChangeRequest(request.data, request.request.id, { ...approval(), effectiveDate: futureDate })
+    expect(approved.ok).toBe(true)
+    if (!approved.ok) return
+    expect(roomOccupants(approved.data, room02.id, DEMO_DATE)).toEqual([])
+    expect(roomOccupancy(approved.data, room02, DEMO_DATE)).toBe('AVAILABLE')
+    expect(roomOccupants(approved.data, room02.id, futureDate).map(tenant => tenant.id)).toEqual([mover.id])
+    expect(roomOccupancy(approved.data, room02, futureDate)).toBe('OCCUPIED')
+    expect(roomOccupants(approved.data, room06.id, futureDate)).toHaveLength(1)
+    const effective = reconcileOccupancy(approved.data, approved.data, futureDate, { createMoveInObligations: false })
+    expect(effective.occupancyCycles.find(cycle => cycle.roomId === room02.id && cycle.status === 'ACTIVE')).toBeDefined()
+    expect(effective.occupancyCycles.find(cycle => cycle.roomId === room06.id)).toMatchObject({ status: 'ACTIVE', endedAt: null })
   })
 
   it('persists requests and migrates version 13 with an empty request queue', async () => {

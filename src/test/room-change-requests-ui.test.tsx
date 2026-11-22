@@ -1,17 +1,26 @@
+import { StrictMode } from 'react'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import { AppRouter } from '@/app/router/app-router'
 import { PrototypeProvider } from '@/app/providers/prototype-provider'
-import { createDemoData, DEMO_DATE } from '@/data/fixtures/demo'
+import { TENANT_DEMO_STORAGE_KEY } from '@/app/providers/tenant-demo'
+import { createDemoData, DEMO_DATE, OCCUPANCY_DATE } from '@/data/fixtures/demo'
 import { localStorageRepository, STORAGE_KEY } from '@/data/repositories/local-storage-repository'
 import { approveRoomChangeRequest, submitRoomChangeRequest } from '@/domain/calculations/room-change-requests'
+import { prototypeReducer } from '@/app/state/prototype-reducer'
+import { roomOccupants } from '@/domain/calculations/summary'
 
 function renderApp(route: string) {
-  return render(<PrototypeProvider repository={localStorageRepository}><MemoryRouter initialEntries={[route]}><AppRouter /></MemoryRouter></PrototypeProvider>)
+  return render(<StrictMode><PrototypeProvider repository={localStorageRepository}><MemoryRouter initialEntries={[route]}><AppRouter /></MemoryRouter></PrototypeProvider></StrictMode>)
 }
 const stored = () => JSON.parse(localStorage.getItem(STORAGE_KEY)!).data
+const addDays = (date: string, days: number) => {
+  const value = new Date(`${date}T00:00:00Z`)
+  value.setUTCDate(value.getUTCDate() + days)
+  return value.toISOString().slice(0, 10)
+}
 
 describe('tenant room change request UI', () => {
   it('submits a request from My Room without changing the tenancy or money', async () => {
@@ -126,6 +135,72 @@ describe('landlord room change review UI', () => {
     expect(saved.occupancyCycles.find((cycle: { roomId: string }) => cycle.roomId === 'room-1')).toMatchObject({ status: 'CLOSED' })
     expect(saved.occupancyCycles.find((cycle: { roomId: string }) => cycle.roomId === 'room-13')).toMatchObject({ status: 'ACTIVE' })
     expect(screen.getByText('APPROVED')).toBeInTheDocument()
+  })
+
+  it('shows Room 02 occupied after approval and keeps the remaining Room 06 occupant', async () => {
+    const user = userEvent.setup()
+    let data = prototypeReducer(createDemoData(), { type: 'tenant/created', draft: { name: 'Room 06 Mover', email: 'r06.mover@example.com', phone: '+63 900 555 0201', address: 'Test', roomId: 'room-13', moveInDate: '2026-11-01', notes: '' } })
+    data = prototypeReducer(data, { type: 'tenant/created', draft: { name: 'Room 06 Remaining', email: 'r06.remaining@example.com', phone: '+63 900 555 0202', address: 'Test', roomId: 'room-13', moveInDate: '2026-11-01', notes: '' } })
+    const mover = roomOccupants(data, 'room-13', DEMO_DATE).find(tenant => tenant.name === 'Room 06 Mover')!
+    const remaining = roomOccupants(data, 'room-13', DEMO_DATE).find(tenant => tenant.name === 'Room 06 Remaining')!
+    const first = submitRoomChangeRequest(data, { tenantId: mover.id, requestedRoomId: 'room-15', requestedStartDate: DEMO_DATE, reason: 'Move to Room 02' }, DEMO_DATE)
+    if (!first.ok) throw new Error('request failed')
+    await localStorageRepository.save(first.data)
+    const view = renderApp('/tenants')
+    await screen.findByRole('heading', { level: 1, name: 'Tenants' })
+    const panel = screen.getByRole('region', { name: 'Room change request queue' })
+    await user.click(within(panel).getByRole('button', { name: /Review room change request from Room 06 Mover/ }))
+    const dialog = screen.getByRole('dialog', { name: 'Review room change request' })
+    await user.click(within(dialog).getByRole('checkbox', { name: /I reviewed the outstanding balance/ }))
+    await user.click(within(dialog).getByRole('button', { name: 'Approve transfer' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Review room change request' })).not.toBeInTheDocument())
+
+    expect(stored().roomAssignments.some((assignment: { tenantId: string; roomId: string; endDate: string | null }) => assignment.tenantId === mover.id && assignment.roomId === 'room-15' && assignment.endDate === null)).toBe(true)
+    expect(stored().roomAssignments.some((assignment: { tenantId: string; roomId: string; endDate: string | null }) => assignment.tenantId === remaining.id && assignment.roomId === 'room-13' && assignment.endDate === null)).toBe(true)
+
+    view.unmount()
+    const roomsView = renderApp('/rooms')
+    const room02 = await screen.findByRole('button', { name: 'Room 02 details' })
+    expect(room02).toHaveTextContent('Occupied')
+    expect(room02).toHaveTextContent('Room 06 Mover')
+    const room06 = screen.getByRole('button', { name: 'Room 06 details' })
+    expect(room06).toHaveTextContent('Occupied')
+    expect(room06).toHaveTextContent('Room 06 Remaining')
+    expect(room06).not.toHaveTextContent('Room 06 Mover')
+
+    roomsView.unmount()
+    localStorage.setItem(TENANT_DEMO_STORAGE_KEY, mover.id)
+    renderApp('/tenant/room')
+    expect(await screen.findByText('Room 02 at a glance')).toBeInTheDocument()
+  })
+
+  it('keeps a future-dated transfer scheduled instead of occupying Room 02 early', async () => {
+    const user = userEvent.setup()
+    const futureDate = addDays(OCCUPANCY_DATE, 5)
+    let data = prototypeReducer(createDemoData(), { type: 'tenant/created', draft: { name: 'Future Room 06 Mover', email: 'future.r06.mover@example.com', phone: '+63 900 555 0301', address: 'Test', roomId: 'room-13', moveInDate: '2026-11-01', notes: '' } })
+    data = prototypeReducer(data, { type: 'tenant/created', draft: { name: 'Future Room 06 Remaining', email: 'future.r06.remaining@example.com', phone: '+63 900 555 0302', address: 'Test', roomId: 'room-13', moveInDate: '2026-11-01', notes: '' } })
+    const mover = roomOccupants(data, 'room-13', OCCUPANCY_DATE).find(tenant => tenant.name === 'Future Room 06 Mover')!
+    const request = submitRoomChangeRequest(data, { tenantId: mover.id, requestedRoomId: 'room-15', requestedStartDate: futureDate, reason: 'Future move to Room 02' }, OCCUPANCY_DATE)
+    if (!request.ok) throw new Error(JSON.stringify(request.errors))
+    await localStorageRepository.save(request.data)
+    const view = renderApp('/tenants')
+    await screen.findByRole('heading', { level: 1, name: 'Tenants' })
+    const panel = screen.getByRole('region', { name: 'Room change request queue' })
+    await user.click(within(panel).getByRole('button', { name: /Review room change request from Future Room 06 Mover/ }))
+    const dialog = screen.getByRole('dialog', { name: 'Review room change request' })
+    await user.click(within(dialog).getByRole('checkbox', { name: /I reviewed the outstanding balance/ }))
+    await user.click(within(dialog).getByRole('button', { name: 'Approve transfer' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Review room change request' })).not.toBeInTheDocument())
+    expect(stored().roomAssignments.find((assignment: { tenantId: string; endDate: string | null }) => assignment.tenantId === mover.id && assignment.endDate === null)).toMatchObject({ roomId: 'room-15', startDate: futureDate })
+
+    view.unmount()
+    renderApp('/rooms')
+    const room02 = await screen.findByRole('button', { name: 'Room 02 details' })
+    expect(room02).toHaveTextContent('Available')
+    expect(room02).not.toHaveTextContent('Future Room 06 Mover')
+    const room06 = screen.getByRole('button', { name: 'Room 06 details' })
+    expect(room06).toHaveTextContent('Future Room 06 Mover')
+    expect(room06).toHaveTextContent('Future Room 06 Remaining')
   })
 
   it('rejects with a tenant-visible reason and no assignment changes', async () => {

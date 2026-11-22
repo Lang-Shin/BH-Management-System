@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { usePrototype } from '@/hooks/use-prototype'
 import { useTenantDemo } from '@/app/providers/tenant-demo'
 import { roomOccupancy } from '@/domain/calculations/summary'
-import { DEMO_DATE } from '@/data/fixtures/demo'
+import { OCCUPANCY_DATE } from '@/data/fixtures/demo'
 import { formatDate } from '@/lib/format'
 import { selectTenantPersona } from './tenant-persona'
 import { RoomChangeRequestSection } from './room-change-request-status'
@@ -39,7 +39,7 @@ export default function TenantRoom() {
           <div><dt>Room number</dt><dd>Room {room.name}</dd></div>
           <div><dt>Floor</dt><dd>Floor {room.floor}</dd></div>
           <div><dt>Stay started</dt><dd>{formatDate(assignment.startDate)}</dd></div>
-          <div><dt>Room status</dt><dd><StatusBadge status={occupancyLabels[roomOccupancy(data, room, DEMO_DATE)]} /></dd></div>
+          <div><dt>Room status</dt><dd><StatusBadge status={occupancyLabels[roomOccupancy(data, room, OCCUPANCY_DATE)]} /></dd></div>
           <div><dt>Room type</dt><dd>{room.kind === 'SHARED' ? 'Shared-capacity room' : 'Private room'}</dd></div>
           <div><dt>Number of beds</dt><dd>{room.capacity} {room.capacity === 1 ? 'bed' : 'beds'}</dd></div>
           <div><dt>Washing machine</dt><dd className="flex items-center justify-end gap-2"><WashingMachine className="size-4 text-muted-foreground" aria-hidden="true" />{room.washingMachineEnabled ? 'Included' : 'Not subscribed'}</dd></div>

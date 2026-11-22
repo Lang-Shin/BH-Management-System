@@ -1,6 +1,6 @@
 import type { PrototypeAppState, Room, RoomAssignment, Tenant } from '@/domain/types/models'
 import { activeAssignments } from '@/domain/calculations/summary'
-import { DEMO_DATE } from '@/data/fixtures/demo'
+import { OCCUPANCY_DATE } from '@/data/fixtures/demo'
 
 export interface TenantPersona {
   tenant: Tenant
@@ -18,7 +18,7 @@ export function selectTenantPersona(data: PrototypeAppState, tenantId?: string):
     ? data.tenants.find(item => item.id === tenantId) ?? null
     : data.tenants.find(item => item.status === 'ACTIVE') ?? null
   if (!tenant) return null
-  const assignment = activeAssignments(data, DEMO_DATE).filter(item => item.tenantId === tenant.id).at(0) ?? null
+  const assignment = activeAssignments(data, OCCUPANCY_DATE).filter(item => item.tenantId === tenant.id).at(0) ?? null
   const room = assignment ? data.rooms.find(item => item.id === assignment.roomId) ?? null : null
   return { tenant, assignment, room }
 }

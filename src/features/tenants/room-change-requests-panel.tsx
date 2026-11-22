@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { PaginatedDataTable } from '@/components/shared/table-pagination'
 import { usePrototype } from '@/hooks/use-prototype'
-import { DEMO_DATE } from '@/data/fixtures/demo'
+import { OCCUPANCY_DATE } from '@/data/fixtures/demo'
 import { formatDate, formatMoney } from '@/lib/format'
 import type { RoomChangeRequest } from '@/domain/types/models'
 import { activeAssignments } from '@/domain/calculations/summary'
@@ -23,7 +23,7 @@ function RoomChangeReviewDialog({ request, onClose, onNotice }: {
 }) {
   const { data, dispatch, persistSnapshot } = usePrototype()
   const [mode, setMode] = useState<'approve' | 'reject'>('approve')
-  const [effectiveDate, setEffectiveDate] = useState(request.requestedStartDate)
+  const [effectiveDate, setEffectiveDate] = useState(request.requestedStartDate >= OCCUPANCY_DATE ? request.requestedStartDate : OCCUPANCY_DATE)
   const [note, setNote] = useState('')
   const [acknowledged, setAcknowledged] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -42,7 +42,7 @@ function RoomChangeReviewDialog({ request, onClose, onNotice }: {
   async function approve() {
     if (saving) return
     const result = approveRoomChangeRequest(data, request.id, {
-      effectiveDate, note, billingReviewAcknowledged: acknowledged, decidedAt: DEMO_DATE,
+      effectiveDate, note, billingReviewAcknowledged: acknowledged, decidedAt: OCCUPANCY_DATE,
     })
     if (!result.ok) {
       setErrors(result.errors)
@@ -55,14 +55,14 @@ function RoomChangeReviewDialog({ request, onClose, onNotice }: {
       setErrors({ general: `Request was not saved. ${warning}` })
       return
     }
-    dispatch({ type: 'roomChange/approved', requestId: request.id, effectiveDate, note, billingReviewAcknowledged: acknowledged, decidedAt: DEMO_DATE })
+    dispatch({ type: 'roomChange/approved', requestId: request.id, effectiveDate, note, billingReviewAcknowledged: acknowledged, decidedAt: OCCUPANCY_DATE })
     onNotice(`Room change approved for ${tenant?.name ?? 'tenant'} effective ${formatDate(effectiveDate)}. Historical records were preserved.`)
     onClose()
   }
 
   async function reject() {
     if (saving) return
-    const result = rejectRoomChangeRequest(data, request.id, note, DEMO_DATE)
+    const result = rejectRoomChangeRequest(data, request.id, note, OCCUPANCY_DATE)
     if (!result.ok) {
       setErrors(result.errors)
       return
@@ -74,7 +74,7 @@ function RoomChangeReviewDialog({ request, onClose, onNotice }: {
       setErrors({ general: `Request was not saved. ${warning}` })
       return
     }
-    dispatch({ type: 'roomChange/rejected', requestId: request.id, reason: note.trim(), decidedAt: DEMO_DATE })
+    dispatch({ type: 'roomChange/rejected', requestId: request.id, reason: note.trim(), decidedAt: OCCUPANCY_DATE })
     onNotice(`Room change request for ${tenant?.name ?? 'tenant'} was rejected. No tenancy or financial record changed.`)
     onClose()
   }
@@ -108,7 +108,7 @@ function RoomChangeReviewDialog({ request, onClose, onNotice }: {
       </div>
       {mode === 'approve' && <div className="grid gap-4">
         <label className="grid gap-2 text-sm font-semibold">Effective move date
-          <input type="date" min={DEMO_DATE} value={effectiveDate} onChange={event => { setEffectiveDate(event.target.value); setAcknowledged(false); setErrors({}) }} className="min-h-12 rounded-xl border border-input bg-card px-3" aria-invalid={Boolean(errors.startDate)} />
+          <input type="date" min={OCCUPANCY_DATE} value={effectiveDate} onChange={event => { setEffectiveDate(event.target.value); setAcknowledged(false); setErrors({}) }} className="min-h-12 rounded-xl border border-input bg-card px-3" aria-invalid={Boolean(errors.startDate)} />
         </label>
         <label className="grid gap-2 text-sm font-semibold">Decision note (optional)
           <textarea rows={3} maxLength={500} value={note} onChange={event => setNote(event.target.value)} className="w-full rounded-xl border border-input bg-card p-3" />
