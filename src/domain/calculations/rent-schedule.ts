@@ -26,6 +26,7 @@ export type RentScheduleError =
   | 'PARTIAL_RENT'
   | 'UNPAID_PERIOD_CONFLICT'
   | 'INVALID_AMOUNT'
+  | 'TRANSFER_REVIEW_REQUIRED'
 
 export interface RentPeriodQuoteLine {
   sequence: number
@@ -152,6 +153,10 @@ export function quoteRentPrepayment(
   if (!cycle) return { ok: false, reason: 'CYCLE_NOT_FOUND' }
   if (cycle.status !== 'ACTIVE') return { ok: false, reason: 'CYCLE_NOT_ACTIVE' }
   if (cycle.rentSchedule !== 'ANNIVERSARY' || !cycle.rentAnchorDate) return { ok: false, reason: 'NOT_ANNIVERSARY' }
+  if (data.financialReviewCases.some(review => review.occupancyCycleId === cycle.id
+    && review.status === 'OPEN' && review.type === 'TRANSFER_PREPAID_RENT')) {
+    return { ok: false, reason: 'TRANSFER_REVIEW_REQUIRED' }
+  }
   if (!Number.isSafeInteger(input.periodCount) || input.periodCount < 1 || input.periodCount > 120) {
     return { ok: false, reason: 'INVALID_PERIOD_COUNT' }
   }

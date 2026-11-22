@@ -14,11 +14,11 @@ Tenants submit a room-change request from **My Room**. Landlord approval is requ
 - Pending requests expire when the tenant moves out or is directly transferred.
 - The tenant sees a status timeline with submission, landlord review, decision, effective date, and any billing-review flag.
 
-Landlord approval revalidates capacity and the current assignment, records the approved effective date, closes the old assignment the day before, creates a new assignment, and uses the existing occupancy reconciliation. Requested date is retained separately from the landlord-approved date. A transfer into an occupied shared room preserves the room's occupancy cycle and does not create another move-in obligation.
+Landlord approval revalidates capacity and the current assignment, records the approved effective date, closes the old assignment the day before, creates a new assignment, and uses the existing occupancy reconciliation. Requested date is retained separately from the landlord-approved date. A transfer into an occupied shared room preserves the room's occupancy cycle and does not create another move-in obligation. A transfer into an empty room creates a new cycle without advance or deposit, with the destination rent rate beginning in the next applicable rental period.
 
 ## Financial review
 
-Submission and approval show outstanding balance, held advance credit, rent difference, and mid-period/paid-period billing review. Approval requires acknowledgment when review is needed. Nothing is posted automatically: no advance application, deposit adjustment, refund, or income recognition. Transfers never create another advance or deposit, never collect a deposit top-up, and keep the original deposit amount unchanged. No proration rule is introduced. A transfer during a paid anniversary period or with future prepaid rent creates a manual financial-review case.
+Submission and approval show outstanding balance, held advance credit, rent difference, and mid-period/paid-period billing review. Approval requires acknowledgment when review is needed. Nothing is posted automatically: no advance application, deposit adjustment, refund, or income recognition. Transfers never create another advance or deposit, never collect a deposit top-up, and keep the original deposit amount unchanged. No proration or mid-period rent difference is introduced. The destination rate begins with the next applicable rental period. Paid or prepaid source periods, different anniversaries, and existing destination obligations create manual financial-review cases; no payment is reallocated or rewritten.
 
 When an approved transfer starts after the first day of a billing period, the request stores that period's ID in `billingReviewPeriodIds`. The Billing page flags the affected period for manual rent review and lists the tenant and effective date. The flag never changes bills on its own.
 
@@ -28,7 +28,7 @@ Schema v14 adds `roomChangeRequests`; v15 adds persisted `billingReviewPeriodIds
 
 ## Effective dates and occupancy
 
-Room occupancy is derived from active room assignments using stable room IDs, not from stored room-status labels. Landlord rooms, tenant selection, and tenant room views share one occupancy date: the later of the sample financial date and the local calendar date. A transfer effective today is visible immediately after approval and after a browser refresh. A future-dated transfer remains scheduled until its effective date; the timeline shows **Scheduled** before that date and **Effective** on or after it. Date-dependent UI refreshes automatically at local midnight and on every reload.
+Room occupancy is derived from active room assignments using stable room IDs, not from stored room-status labels. Landlord rooms, tenant selection, and tenant room views share one occupancy date: the later of the sample financial date and the Asia/Manila business date. A transfer effective today is visible immediately after approval and after a browser refresh. A future-dated transfer remains scheduled until its effective date; the timeline shows **Scheduled** before that date and **Effective** on or after it. Date-dependent UI refreshes automatically at Manila midnight and on every reload.
 
 Financial reporting and receipt history remain anchored to the documented sample date so the demonstration totals stay deterministic.
 
@@ -39,3 +39,5 @@ Pending requests do not reserve a room. Approval creates a future room assignmen
 Capacity is checked at every overlapping assignment start for the requested interval. Shared rooms reserve only the required slots. Capacity changes, new tenancies, transfers, and approval all use the same check. The room selector excludes rooms that cannot accept the selected date and marks unavailable options in the tenancy form.
 
 Approved future reservations can be explicitly rescheduled or cancelled from the landlord request queue. These workflows recheck capacity, preserve request/audit history, release or move the assignment safely, and do not create or rewrite financial transactions. Effective or already-active transfers are not silently cancelled.
+
+A tenant whose tenancy has formally ended is not an internal transfer if they return later. A return is a new admission: it requires a new advance and security deposit at the new room’s rate, and the new advance settles the new first rental period. Earlier payments, deposits, receipts, and tenancy history remain unchanged.

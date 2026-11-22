@@ -202,11 +202,17 @@ describe('anniversary rent periods', () => {
     const source = transferred.occupancyCycles.find(item => item.id === created.cycle.id)!
     const destination = transferred.occupancyCycles.find(item => item.roomId === 'room-15' && item.status === 'ACTIVE')!
     expect(source.status).toBe('CLOSED')
-    expect(destination).toMatchObject({ rentSchedule: 'ANNIVERSARY', rentAnchorDate: '2026-11-15', cycleOrigin: 'TRANSFER' })
+    expect(destination).toMatchObject({
+      startedAt: '2026-11-15', rentSchedule: 'ANNIVERSARY', rentAnchorDate: '2026-12-13', rentAnchorDay: 13, cycleOrigin: 'TRANSFER',
+    })
     expect(transferred.moveInObligations.filter(item => item.roomId === 'room-15')).toHaveLength(0)
     expect(transferred.charges.filter(item => item.category === 'ADVANCE' || item.category === 'SECURITY_DEPOSIT')).toHaveLength(2)
     const destinationRent = transferred.rentObligations.find(item => item.occupancyCycleId === destination.id)!
-    expect(destinationRent).toMatchObject({ amountCents: 500_000, source: 'REGULAR' })
+    expect(destinationRent).toMatchObject({ amountCents: 500_000, source: 'REGULAR', issuedOn: '2026-11-15', dueDate: '2026-12-13' })
+    const destinationPeriod = transferred.rentalPeriods.find(item => item.occupancyCycleId === destination.id)!
+    expect(destinationPeriod).toMatchObject({ startDate: '2026-12-13', endDateExclusive: '2027-01-13', dueDate: '2026-12-13' })
+    expect(transferred.rentObligations.some(item => item.occupancyCycleId === destination.id
+      && item.issuedOn <= '2026-11-15' && item.dueDate < '2026-12-13')).toBe(false)
     expect(transferred.advanceApplications).toHaveLength(1)
     expect(transferred.advanceApplications[0]!.rentObligationId).toBe(
       transferred.rentObligations.find(item => item.occupancyCycleId === created.cycle.id)!.id,

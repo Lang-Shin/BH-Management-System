@@ -104,6 +104,8 @@ The production build uses `/api/v1` through `.env.production`. Local `npm run de
 - Existing demo/localStorage records are never rewritten automatically. Legacy cycles remain calendar-based until the room becomes vacant; paid legacy advances are surfaced for owner review.
 - Rent is due on the **first day of each anniversary period**; `rental_periods.due_date` and the corresponding obligation due date equal the period start date. Dates use the Asia/Manila business calendar. There are no late-payment penalties or grace periods.
 - Fully advance-covered or prepaid periods display **PAID** and are excluded from later collection quotes. Security deposits remain separate.
+- Internal transfers never collect another advance or deposit. Destination rent starts with the next applicable period; occupied-room anniversaries remain unchanged, and gaps/overlaps or prepaid source rent are flagged for owner review rather than automatically reallocated.
+- A tenant who formally moved out and later returns is a new admission with a new advance and deposit at the new room’s rate; historical records remain unchanged.
 - The Worker stores the versioned workspace snapshot as the compatibility read model and mirrors Phase 2 occupancy, rent, advance-application, prepayment, deposit-holding, and review records into normalized D1 tables in the same batch. Full normalization of legacy utility/payment tables remains Phase 2 follow-up work.
 
 ### Technology and organization

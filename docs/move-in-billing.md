@@ -9,7 +9,10 @@
 - The advance and deposit are separate full-category categories. The deposit is never applied to rent, never recognized as rental income automatically, and never added to a destination room's price difference during a transfer.
 - Adding a roommate does not create another advance, deposit, rent obligation, or anniversary. The first occupant establishes the cycle anchor; later occupants join it.
 - If the first occupant leaves while another remains, the cycle and rent anchor remain. A fully vacant room closes the cycle; a later occupancy starts a new cycle and anchor.
-- Transfers into an occupied room preserve the destination room's existing anniversary. Transfers into a vacant room create a new destination cycle at the destination rate without automatically collecting another advance or deposit.
+- Internal transfers never collect another advance or security deposit. The destination room rate begins with the next applicable rental period, not on the transfer date; no mid-period rent difference is charged automatically.
+- Transfers into an occupied room preserve the destination room's existing anniversary and existing room rent obligation. Transfers into a vacant room create a new cycle without move-in charges, using the next period after transfer as its first rent period.
+- Different source/destination anniversaries, already-paid overlaps, destination obligations, and future prepaid source rent are flagged for owner review. Payments are not reallocated, refunded, or rewritten automatically.
+- A tenant who has formally moved out and later returns is a new admission: a new cycle must collect a new advance and security deposit at the new room's rate, and the new advance settles the new first period.
 - Advance and deposit payment categories are collected in full; partial category payments are rejected, while legacy partial allocations remain readable.
 - A payment correction that removes an advance reverses its first-rent application with an audit event. The first period then returns to unpaid rather than keeping a duplicate cash or rent record.
 - Transfers during an already-paid rent period and transfers with future prepaid rent create manual financial-review cases. Settled payments are not modified automatically.

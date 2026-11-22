@@ -24,6 +24,8 @@ export default function Billing() {
   const billingRooms = selectBillingRooms(data, periodId, occupancyDate, false)
   const summary = billingOverview(billingRooms)
   const billingReviews = approvedRoomChangeBillingReviews(data, periodId)
+  const financialReviews = data.financialReviewCases.filter(review => review.status === 'OPEN'
+    && (review.type === 'TRANSFER_RENT_DIFFERENCE' || review.type === 'TRANSFER_PREPAID_RENT'))
 
   return <>
     <PageHeader title="Billing" description="Check rent, electricity, water, and washing payments in one place." />
@@ -33,6 +35,13 @@ export default function Billing() {
       <strong>Room change billing review</strong>
       <p>{billingReviews.length === 1 ? 'One approved mid-period transfer affects' : `${billingReviews.length} approved mid-period transfers affect`} this billing period. Review room rent manually; no proration or duplicate rent was generated automatically.</p>
       <ul>{billingReviews.map(request => <li key={request.id}>{data.tenants.find(tenant => tenant.id === request.tenantId)?.name ?? 'Tenant'}: Room {data.rooms.find(room => room.id === request.currentRoomId)?.name ?? '—'} → Room {data.rooms.find(room => room.id === request.requestedRoomId)?.name ?? '—'}{request.approvedStartDate ? `, effective ${formatDate(request.approvedStartDate)}` : ''}</li>)}</ul>
+    </div>}
+    {financialReviews.length > 0 && <div className="room-change-billing-review" role="note">
+      <strong>Transfer financial review</strong>
+      <p>{financialReviews.length === 1 ? 'One internal transfer has an unresolved financial reconciliation.' : `${financialReviews.length} internal transfers have unresolved financial reconciliations.`} No rent, refund, prepayment, or deposit was moved automatically.</p>
+      <ul>{financialReviews.map(review => <li key={review.id}>
+        Room {data.rooms.find(room => room.id === review.roomId)?.name ?? '—'}: {review.note}
+      </li>)}</ul>
     </div>}
     <section className="mb-7 grid gap-5 xl:grid-cols-3" aria-label="Bills overview">
       <StatCard label="Total bills" value={formatMoney(summary.billed)} detail="All bills for the month you chose." icon={ReceiptText} />

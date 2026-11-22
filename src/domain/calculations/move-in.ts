@@ -7,6 +7,7 @@ import { activeMoveInPolicy } from './move-in-policy'
 import { nextReceiptNumbers } from './receipt-numbering'
 import { dateParts, rentObligationForPeriod, rentObligationPaidCents, rentalPeriodsForCycle } from './rental-periods'
 import { ensureFirstRentalPeriod, openFinancialReviewCase } from './rent-schedule'
+import { internalTransferContext } from './internal-transfer'
 
 export type MoveInSettlementStatus = 'NOT PAID' | 'PARTLY PAID' | 'PAID' | 'REFUNDED'
 export type MoveInCategory = 'ADVANCE' | 'SECURITY_DEPOSIT'
@@ -86,7 +87,10 @@ export function reconcileOccupancy(
     const previousOccupants = activeOccupantIds(previous, room.id, asOf)
     let cycle = activeCycleForRoom(data, room.id)
     let sameDayReplacement = false
+    let createdCycle = false
     if (nextOccupants.length > 0) {
+      const existingCycle = cycle
+      const transfer = options.createMoveInObligations ? null : internalTransferContext(data, room.id, asOf)
       if (!cycle) {
         const closedToday = data.occupancyCycles
           .filter(item => item.roomId === room.id && item.status === 'CLOSED' && item.endedAt === asOf)
@@ -102,16 +106,42 @@ export function reconcileOccupancy(
           .filter(assignment => assignment.roomId === room.id)
           .map(assignment => assignment.startDate)
           .sort()[0] ?? asOf
-        const anchorDay = dateParts(startedAt).day
+        const rentAnchorDate = transfer?.nextRentStart ?? startedAt
+        const anchorDay = dateParts(rentAnchorDate).day
         cycle = {
           id: `cycle-${room.id}-${startedAt}`, roomId: room.id, startedAt, endedAt: null, status: 'ACTIVE',
-          rentSchedule: 'ANNIVERSARY', rentAnchorDate: startedAt, rentAnchorDay: anchorDay,
+          rentSchedule: 'ANNIVERSARY', rentAnchorDate, rentAnchorDay: anchorDay,
           cycleOrigin: options.createMoveInObligations ? 'NEW_MOVE_IN' : 'TRANSFER',
           createdAt: asOf, updatedAt: asOf,
         }
+        createdCycle = true
         data = { ...data, occupancyCycles: [...data.occupancyCycles, cycle] }
       }
-      if (cycle.rentSchedule === 'ANNIVERSARY') {
+      if (transfer) {
+        if (cycle.rentSchedule === 'ANNIVERSARY' && !transfer.sourcePrepaidPeriodStartingAtNextRent) {
+          data = ensureFirstRentalPeriod(data, cycle, options.createMoveInObligations ? 'MOVE_IN_ADVANCE' : 'REGULAR')
+        }
+        if (transfer.sourcePrepaidPeriodStartingAtNextRent) {
+          data = openFinancialReviewCase(data, {
+            type: 'TRANSFER_PREPAID_RENT', roomId: room.id, occupancyCycleId: cycle.id,
+            tenantId: transfer.tenantId, rentalPeriodId: transfer.sourcePrepaidPeriodStartingAtNextRent.id, asOf,
+            note: `Source rent is prepaid for the period starting ${transfer.sourcePrepaidPeriodStartingAtNextRent.startDate}. The destination rate starts with the next applicable period; no automatic charge or reallocation was posted.`,
+          })
+        } else if (createdCycle && cycle.rentSchedule === 'ANNIVERSARY') {
+          data = ensureFirstRentalPeriod(data, cycle, 'REGULAR')
+        }
+        if (existingCycle && (transfer.sourceHasPaidOrPrepaidCoverage
+          || (existingCycle.rentSchedule === 'ANNIVERSARY' && transfer.sourceCycle?.rentAnchorDate
+            && existingCycle.rentAnchorDate !== transfer.sourceCycle.rentAnchorDate))) {
+          const destinationPeriod = rentalPeriodsForCycle(data, existingCycle.id)
+            .find(period => period.startDate <= transfer.transferDate && period.endDateExclusive > transfer.transferDate)
+          data = openFinancialReviewCase(data, {
+            type: 'TRANSFER_RENT_DIFFERENCE', roomId: room.id, occupancyCycleId: existingCycle.id,
+            tenantId: transfer.tenantId, rentalPeriodId: destinationPeriod?.id ?? null, asOf,
+            note: `Destination room already has an occupancy rent schedule for ${transfer.transferDate}; source and destination anniversaries or paid coverage differ. No mid-period charge, refund, or reallocation was posted.`,
+          })
+        }
+      } else if (cycle.rentSchedule === 'ANNIVERSARY') {
         data = ensureFirstRentalPeriod(data, cycle, options.createMoveInObligations ? 'MOVE_IN_ADVANCE' : 'REGULAR')
       }
       if (options.createMoveInObligations && previousOccupants.length === 0 && !sameDayReplacement) {

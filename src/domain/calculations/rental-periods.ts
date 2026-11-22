@@ -60,6 +60,15 @@ export function rentDueDate(periodStartDate: string): string {
   return periodStartDate
 }
 
+/** First anniversary period start strictly after a transfer or other cutover date. */
+export function nextAnniversaryStartAfter(anchorDate: string, afterDate: string): string {
+  for (let offset = 1; offset <= 240; offset += 1) {
+    const start = addMonthsClamped(anchorDate, offset)
+    if (start > afterDate) return start
+  }
+  throw new Error('No next anniversary period found within twenty years.')
+}
+
 export function rentalPeriodId(cycleId: string, sequence: number): string {
   return `rent-period-${cycleId}-${sequence}`
 }
