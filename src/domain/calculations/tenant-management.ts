@@ -132,6 +132,24 @@ function newAssignment(data: PrototypeAppState, tenantId: string, roomId: string
   }
 }
 
+/** Shared transfer primitive used by landlord editing and approved tenant requests. */
+export function transferTenantRoom(data: PrototypeAppState, tenantId: string, roomId: string, startDate: string, asOf: string) {
+  const current = activeAssignments(data, asOf).find(assignment => assignment.tenantId === tenantId)
+  if (!current || current.roomId === roomId) return null
+  const assignment = newAssignment(data, tenantId, roomId, startDate)
+  return {
+    data: {
+      ...data,
+      roomAssignments: [
+        ...data.roomAssignments.map(item => item.id === current.id ? { ...item, endDate: previousDate(startDate) } : item),
+        assignment,
+      ],
+    },
+    assignment,
+    endedAssignmentId: current.id,
+  }
+}
+
 export function createTenant(data: PrototypeAppState, draft: TenantDraft, asOf: string): TenantMutationResult {
   const errors = validateTenantDraft(data, draft, { asOf })
   if (Object.keys(errors).length > 0) return { ok: false, errors }
@@ -155,10 +173,8 @@ export function updateTenant(data: PrototypeAppState, tenantId: string, draft: T
   const existingAssignment = activeAssignments(data, asOf).find(assignment => assignment.tenantId === tenantId)
   let roomAssignments = data.roomAssignments
   if (existingAssignment && draft.roomId && draft.roomId !== existingAssignment.roomId) {
-    roomAssignments = roomAssignments.map(assignment => assignment.id === existingAssignment.id
-      ? { ...assignment, endDate: previousDate(draft.moveInDate) }
-      : assignment)
-    roomAssignments = [...roomAssignments, newAssignment(data, tenantId, draft.roomId, draft.moveInDate)]
+    const transferred = transferTenantRoom(data, tenantId, draft.roomId, draft.moveInDate, asOf)
+    if (transferred) roomAssignments = transferred.data.roomAssignments
   } else if (existingAssignment && draft.roomId === existingAssignment.roomId && draft.moveInDate !== existingAssignment.startDate) {
     roomAssignments = roomAssignments.map(assignment => assignment.id === existingAssignment.id ? { ...assignment, startDate: draft.moveInDate } : assignment)
   } else if (!existingAssignment && draft.roomId) {

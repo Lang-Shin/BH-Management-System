@@ -9,6 +9,7 @@ import { roomOccupancy } from '@/domain/calculations/summary'
 import { DEMO_DATE } from '@/data/fixtures/demo'
 import { formatDate } from '@/lib/format'
 import { selectTenantPersona } from './tenant-persona'
+import { RoomChangeRequestSection } from './room-change-request-status'
 
 const occupancyLabels = { OCCUPIED: 'Occupied', AVAILABLE: 'Available', UNDER_REPAIR: 'Under repair' } as const
 
@@ -45,6 +46,7 @@ export default function TenantRoom() {
         </dl>
       </CardContent>
     </Card>}
+    {room && persona && <div className="mt-6"><RoomChangeRequestSection tenantId={persona.tenant.id} room={room} /></div>}
     {room && <div className="mt-6"><EmptyState title="More room details are coming soon" description="Maintenance requests and additional stay details arrive in a later phase. The landlord workspace still manages rooms for now." /></div>}
   </>
 }

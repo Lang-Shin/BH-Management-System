@@ -28,6 +28,11 @@ const changeLabels: Record<AuditEvent['action'], string> = {
   MOVE_IN_PAYMENT_RECORDED: 'Move-in payment recorded',
   MOVE_IN_POLICY_UPDATED: 'Move-in policy updated',
   METER_INITIALIZED: 'Initial meter reading recorded',
+  ROOM_CHANGE_REQUESTED: 'Room change requested',
+  ROOM_CHANGE_CANCELLED: 'Room change request cancelled',
+  ROOM_CHANGE_APPROVED: 'Room change approved',
+  ROOM_CHANGE_REJECTED: 'Room change rejected',
+  ROOM_CHANGE_EXPIRED: 'Room change request expired',
 }
 
 export default function Reports() {

@@ -193,6 +193,27 @@ export interface MoveInPolicy {
   moveOutSettlement: 'MANUAL_REVIEW'
 }
 
+export type RoomChangeRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'EXPIRED'
+
+/** A tenant request; approval uses the shared tenancy transfer service and never posts money. */
+export interface RoomChangeRequest {
+  id: string
+  tenantId: string
+  currentAssignmentId: string
+  currentRoomId: string
+  requestedRoomId: string
+  requestedStartDate: string
+  reason: string
+  status: RoomChangeRequestStatus
+  createdAt: string
+  decidedAt: string | null
+  decidedBy: string | null
+  decisionReason: string | null
+  approvedStartDate: string | null
+  resultingAssignmentId: string | null
+  billingReviewAcknowledged: boolean
+}
+
 export type PaymentScope = 'TENANT' | 'ROOM'
 
 export interface Payment {
@@ -279,8 +300,8 @@ export interface AuditEvent {
   id: string
   actorId: string
   occurredOn: string
-  action: 'DEMO_SEEDED' | 'READING_CORRECTED' | 'CHARGE_CORRECTED' | 'PAYMENT_CORRECTED' | 'ALLOCATION_REVERSED' | 'ELECTRICITY_PAYMENT_RECORDED' | 'ROOM_PAYMENT_RECORDED' | 'MOVE_IN_PAYMENT_RECORDED' | 'MOVE_IN_POLICY_UPDATED' | 'METER_INITIALIZED'
-  entityType: 'PROTOTYPE' | 'METER_READING' | 'CHARGE' | 'PAYMENT' | 'PAYMENT_ALLOCATION'
+  action: 'DEMO_SEEDED' | 'READING_CORRECTED' | 'CHARGE_CORRECTED' | 'PAYMENT_CORRECTED' | 'ALLOCATION_REVERSED' | 'ELECTRICITY_PAYMENT_RECORDED' | 'ROOM_PAYMENT_RECORDED' | 'MOVE_IN_PAYMENT_RECORDED' | 'MOVE_IN_POLICY_UPDATED' | 'METER_INITIALIZED' | 'ROOM_CHANGE_REQUESTED' | 'ROOM_CHANGE_CANCELLED' | 'ROOM_CHANGE_APPROVED' | 'ROOM_CHANGE_REJECTED' | 'ROOM_CHANGE_EXPIRED'
+  entityType: 'PROTOTYPE' | 'METER_READING' | 'CHARGE' | 'PAYMENT' | 'PAYMENT_ALLOCATION' | 'ROOM_CHANGE_REQUEST'
   entityId: string
   reason: string
   /** Serialized before/after snapshots preserve a future correction trail. */
@@ -310,6 +331,7 @@ export interface PrototypeAppState {
   occupancyCycles: OccupancyCycle[]
   moveInObligations: MoveInObligation[]
   moveInPolicy: MoveInPolicy
+  roomChangeRequests: RoomChangeRequest[]
 }
 
 /** Existing prototype reducer/repository payload name; identical to the app state. */

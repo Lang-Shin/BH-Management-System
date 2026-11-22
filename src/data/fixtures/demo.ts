@@ -206,6 +206,6 @@ export function createDemoData(): PrototypeAppState {
   return {
     tenants, rooms, roomAssignments, electricityMeters, meterReadings, electricityBillObligations, electricityRates,
     roomRentRates, waterRates, washingRates, billingPeriods, charges, payments, paymentAllocations, tenantCredits, receipts,
-    paymentCorrections, auditEvents, occupancyCycles, moveInObligations: [], moveInPolicy: { ...DEFAULT_MOVE_IN_POLICY },
+    paymentCorrections, auditEvents, occupancyCycles, moveInObligations: [], moveInPolicy: { ...DEFAULT_MOVE_IN_POLICY }, roomChangeRequests: [],
   }
 }

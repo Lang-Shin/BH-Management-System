@@ -1629,3 +1629,39 @@ li:nth-child(n + 5) > .notification-item { animation-delay: 120ms; }
 }
 @media (max-width: 43.999rem) { .move-in-amounts { grid-template-columns: minmax(0, 1fr); } }
 @media (prefers-reduced-motion: reduce) { .move-in-disclosure, .move-in-toggle svg, .move-in-record-button[data-slot="button"] { transition: none; } }
+
+/* Tenant room change requests */
+.room-change-section, .room-change-panel { min-width: 0; padding: 22px; border: 1px solid var(--border); border-radius: 20px; background: var(--card); }
+.room-change-heading, .room-change-panel-heading { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 18px; }
+.room-change-heading h2, .room-change-panel-heading h2 { font-size: 18px; font-weight: 750; }
+.room-change-heading p, .room-change-panel-heading p { margin-top: 5px; max-width: 42rem; color: var(--muted-foreground); font-size: 13px; line-height: 1.6; }
+.room-change-panel { margin-bottom: 24px; }
+.room-change-panel-count { display: inline-flex; padding: 6px 10px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted-foreground); font-size: 12px; font-weight: 700; }
+.room-change-card { display: grid; gap: 4px; min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: color-mix(in srgb, var(--surface-2) 42%, var(--card)); }
+.room-change-card .font-semibold { overflow-wrap: anywhere; }
+.room-change-status { display: inline-flex; align-items: center; min-height: 24px; padding: 3px 8px; border: 1px solid var(--border); border-radius: 999px; font-size: 10px; font-weight: 800; letter-spacing: 0.035em; color: var(--muted-foreground); }
+.room-change-status[data-status="PENDING"] { color: #7a5000; background: color-mix(in srgb, #9a6400 8%, var(--card)); border-color: color-mix(in srgb, #9a6400 24%, var(--border)); }
+.room-change-status[data-status="APPROVED"] { color: #0f7b5a; background: color-mix(in srgb, #0f7b5a 8%, var(--card)); border-color: color-mix(in srgb, #0f7b5a 24%, var(--border)); }
+.room-change-status[data-status="REJECTED"] { color: color-mix(in srgb, var(--red) 78%, var(--label)); background: color-mix(in srgb, var(--red) 6%, var(--card)); border-color: color-mix(in srgb, var(--red) 22%, var(--border)); }
+.dark .room-change-status[data-status="APPROVED"] { color: #7dd8b6; }
+.room-change-notice { margin-bottom: 14px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--tint) 20%, var(--border)); border-radius: 10px; color: var(--tint); font-size: 13px; line-height: 1.5; }
+.room-change-empty { display: flex; align-items: flex-start; gap: 8px; color: var(--muted-foreground); font-size: 13px; line-height: 1.55; }
+.room-change-empty svg { width: 18px; height: 18px; flex: none; color: var(--tint); }
+.room-change-current { display: flex; align-items: center; gap: 10px; padding: 13px; border: 1px solid var(--border); border-radius: 12px; background: color-mix(in srgb, var(--surface-2) 48%, var(--card)); }
+.room-change-current svg { width: 20px; height: 20px; flex: none; color: var(--tint); }
+.room-change-warnings { padding: 13px; border: 1px solid color-mix(in srgb, #9a6400 24%, var(--border)); border-radius: 12px; background: color-mix(in srgb, #9a6400 5%, var(--card)); font-size: 12px; line-height: 1.55; }
+.room-change-warnings dl { display: grid; gap: 6px; margin-top: 10px; }
+.room-change-warnings dl > div { display: flex; justify-content: space-between; gap: 12px; }
+.room-change-warnings dt { color: var(--muted-foreground); }
+.room-change-warnings dd { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.room-change-warnings ul { display: grid; gap: 5px; margin-top: 10px; padding-left: 18px; }
+.room-change-review-summary { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: color-mix(in srgb, var(--surface-2) 45%, var(--card)); font-size: 13px; }
+.room-change-review-summary > div { display: flex; justify-content: space-between; gap: 16px; }
+.room-change-review-summary span { color: var(--muted-foreground); }
+.room-change-review-summary strong { max-width: 65%; text-align: right; overflow-wrap: anywhere; }
+@media (max-width: 39.999rem) {
+  .room-change-section, .room-change-panel { padding: 16px; }
+  .room-change-heading > button, .room-change-panel-heading > button { width: 100%; }
+  .room-change-review-summary > div { flex-direction: column; gap: 4px; }
+  .room-change-review-summary strong { max-width: 100%; text-align: left; }
+}

@@ -3,7 +3,7 @@ import { initialRoomRentRates, initialWashingRates, initialWaterRates } from '@/
 import { DEFAULT_MOVE_IN_POLICY } from '@/domain/calculations/move-in-policy'
 import { isPrototypeData, isRecord } from '@/domain/validation/prototype-data'
 
-export const STORAGE_SCHEMA_VERSION = 13
+export const STORAGE_SCHEMA_VERSION = 14
 
 type ParseResult =
   | { ok: true; data: PrototypeAppState }
@@ -37,6 +37,11 @@ function withPaymentScope(value: unknown): unknown {
       : payment)
     : value.payments
   return { ...value, payments }
+}
+
+function withRoomChangeRequests(value: unknown): unknown {
+  if (!isRecord(value)) return value
+  return { ...value, roomChangeRequests: Array.isArray(value.roomChangeRequests) ? value.roomChangeRequests : [] }
 }
 
 /**
@@ -83,7 +88,8 @@ function withMoveInState(value: unknown, fromVersion: 7 | 8 | 9 | 10): Prototype
     moveInPolicy,
   }
   const withPayments = withPaymentScope(candidate)
-  return isPrototypeData(withPayments) ? withPayments : null
+  const withRequests = withRoomChangeRequests(withPayments)
+  return isPrototypeData(withRequests) ? withRequests : null
 }
 
 /** Pure, non-throwing decoding. Storage access and recovery decisions stay in the adapter. */
@@ -95,13 +101,13 @@ export function parsePrototypeSnapshot(raw: string): ParseResult {
     return { ok: false, reason: 'MALFORMED_JSON' }
   }
   if (!isRecord(parsed)) return { ok: false, reason: 'INVALID_DATA' }
-  // Version 13 adds optional explicit meter-room links and administrative initial readings.
-  // Existing v12 records retain every field and ID without relabeling legacy reading history.
-  if (parsed.version === 12) {
-    return isPrototypeData(parsed.data) ? { ok: true, data: parsed.data } : { ok: false, reason: 'INVALID_DATA' }
+  // Version 14 adds tenant room-change requests. Older versions receive an empty request queue.
+  if (parsed.version === 13 || parsed.version === 12) {
+    const migrated = withRoomChangeRequests(parsed.data)
+    return isPrototypeData(migrated) ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }
   }
   if (parsed.version === 11) {
-    const migrated = withPaymentScope(parsed.data)
+    const migrated = withRoomChangeRequests(withPaymentScope(parsed.data))
     return isPrototypeData(migrated) ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }
   }
   if (parsed.version === 10) {

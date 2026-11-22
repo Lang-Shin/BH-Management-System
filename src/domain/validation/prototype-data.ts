@@ -83,6 +83,19 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     && id(r.advanceChargeId) && id(r.depositChargeId) && Number.isSafeInteger(r.policyVersion) && (r.policyVersion as number) > 0
     && oneOf(r.depositDisposition, ['NON_REFUNDABLE', 'MANUAL_REVIEW']) && r.depositIncomeRecognition === 'NOT_RECOGNIZED'
     && date(r.createdAt) && r.status === 'OPEN')) return false
+  if (!rows(value, 'roomChangeRequests', r => id(r.tenantId) && id(r.currentAssignmentId) && id(r.currentRoomId)
+    && id(r.requestedRoomId) && date(r.requestedStartDate) && text(r.reason) && r.reason.length >= 3 && r.reason.length <= 500
+    && oneOf(r.status, ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'EXPIRED']) && date(r.createdAt)
+    && (r.decidedAt === null || date(r.decidedAt)) && (r.decidedBy === null || id(r.decidedBy))
+    && (r.decisionReason === null || (text(r.decisionReason) && r.decisionReason.length <= 500))
+    && (r.approvedStartDate === null || date(r.approvedStartDate))
+    && (r.resultingAssignmentId === null || id(r.resultingAssignmentId))
+    && typeof r.billingReviewAcknowledged === 'boolean'
+    && (r.status === 'PENDING'
+      ? r.decidedAt === null && r.decidedBy === null && r.decisionReason === null && r.approvedStartDate === null && r.resultingAssignmentId === null
+      : r.status === 'APPROVED'
+        ? r.decidedAt !== null && r.approvedStartDate !== null && r.resultingAssignmentId !== null
+        : r.decidedAt !== null && r.decidedBy !== null && r.decisionReason !== null && r.resultingAssignmentId === null))) return false
   if (!isRecord(value.moveInPolicy)
     || !Number.isSafeInteger(value.moveInPolicy.version) || (value.moveInPolicy.version as number) < 1
     || !oneOf(value.moveInPolicy.advanceApplication, ['FIRST_MONTH', 'LAST_MONTH', 'MANUAL'])
@@ -92,8 +105,8 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     || value.moveInPolicy.transferDecrease !== 'MANUAL_REVIEW'
     || value.moveInPolicy.moveOutSettlement !== 'MANUAL_REVIEW') return false
   if (!rows(value, 'auditEvents', r => id(r.actorId) && date(r.occurredOn) && id(r.entityId) && text(r.reason)
-    && oneOf(r.action, ['DEMO_SEEDED', 'READING_CORRECTED', 'CHARGE_CORRECTED', 'PAYMENT_CORRECTED', 'ALLOCATION_REVERSED', 'ELECTRICITY_PAYMENT_RECORDED', 'ROOM_PAYMENT_RECORDED', 'MOVE_IN_PAYMENT_RECORDED', 'MOVE_IN_POLICY_UPDATED', 'METER_INITIALIZED'])
-    && oneOf(r.entityType, ['PROTOTYPE', 'METER_READING', 'CHARGE', 'PAYMENT', 'PAYMENT_ALLOCATION'])
+    && oneOf(r.action, ['DEMO_SEEDED', 'READING_CORRECTED', 'CHARGE_CORRECTED', 'PAYMENT_CORRECTED', 'ALLOCATION_REVERSED', 'ELECTRICITY_PAYMENT_RECORDED', 'ROOM_PAYMENT_RECORDED', 'MOVE_IN_PAYMENT_RECORDED', 'MOVE_IN_POLICY_UPDATED', 'METER_INITIALIZED', 'ROOM_CHANGE_REQUESTED', 'ROOM_CHANGE_CANCELLED', 'ROOM_CHANGE_APPROVED', 'ROOM_CHANGE_REJECTED', 'ROOM_CHANGE_EXPIRED'])
+    && oneOf(r.entityType, ['PROTOTYPE', 'METER_READING', 'CHARGE', 'PAYMENT', 'PAYMENT_ALLOCATION', 'ROOM_CHANGE_REQUEST'])
     && nullableText(r.beforeSnapshot) && nullableText(r.afterSnapshot))) return false
 
   // Each collection and its discriminated field shapes have been checked above.
@@ -114,7 +127,7 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
   if ([data.tenants, data.rooms, data.roomAssignments, data.electricityMeters, data.meterReadings,
     data.electricityBillObligations, data.electricityRates, data.roomRentRates, data.waterRates, data.washingRates,
     data.billingPeriods, data.charges, data.payments, data.paymentAllocations, data.tenantCredits, data.receipts,
-    data.paymentCorrections, data.auditEvents, data.occupancyCycles, data.moveInObligations]
+    data.paymentCorrections, data.auditEvents, data.occupancyCycles, data.moveInObligations, data.roomChangeRequests]
     .some(items => new Set(items.map(item => item.id)).size !== items.length)) return false
   if (new Set(data.electricityRates.map(rate => rate.effectiveFrom)).size !== data.electricityRates.length
     || new Set(data.roomRentRates.map(rate => `${rate.categoryId}:${rate.effectiveFrom}`)).size !== data.roomRentRates.length
@@ -291,9 +304,21 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
       && event.reason === correction.reason
   })) return false
   if (new Set(data.paymentCorrections.map(correction => correction.correctedPaymentId)).size !== data.paymentCorrections.length) return false
+  if (!data.roomChangeRequests.every(request => {
+    const current = data.roomAssignments.find(item => item.id === request.currentAssignmentId)
+    const resulting = request.resultingAssignmentId ? data.roomAssignments.find(item => item.id === request.resultingAssignmentId) : null
+    return tenant(request.tenantId) && data.rooms.some(room => room.id === request.currentRoomId)
+      && data.rooms.some(room => room.id === request.requestedRoomId)
+      && current?.tenantId === request.tenantId && current.roomId === request.currentRoomId
+      && (request.status !== 'APPROVED' || (resulting?.tenantId === request.tenantId && resulting.roomId === request.requestedRoomId
+        && resulting.startDate === request.approvedStartDate))
+  })) return false
+  if (new Set(data.roomChangeRequests.filter(request => request.status === 'PENDING').map(request => request.tenantId)).size
+    !== data.roomChangeRequests.filter(request => request.status === 'PENDING').length) return false
   return data.auditEvents.every(a => a.entityType === 'PROTOTYPE'
     || (a.entityType === 'METER_READING' && data.meterReadings.some(r => r.id === a.entityId))
     || (a.entityType === 'CHARGE' && data.charges.some(c => c.id === a.entityId))
     || (a.entityType === 'PAYMENT' && data.payments.some(p => p.id === a.entityId))
-    || (a.entityType === 'PAYMENT_ALLOCATION' && data.paymentAllocations.some(p => p.id === a.entityId)))
+    || (a.entityType === 'PAYMENT_ALLOCATION' && data.paymentAllocations.some(p => p.id === a.entityId))
+    || (a.entityType === 'ROOM_CHANGE_REQUEST' && data.roomChangeRequests.some(r => r.id === a.entityId)))
 }

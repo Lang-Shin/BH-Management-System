@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Bell, CalendarClock, CheckCheck, CircleAlert, Wallet, Wrench, type LucideIcon } from 'lucide-react'
+import { ArrowLeftRight, Bell, CalendarClock, CheckCheck, CircleAlert, Wallet, Wrench, type LucideIcon } from 'lucide-react'
 import { usePrototype } from '@/hooks/use-prototype'
 import { DEMO_DATE } from '@/data/fixtures/demo'
 import { selectNotifications, type NotificationKind } from '@/features/notifications/select-notifications'
@@ -14,6 +14,7 @@ const icons: Record<NotificationKind, LucideIcon> = {
   'due-soon': CalendarClock,
   repair: Wrench,
   credit: Wallet,
+  'room-change': ArrowLeftRight,
 }
 
 export function NotificationCenter() {

@@ -1,8 +1,9 @@
 import { chargeBalance, creditRemaining, issuedCharges, roomOccupancy, unresolvedElectricity } from '@/domain/calculations/summary'
 import type { PrototypeAppState } from '@/domain/types/models'
+import { pendingRoomChangeRequests } from '@/domain/calculations/room-change-requests'
 import { formatMoney } from '@/lib/format'
 
-export type NotificationKind = 'overdue' | 'due-soon' | 'repair' | 'credit'
+export type NotificationKind = 'overdue' | 'due-soon' | 'repair' | 'credit' | 'room-change'
 
 export interface AppNotification {
   id: string
@@ -44,6 +45,7 @@ export function selectNotifications(data: PrototypeAppState, asOf: string): AppN
     .map(credit => ({ credit, remaining: creditRemaining(data, credit, asOf) }))
     .filter(item => item.remaining > 0)
   const awaitingElectricity = unresolvedElectricity(data, asOf).length
+  const roomChangeRequests = pendingRoomChangeRequests(data)
 
   const notifications: AppNotification[] = []
 
@@ -81,7 +83,15 @@ export function selectNotifications(data: PrototypeAppState, asOf: string): AppN
       href: '/rooms',
     })
   }
-
+  if (roomChangeRequests.length > 0) {
+    notifications.push({
+      id: `room-change:${roomChangeRequests.map(request => request.id).join(',')}`,
+      kind: 'room-change',
+      title: roomChangeRequests.length === 1 ? '1 tenant requested a room change' : `${roomChangeRequests.length} tenants requested room changes`,
+      description: 'Review the request before changing any room assignment.',
+      href: '/tenants',
+    })
+  }
   if (credits.length > 0) {
     const total = credits.reduce((sum, item) => sum + item.remaining, 0)
     const tenantIds = [...new Set(credits.map(item => item.credit.tenantId))].sort()
