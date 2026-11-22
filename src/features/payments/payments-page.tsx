@@ -2,6 +2,7 @@ import { Wallet, Banknote, CircleDollarSign, ShieldCheck } from 'lucide-react'
 import { PageHeader, PreviewNotice, StatCard } from '@/components/shared/page'
 import { PaginatedDataTable } from '@/components/shared/table-pagination'
 import { usePrototype } from '@/hooks/use-prototype'
+import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { creditRemaining, selectSummary } from '@/domain/calculations/summary'
 import { DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
 import { moveInSummary, selectMoveInObligations } from '@/domain/calculations/move-in'
@@ -10,9 +11,10 @@ import { PaymentsTransactionWorkspace } from './payments-transaction-workspace'
 
 export default function Payments() {
   const { data } = usePrototype()
+  const occupancyDate = useOccupancyDate()
   const summary = selectSummary(data, DEMO_DATE, DEMO_PERIOD)
-  const moveIn = moveInSummary(data, DEMO_DATE)
-  const moveInRows = selectMoveInObligations(data, DEMO_DATE).map(view => ({ ...view, id: view.obligation.id }))
+  const moveIn = moveInSummary(data, occupancyDate)
+  const moveInRows = selectMoveInObligations(data, occupancyDate).map(view => ({ ...view, id: view.obligation.id }))
 
   return <>
     <PageHeader title="Payments & Receipts" description="See who paid, when they paid, and what the payment was for." />

@@ -3,6 +3,7 @@ import { Check, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { usePrototype } from '@/hooks/use-prototype'
+import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { validateTenantDraft, type TenantDraft, type TenantDraftErrors } from '@/domain/calculations/tenant-management'
 import { DEMO_DATE } from '@/data/fixtures/demo'
 import { TenantFormFields } from './tenant-form-fields'
@@ -13,6 +14,7 @@ const emptyTenantForm: TenantDraft = {
 
 export function AddTenantDialog({ onSaved }: { onSaved?: (message: string) => void }) {
   const { data, dispatch } = usePrototype()
+  const occupancyDate = useOccupancyDate()
 
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState<'form' | 'success'>('form')
@@ -37,11 +39,11 @@ export function AddTenantDialog({ onSaved }: { onSaved?: (message: string) => vo
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (submitting.current) return
-    const nextErrors = validateTenantDraft(data, values, { asOf: DEMO_DATE })
+    const nextErrors = validateTenantDraft(data, values, { asOf: occupancyDate })
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
     submitting.current = true
-    dispatch({ type: 'tenant/created', draft: values })
+    dispatch({ type: 'tenant/created', draft: values, asOf: occupancyDate })
     setSavedName(values.name.trim())
     setStep('success')
     onSaved?.(`Tenant ${values.name.trim()} was added.`)

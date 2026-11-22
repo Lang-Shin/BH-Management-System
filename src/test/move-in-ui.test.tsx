@@ -7,7 +7,7 @@ import { PrototypeProvider } from '@/app/providers/prototype-provider'
 import { TENANT_DEMO_STORAGE_KEY } from '@/app/providers/tenant-demo'
 import { prototypeReducer } from '@/app/state/prototype-reducer'
 import { localStorageRepository, STORAGE_KEY } from '@/data/repositories/local-storage-repository'
-import { createDemoData } from '@/data/fixtures/demo'
+import { createDemoData, OCCUPANCY_DATE } from '@/data/fixtures/demo'
 import { prepareMoveInPayment, selectMoveInObligations } from '@/domain/calculations/move-in'
 import type { TenantDraft } from '@/domain/calculations/tenant-management'
 import type { PrototypeAppState } from '@/domain/types/models'
@@ -61,6 +61,35 @@ describe('move-in advance and security deposit UI', () => {
     expect(within(section).getByLabelText('Security deposit terms')).toBe(policy)
     expect(within(section).getByRole('button', { name: 'Record move-in payment for room 01' })).toBeEnabled()
     expect(localStorage.getItem(STORAGE_KEY)).toBe(before)
+  })
+
+  it('shows one Room 06 move-in obligation after adding two occupants and keeps it after refresh', async () => {
+    const user = userEvent.setup()
+    const app = renderApp('/tenants')
+    async function addTenant(name: string) {
+      await user.click(await screen.findByRole('button', { name: 'Add tenant' }))
+      const dialog = await screen.findByRole('dialog', { name: 'Add a tenant' })
+      await user.type(within(dialog).getByLabelText('Full name'), name)
+      await user.selectOptions(within(dialog).getByLabelText('Room assignment'), 'room-13')
+      await user.click(within(dialog).getByRole('button', { name: 'Add tenant' }))
+      const success = await screen.findByRole('dialog', { name: 'Tenant added successfully' })
+      await user.click(within(success).getByRole('button', { name: 'Got it' }))
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    }
+    await addTenant('Room 06 First')
+    await addTenant('Room 06 Second')
+    await user.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('link', { name: 'Billing' }))
+    const section = await screen.findByRole('region', { name: 'Move-in advance & security deposit' })
+    let row = within(within(section).getByRole('table')).getByText('Room 06').closest('tr')!
+    expect(within(row).getAllByText(/4,000\.00/)).toHaveLength(2)
+    expect(within(row).getByRole('button', { name: 'Record move-in payment for room 06' })).toBeEnabled()
+    expect(savedData().moveInObligations.filter(obligation => obligation.roomId === 'room-13')).toHaveLength(1)
+
+    app.unmount()
+    renderApp('/billing')
+    const refreshedSection = await screen.findByRole('region', { name: 'Move-in advance & security deposit' })
+    row = within(within(refreshedSection).getByRole('table')).getByText('Room 06').closest('tr')!
+    expect(within(row).getAllByText(/4,000\.00/)).toHaveLength(2)
   })
 
   it('remembers the UI-only collapsed preference when navigating back to Billing', async () => {
@@ -169,7 +198,7 @@ describe('move-in advance and security deposit UI', () => {
 
     await waitFor(() => {
       const data = savedData()
-      const view = selectMoveInObligations(data, '2026-11-13', 'room-9')[0]!
+      const view = selectMoveInObligations(data, OCCUPANCY_DATE, 'room-9')[0]!
       expect(view.status).toBe('PAID')
       expect(view.advancePaidCents).toBe(400_000)
       expect(view.depositPaidCents).toBe(400_000)

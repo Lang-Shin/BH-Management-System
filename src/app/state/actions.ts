@@ -7,7 +7,7 @@ import type { RoomChangeRequestDraft } from '@/domain/calculations/room-change-r
 
 export type PrototypeAction =
   | { type: 'tenant/noteUpdated'; tenantId: string; notes: string }
-  | { type: 'tenant/created'; draft: TenantDraft }
+  | { type: 'tenant/created'; draft: TenantDraft; asOf?: string }
   | { type: 'tenant/updated'; tenantId: string; draft: TenantDraft }
   | { type: 'tenant/movedOut'; tenantId: string }
   | { type: 'tenant/deleted'; tenantId: string }

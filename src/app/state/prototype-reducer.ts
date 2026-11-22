@@ -8,7 +8,7 @@ import { prepareElectricityPayment } from '@/domain/calculations/electricity-pay
 import { prepareMeterInitialization } from '@/domain/calculations/meter-initialization'
 import { prepareRoomPayment } from '@/domain/calculations/room-payment'
 import { preparePaymentCorrection } from '@/domain/calculations/payment-correction'
-import { prepareMoveInPayment, reconcileOccupancy } from '@/domain/calculations/move-in'
+import { prepareMoveInPayment, reconcileOccupancy, repairNewCycleMoveInObligations } from '@/domain/calculations/move-in'
 import { activeMoveInPolicy } from '@/domain/calculations/move-in-policy'
 import { approveRoomChangeRequest, cancelApprovedRoomChangeRequest, cancelRoomChangeRequest, expirePendingRoomChangeRequests, rejectRoomChangeRequest, rescheduleApprovedRoomChangeRequest, submitRoomChangeRequest } from '@/domain/calculations/room-change-requests'
 import { createRoom, deleteRoom, updateRoom } from '@/domain/calculations/room-management'
@@ -17,7 +17,7 @@ import { createTenant, deleteTenant, moveOutTenant, updateTenant } from '@/domai
 export function prototypeReducer(state: PrototypeData, action: StateAction): PrototypeData {
   switch (action.type) {
     case 'data/loaded':
-      return reconcileOccupancy(action.data, action.data, action.occupancyDate, { createMoveInObligations: false })
+      return repairNewCycleMoveInObligations(reconcileOccupancy(action.data, action.data, action.occupancyDate, { createMoveInObligations: false }), action.occupancyDate, DEMO_DATE)
     case 'tenant/noteUpdated':
       return {
         ...state,
@@ -26,8 +26,9 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
           : tenant),
       }
     case 'tenant/created': {
-      const result = createTenant(state, action.draft, DEMO_DATE)
-      return result.ok ? reconcileOccupancy(state, result.data, DEMO_DATE, { createMoveInObligations: true }) : state
+      const asOf = action.asOf ?? DEMO_DATE
+      const result = createTenant(state, action.draft, asOf)
+      return result.ok ? reconcileOccupancy(state, result.data, asOf, { createMoveInObligations: true }) : state
     }
     case 'tenant/updated': {
       const previousRoom = activeAssignments(state, DEMO_DATE).find(item => item.tenantId === action.tenantId)?.roomId
@@ -155,7 +156,7 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
       return result.ok ? result.data : state
     }
     case 'occupancy/dateChanged':
-      return reconcileOccupancy(state, state, action.asOf, { createMoveInObligations: false })
+      return repairNewCycleMoveInObligations(reconcileOccupancy(state, state, action.asOf, { createMoveInObligations: false }), action.asOf, DEMO_DATE)
     case 'demo/reset':
       return createDemoData()
   }

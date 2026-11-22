@@ -2,7 +2,8 @@ import { useMemo, useRef, useState } from 'react'
 import { ChevronDown, CircleDollarSign, ReceiptText, ShieldCheck, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { usePrototype } from '@/hooks/use-prototype'
-import { DEMO_DATE } from '@/data/fixtures/demo'
+import { useOccupancyDate } from '@/hooks/use-occupancy-date'
+
 import { activeMoveInPolicy } from '@/domain/calculations/move-in-policy'
 import {
   moveInSummary, proposedMoveInAdjustment, selectMoveInObligations,
@@ -19,14 +20,15 @@ function initialExpanded() {
 
 export function MoveInSection() {
   const { data, dispatch } = usePrototype()
+  const occupancyDate = useOccupancyDate()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
   const [expanded, setExpanded] = useState(initialExpanded)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const headingRef = useRef<HTMLHeadingElement | null>(null)
   const policy = activeMoveInPolicy(data)
-  const views = useMemo(() => selectMoveInObligations(data, DEMO_DATE), [data])
-  const summary = useMemo(() => moveInSummary(data, DEMO_DATE), [data])
+  const views = useMemo(() => selectMoveInObligations(data, occupancyDate), [data, occupancyDate])
+  const summary = useMemo(() => moveInSummary(data, occupancyDate), [data, occupancyDate])
   const selected = selectedId ? views.find(view => view.obligation.id === selectedId) : undefined
   const proposals = useMemo(() => data.occupancyCycles
     .filter(cycle => cycle.status === 'ACTIVE')

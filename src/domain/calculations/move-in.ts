@@ -120,6 +120,24 @@ export function reconcileOccupancy(
   return data
 }
 
+/** Repairs newly created active cycles that missed their move-in obligation; legacy cycles are untouched. */
+export function repairNewCycleMoveInObligations(data: PrototypeAppState, asOf: string, createdAfter: string): PrototypeAppState {
+  let next = data
+  for (const cycle of data.occupancyCycles) {
+    if (cycle.status !== 'ACTIVE' || cycle.createdAt <= createdAfter) continue
+    if (next.moveInObligations.some(obligation => obligation.occupancyCycleId === cycle.id)) continue
+    const occupantIds = new Set(activeOccupantIds(next, cycle.roomId, asOf))
+    if (occupantIds.size === 0) continue
+    const hasPriorMoveIn = next.moveInObligations.some(obligation => {
+      const advance = next.charges.find(charge => charge.id === obligation.advanceChargeId)
+      return Boolean(advance && 'tenantId' in advance && occupantIds.has(advance.tenantId))
+    })
+    if (hasPriorMoveIn) continue
+    next = ensureMoveInObligation(next, cycle, asOf)
+  }
+  return next
+}
+
 export interface MoveInObligationView {
   obligation: MoveInObligation
   cycle: Cycle

@@ -18,25 +18,20 @@ import { roomMonthlyRentCents } from '@/domain/calculations/billing-rates'
 import { roomCategoryLabel } from '@/lib/room-rates'
 import { AddRoomDialog } from './add-room-dialog'
 import { RoomDetailsDialog } from './room-details-dialog'
+import { RoomFiltersMenu, type RoomFilter } from './room-filters-menu'
 
-type Filter = 'ALL' | RoomOccupancy
-const filters: { value: Filter; label: string }[] = [
-  { value: 'ALL', label: 'All rooms' }, { value: 'OCCUPIED', label: 'Occupied' },
-  { value: 'RESERVED', label: 'Reserved' }, { value: 'AVAILABLE', label: 'Available' }, { value: 'UNDER_REPAIR', label: 'Under repair' },
-]
 const statusLabels: Record<RoomOccupancy, string> = { OCCUPIED: 'Occupied', RESERVED: 'Reserved', AVAILABLE: 'Available', UNDER_REPAIR: 'Under repair' }
 
 export default function Rooms() {
   const { data } = usePrototype()
   const occupancyDate = useOccupancyDate()
-  const [filter, setFilter] = useState<Filter>('ALL')
+  const [filter, setFilter] = useState<RoomFilter>('ALL')
   const [notice, setNotice] = useState('')
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
   const roomTrigger = useRef<HTMLElement | null>(null)
   const summary = selectRoomSummary(data, occupancyDate)
   const rooms = data.rooms.filter(room => filter === 'ALL' || roomOccupancy(data, room, occupancyDate) === filter)
   const selectedRoom = data.rooms.find(room => room.id === selectedRoomId)
-  const filterIndex = filters.findIndex(item => item.value === filter)
   const hasLegacyRoomNumbers = data.rooms.some(room => /^(10[1-9]|11[0-5])$/.test(room.name))
 
   return <>
@@ -45,7 +40,7 @@ export default function Rooms() {
     {hasLegacyRoomNumbers && <p role="note" className="room-management-notice mb-6">
       Some saved room numbers match the earlier fictional layout (101–115). They have not been mapped to actual rooms: an owner-approved correspondence is required. Tenant assignments and financial records are retained. “Restore sample records” in <Link to="/reports" className="font-semibold underline">Reports &amp; Settings</Link> explicitly replaces the saved demo dataset; it is not a historical-data migration.
     </p>}
-    <div className="mb-6 flex flex-wrap items-center justify-between gap-4"><div className="room-segmented-control" role="group" aria-label="Show rooms" style={{ '--filter-index': filterIndex, '--filter-column': filterIndex % 2, '--filter-row': Math.floor(filterIndex / 2) } as CSSProperties}>{filters.map(item => <Button key={item.value} variant="ghost" className="room-filter" aria-pressed={filter === item.value} onClick={() => setFilter(item.value)}>{item.label}</Button>)}</div><p role="status" className="text-sm text-muted-foreground">Showing <AnimatedNumber value={rooms.length} /> of <AnimatedNumber value={data.rooms.length} /> rooms</p></div>
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-4"><RoomFiltersMenu value={filter} onChange={setFilter} /><p role="status" className="text-sm text-muted-foreground">Showing <AnimatedNumber value={rooms.length} /> of <AnimatedNumber value={data.rooms.length} /> rooms</p></div>
     {notice ? <p role="status" className="room-management-notice">{notice}</p> : <p role="status" className="sr-only" />}
     {rooms.length === 0 ? <div key={filter} className="room-filter-empty"><EmptyState title="No rooms here" description="There are no rooms with this status." action={<Button variant="outline" onClick={() => setFilter('ALL')}>Show all rooms</Button>} /></div> : <div key={filter} className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">{rooms.map((room, index) => {
       const tenants = roomOccupants(data, room.id, occupancyDate)

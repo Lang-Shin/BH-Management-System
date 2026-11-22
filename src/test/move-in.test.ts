@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createDemoData, DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
+import { createDemoData, DEMO_DATE, DEMO_PERIOD, OCCUPANCY_DATE } from '@/data/fixtures/demo'
 import { prototypeReducer } from '@/app/state/prototype-reducer'
 import {
   moveInSummary, prepareMoveInPayment, proposedMoveInAdjustment, reconcileOccupancy, selectMoveInObligations,
@@ -56,6 +56,39 @@ describe('room-level move-in advance and security deposit', () => {
     })
   })
 
+  it('creates one Room 06 obligation when two occupants start on the current occupancy date', () => {
+    const firstDraft = draft({ roomId: 'room-13', name: 'Room 06 First', email: 'room06.first@example.com', moveInDate: OCCUPANCY_DATE })
+    const first = prototypeReducer(createDemoData(), { type: 'tenant/created', draft: firstDraft, asOf: OCCUPANCY_DATE })
+    const firstView = selectMoveInObligations(first, OCCUPANCY_DATE, 'room-13')[0]!
+    expect(firstView).toMatchObject({
+      room: { id: 'room-13', name: '06' }, cycle: { status: 'ACTIVE', startedAt: OCCUPANCY_DATE },
+      obligation: { agreedMonthlyRentCents: 400_000, advanceRequiredCents: 400_000, depositRequiredCents: 400_000 },
+      totalRequiredCents: 800_000, status: 'NOT PAID',
+    })
+    const second = prototypeReducer(first, {
+      type: 'tenant/created', asOf: OCCUPANCY_DATE,
+      draft: draft({ roomId: 'room-13', name: 'Room 06 Second', email: 'room06.second@example.com', moveInDate: OCCUPANCY_DATE }),
+    })
+    expect(second.moveInObligations.filter(obligation => obligation.roomId === 'room-13')).toHaveLength(1)
+    expect(second.occupancyCycles.filter(cycle => cycle.roomId === 'room-13')).toHaveLength(1)
+    expect(selectMoveInObligations(second, OCCUPANCY_DATE, 'room-13')[0]?.obligation.id).toBe(firstView.obligation.id)
+    expect(selectMoveInObligations(second, OCCUPANCY_DATE, 'room-6')).toEqual([])
+  })
+
+  it('repairs a newly created cycle that missed its obligation without touching sample legacy rooms', () => {
+    const broken = prototypeReducer(createDemoData(), {
+      type: 'tenant/created',
+      draft: draft({ roomId: 'room-13', name: 'Room 06 Repair', email: 'room06.repair@example.com', moveInDate: OCCUPANCY_DATE }),
+    })
+    expect(selectMoveInObligations(broken, OCCUPANCY_DATE, 'room-13')).toEqual([])
+    const repaired = prototypeReducer(broken, { type: 'data/loaded', data: broken, occupancyDate: OCCUPANCY_DATE })
+    expect(selectMoveInObligations(repaired, OCCUPANCY_DATE, 'room-13')[0]?.totalRequiredCents).toBe(800_000)
+    const repeated = prototypeReducer(repaired, { type: 'data/loaded', data: repaired, occupancyDate: OCCUPANCY_DATE })
+    expect(repeated.moveInObligations.filter(obligation => obligation.roomId === 'room-13')).toHaveLength(1)
+    const sample = prototypeReducer(createDemoData(), { type: 'data/loaded', data: createDemoData(), occupancyDate: OCCUPANCY_DATE })
+    expect(sample.moveInObligations).toEqual([])
+  })
+
   it('adds a roommate without creating a second room obligation', () => {
     const first = createInRoom(createDemoData())
     const second = createInRoom(first.data, { name: 'Second Occupant', email: 'second@example.com', moveInDate: '2026-11-05' })
@@ -73,6 +106,24 @@ describe('room-level move-in advance and security deposit', () => {
     expect(view!.obligation.advanceRequiredCents).toBe(500_000)
     expect(view!.obligation.depositRequiredCents).toBe(500_000)
     expect(view!.room.name).toBe('02')
+  })
+
+  it('keeps one settled obligation when another occupant joins later', () => {
+    const first = createInRoom(createDemoData())
+    const view = viewFor(first.data, first.tenant)
+    const paid = prepareMoveInPayment(first.data, { obligationId: view!.obligation.id, categories: ['ADVANCE', 'SECURITY_DEPOSIT'], paidOn: DEMO_DATE })
+    if (!paid.ok) throw new Error(paid.reason)
+    const paymentsBefore = paid.data.payments
+    const receiptsBefore = paid.data.receipts
+    const joined = prototypeReducer(paid.data, {
+      type: 'tenant/created',
+      draft: draft({ name: 'Settled Roommate', email: 'settled.roommate@example.com', moveInDate: '2026-11-14' }),
+    })
+    expect(joined.moveInObligations).toHaveLength(1)
+    expect(joined.charges.filter(charge => charge.category === 'ADVANCE' || charge.category === 'SECURITY_DEPOSIT')).toHaveLength(2)
+    expect(selectMoveInObligations(joined, DEMO_DATE, 'room-9')[0]).toMatchObject({ status: 'PAID', totalRemainingCents: 0 })
+    expect(joined.payments).toEqual(paymentsBefore)
+    expect(joined.receipts).toEqual(receiptsBefore)
   })
 
   it('records full advance and deposit categories separately with unique receipts', () => {

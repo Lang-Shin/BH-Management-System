@@ -1739,3 +1739,10 @@ li:nth-child(n + 5) > .notification-item { animation-delay: 120ms; }
 .room-reservation-note > p { color: #7a5000; }
 .dark .room-reservation-note > p { color: #e8bd6a; }
 .room-reservation-note ul { display: grid; gap: 4px; margin-top: 6px; }
+.room-filter-menu { width: 16rem; max-width: calc(100vw - 1.5rem); }
+.room-filter-menu [data-slot="dropdown-menu-checkbox-item"] { padding-left: 8px; gap: 10px; }
+.billing-filter-status-icon[data-status="occupied"] { border-color: color-mix(in srgb, var(--forest-green) 28%, var(--border)); background: color-mix(in srgb, var(--forest-green) 10%, var(--card)); color: var(--forest-green); }
+.billing-filter-status-icon[data-status="reserved"] { border-color: color-mix(in srgb, #9a6400 28%, var(--border)); background: color-mix(in srgb, #9a6400 10%, var(--card)); color: #7a5000; }
+.dark .billing-filter-status-icon[data-status="reserved"] { color: #e8bd6a; }
+.billing-filter-status-icon[data-status="available"] { border-color: color-mix(in srgb, #527346 28%, var(--border)); background: color-mix(in srgb, #527346 10%, var(--card)); color: #527346; }
+.billing-filter-status-icon[data-status="repair"] { border-color: color-mix(in srgb, var(--red) 28%, var(--border)); background: color-mix(in srgb, var(--red) 13%, var(--card)); color: var(--red-text); }

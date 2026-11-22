@@ -5,6 +5,8 @@ Version 12 adds explicit room-level payment ownership beside the existing monthl
 ## Rules
 
 - One advance and one security deposit are required per **room occupancy cycle**, not per tenant. Roommates share the same room-level obligation.
+- Tenant creation reconciles the new assignment using the current occupancy date, so a newly occupied room gets its obligation immediately even when the move-in date is later than the fixed sample financial date.
+- Billing therefore shows the room before any payment is recorded; a second occupant joins the existing cycle without creating another obligation.
 - Adding or replacing an occupant does not create another move-in obligation. The room cycle closes when the room becomes fully vacant, while its historical obligation remains.
 - A same-day full replacement keeps the room cycle and its existing obligation. A vacancy followed by a later occupancy starts a new cycle and obligation.
 - Advance and deposit are each one month of the room's agreed rent snapshot at move-in. They are separate charges and may be paid partially and independently.

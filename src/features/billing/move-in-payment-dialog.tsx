@@ -3,7 +3,8 @@ import { Check, ReceiptText, ShieldCheck, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { usePrototype } from '@/hooks/use-prototype'
-import { DEMO_DATE } from '@/data/fixtures/demo'
+import { useOccupancyDate } from '@/hooks/use-occupancy-date'
+
 import { prepareMoveInPayment, type MoveInCategory, type MoveInObligationView } from '@/domain/calculations/move-in'
 import { formatMoney } from '@/lib/format'
 
@@ -13,12 +14,13 @@ export function MoveInPaymentDialog({ view, onClose, onSaved }: {
   onSaved: (message: string) => void
 }) {
   const { data, dispatch, persistSnapshot } = usePrototype()
+  const occupancyDate = useOccupancyDate()
   const initialSelection: MoveInCategory[] = [
     ...(view.advanceRemainingCents > 0 ? ['ADVANCE' as const] : []),
     ...(view.depositRemainingCents > 0 ? ['SECURITY_DEPOSIT' as const] : []),
   ]
   const [selected, setSelected] = useState<MoveInCategory[]>(initialSelection)
-  const [paidOn, setPaidOn] = useState(DEMO_DATE)
+  const [paidOn, setPaidOn] = useState(occupancyDate)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState<{ receiptNumber: string; amountCents: number } | null>(null)
