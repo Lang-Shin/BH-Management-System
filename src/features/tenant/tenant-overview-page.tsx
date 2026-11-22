@@ -9,10 +9,11 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { usePrototype } from '@/hooks/use-prototype'
+import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { useTenantDemo } from '@/app/providers/tenant-demo'
 import { roomOccupants, roomOccupancy, tenantAccount } from '@/domain/calculations/summary'
 import { selectMoveInObligations } from '@/domain/calculations/move-in'
-import { DEMO_DATE, OCCUPANCY_DATE } from '@/data/fixtures/demo'
+import { DEMO_DATE } from '@/data/fixtures/demo'
 import { formatDate, formatMoney, formatMonthYear } from '@/lib/format'
 import { selectTenantPersona } from './tenant-persona'
 import { tenantRoomBilling } from './tenant-room-billing'
@@ -23,7 +24,8 @@ import { CATEGORY_LABELS } from '@/lib/labels'
 export default function TenantOverview() {
   const { data } = usePrototype()
   const { tenantId } = useTenantDemo()
-  const persona = selectTenantPersona(data, tenantId)
+  const occupancyDate = useOccupancyDate()
+  const persona = selectTenantPersona(data, tenantId, occupancyDate)
   const defaultPeriod = data.billingPeriods.find(item => item.startDate <= DEMO_DATE && item.endDate >= DEMO_DATE) ?? data.billingPeriods.at(-1)
   const [periodId, setPeriodId] = useState(defaultPeriod?.id ?? '')
   const period = data.billingPeriods.find(item => item.id === periodId) ?? defaultPeriod
@@ -34,11 +36,11 @@ export default function TenantOverview() {
   const payments = [...new Map(sharedReceipts.map(item => [item.payment.id, item.payment])).values()]
     .filter(item => item.state === 'RECORDED' && item.paidOn <= DEMO_DATE)
   const lastPayment = [...payments].sort((a, b) => b.paidOn.localeCompare(a.paidOn)).at(0)
-  const occupants = persona?.room ? roomOccupants(data, persona.room.id, OCCUPANCY_DATE).filter(tenant => tenant.status === 'ACTIVE') : []
+  const occupants = persona?.room ? roomOccupants(data, persona.room.id, occupancyDate).filter(tenant => tenant.status === 'ACTIVE') : []
   const occupantTitle = occupants.length === 0 ? 'No current tenants' : occupants.length === 1 ? 'Tenant' : 'Tenants'
-  const occupancy = persona?.room ? roomOccupancy(data, persona.room, OCCUPANCY_DATE) : null
+  const occupancy = persona?.room ? roomOccupancy(data, persona.room, occupancyDate) : null
   const billing = tenantRoomBilling(data, tenantId, persona?.room?.id ?? null, period?.id ?? '', DEMO_DATE)
-  const moveIn = persona?.room ? selectMoveInObligations(data, OCCUPANCY_DATE, persona.room.id).find(view => view.cycle.status === 'ACTIVE') : undefined
+  const moveIn = persona?.room ? selectMoveInObligations(data, occupancyDate, persona.room.id).find(view => view.cycle.status === 'ACTIVE') : undefined
   const statusTone = billing.status === 'PAID' ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
     : billing.status === 'NOT PAID' ? 'border-rose-200 bg-rose-50 text-rose-900' : 'border-amber-200 bg-amber-50 text-amber-950'
 
@@ -62,7 +64,7 @@ export default function TenantOverview() {
               <p className="mt-3 text-sm text-muted-foreground">{persona.room ? roomCategoryLabel(persona.room.categoryId) : persona.tenant.name}</p>
               {persona.assignment && <p className="mt-2 text-sm text-muted-foreground">Staying since {formatDate(persona.assignment.startDate)}.</p>}
             </div>
-            <div className="flex flex-wrap gap-2">{occupancy && <StatusBadge status={occupancy === 'OCCUPIED' ? 'Occupied' : occupancy === 'AVAILABLE' ? 'Available' : 'Under repair'} />}<StatusBadge status={persona.tenant.status === 'ACTIVE' ? 'Active' : 'Moved out'} /></div>
+            <div className="flex flex-wrap gap-2">{occupancy && <StatusBadge status={occupancy === 'OCCUPIED' ? 'Occupied' : occupancy === 'RESERVED' ? 'Reserved' : occupancy === 'AVAILABLE' ? 'Available' : 'Under repair'} />}<StatusBadge status={persona.tenant.status === 'ACTIVE' ? 'Active' : 'Moved out'} /></div>
           </div>
           <h3 className="mt-6 mb-3 text-base font-semibold">{occupantTitle}</h3>
           {occupants.length > 0 ? <ul className="grid gap-3 sm:grid-cols-2">{occupants.map(tenant => <li key={tenant.id} className="flex min-w-0 items-center gap-3 rounded-2xl border bg-muted/30 p-4"><User className="size-5 shrink-0 text-[var(--tint)]" aria-hidden="true" /><span className="break-words font-semibold">{tenant.name}</span></li>)}</ul> : <p className="text-sm text-muted-foreground">No active occupants are recorded for the selected room.</p>}

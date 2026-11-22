@@ -1734,3 +1734,8 @@ li:nth-child(n + 5) > .notification-item { animation-delay: 120ms; }
 @media (max-height: 34rem) {
   .room-change-dialog[data-slot="dialog-content"] { max-height: calc(100dvh - 0.5rem); padding-block: 1rem; }
 }
+.room-change-timeline li[data-state="SCHEDULED"]::before { border-color: #9a6400; background: color-mix(in srgb, #9a6400 24%, var(--card)); }
+.room-reservation-note { margin-top: 12px; padding: 12px; border: 1px solid color-mix(in srgb, #9a6400 28%, var(--border)); border-radius: 12px; background: color-mix(in srgb, #9a6400 6%, var(--card)); font-size: 13px; line-height: 1.55; }
+.room-reservation-note > p { color: #7a5000; }
+.dark .room-reservation-note > p { color: #e8bd6a; }
+.room-reservation-note ul { display: grid; gap: 4px; margin-top: 6px; }

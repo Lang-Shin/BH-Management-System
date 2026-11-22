@@ -69,7 +69,7 @@ describe('tenant management UI', { timeout: 15000 }, () => {
     await user.type(within(dialog).getByLabelText('Full name'), 'Room Seven Tenant')
     await user.selectOptions(within(dialog).getByLabelText('Room assignment'), 'room-2')
     await user.click(within(dialog).getByRole('button', { name: 'Add tenant' }))
-    expect(within(dialog).getByText('This room is already full.')).toBeInTheDocument()
+    expect(within(dialog).getByText(/This room would exceed its capacity on/) ).toBeInTheDocument()
     await user.selectOptions(within(dialog).getByLabelText('Room assignment'), 'room-6')
     await user.click(within(dialog).getByRole('button', { name: 'Add tenant' }))
     expect(within(dialog).getByText('This room is under repair and cannot accept a tenant.')).toBeInTheDocument()
@@ -204,7 +204,7 @@ describe('tenant management UI', { timeout: 15000 }, () => {
       expect(saved.receipts).toEqual(original.receipts)
     })
     await user.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('link', { name: 'Rooms' }))
-    expect(await screen.findByRole('button', { name: 'Room 1 details' })).toHaveTextContent('Available — 0 tenants')
+    expect(await screen.findByRole('button', { name: 'Room 1 details' })).toHaveTextContent('Available · 0 current tenants')
   })
 
   it('blocks move-out while unresolved advance credit exists', async () => {

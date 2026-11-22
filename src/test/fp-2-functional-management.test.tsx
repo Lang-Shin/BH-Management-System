@@ -74,7 +74,7 @@ describe('functional room and tenant management', () => {
     expect(screen.getByRole('row', { name: /Functional Resident/ })).toHaveTextContent('Room 904')
     await user.click(within(nav).getByRole('link', { name: 'Rooms' }))
     const roomCard = await screen.findByRole('button', { name: 'Room 904 details' })
-    expect(roomCard).toHaveTextContent('Occupied — 1 tenant')
+    expect(roomCard).toHaveTextContent('Occupied · 1 current tenant')
     expect(roomCard).toHaveTextContent('Functional Resident')
 
     await user.click(within(nav).getByRole('link', { name: 'Tenants' }))
@@ -83,7 +83,7 @@ describe('functional room and tenant management', () => {
     await user.type(within(dialog).getByLabelText('Full name'), 'Capacity Blocked')
     await user.selectOptions(within(dialog).getByLabelText('Room assignment'), roomId)
     await user.click(within(dialog).getByRole('button', { name: 'Add tenant' }))
-    expect(await screen.findByText('This room is already full.')).toBeInTheDocument()
+    expect(await screen.findByText(/This room would exceed its capacity/) ).toBeInTheDocument()
     expect(savedData().tenants.some((tenant: { name: string }) => tenant.name === 'Capacity Blocked')).toBe(false)
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())

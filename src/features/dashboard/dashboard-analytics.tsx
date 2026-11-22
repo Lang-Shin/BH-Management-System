@@ -16,6 +16,7 @@ function AnalyticsLegend({ segments, total }: { segments: Segment[]; total: numb
 export function RoomOccupancyChart({ summary }: { summary: ReturnType<typeof selectRoomSummary> }) {
   const segments: Segment[] = [
     { label: 'Occupied', value: summary.occupiedRooms, color: 'var(--forest-green)' },
+    { label: 'Reserved', value: summary.reservedRooms, color: '#b67c22' },
     { label: 'Available', value: summary.availableRooms, color: '#7c9770' },
     { label: 'Under repair', value: summary.maintenanceRooms, color: 'var(--tomato-red)' },
   ]

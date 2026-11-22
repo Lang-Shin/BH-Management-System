@@ -121,7 +121,7 @@ export function TenantDetailsDialog({ tenant, onClose, onReturnFocus, onNotice }
 
       {mode === 'edit' && <form className="grid gap-5" noValidate onSubmit={saveTenant}>
         <DialogHeader className="pr-6"><DialogTitle>Edit Tenant {tenant.name}</DialogTitle><DialogDescription>Update tenant details. The stable tenant ID and historical financial records are preserved.</DialogDescription></DialogHeader>
-        <TenantFormFields idPrefix="edit-tenant" values={values} errors={errors} onChange={changeField} />
+        <TenantFormFields idPrefix="edit-tenant" values={values} errors={errors} onChange={changeField} tenantId={tenant.id} />
         <div className="rounded-xl border bg-muted/40 p-3 text-sm text-muted-foreground">Choosing a different room records a new assignment and closes the current one at the transfer date. Historical bills, payments, and receipts are not rewritten.</div>
         <DialogFooter><Button type="button" variant="outline" onClick={() => setMode('details')}>Cancel</Button><Button type="submit"><Check aria-hidden="true" />Save Tenant</Button></DialogFooter>
       </form>}

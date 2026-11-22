@@ -44,7 +44,7 @@ describe('room management UI', () => {
     await user.click(within(success).getByRole('button', { name: 'Got it' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     const card = await screen.findByRole('button', { name: 'Room 116 details' })
-    expect(card).toHaveTextContent('Available — 0 tenants')
+    expect(card).toHaveTextContent('Available · 0 current tenants')
     expect(card).toHaveTextContent('₱4,000.00/month')
     await waitFor(() => expect(screen.getByText(/rooms total/).closest('p')).toHaveTextContent('16 rooms total'))
     await waitFor(() => {
@@ -113,7 +113,7 @@ describe('room management UI', () => {
     await user.clear(within(dialog).getByLabelText('Number of beds'))
     await user.type(within(dialog).getByLabelText('Number of beds'), '1')
     await user.click(within(dialog).getByRole('button', { name: 'Save Room' }))
-    expect(within(dialog).getByText(/2 assigned tenants/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/2 assigned or reserved tenants/)).toBeInTheDocument()
 
     await user.clear(within(dialog).getByLabelText('Number of beds'))
     await user.type(within(dialog).getByLabelText('Number of beds'), '2')

@@ -2,6 +2,7 @@ import type { PrototypeAppState, RoomAssignment, Tenant } from '@/domain/types/m
 import { isIsoDate } from '@/domain/validation/date'
 import { roomMonthlyRentCents } from './billing-rates'
 import { activeAssignments, tenantAccount, unresolvedElectricity } from './summary'
+import { roomCapacityConflict } from './room-capacity'
 
 export interface TenantDraft {
   name: string
@@ -60,13 +61,20 @@ export function validateTenantDraft(data: PrototypeAppState, draft: TenantDraft,
   if (draft.roomId && !room) errors.roomId = 'Choose an existing room, or leave the assignment blank.'
   if (room) {
     if (room.status === 'maintenance') errors.roomId = 'This room is under repair and cannot accept a tenant.'
-    const occupants = new Set(activeAssignments(data, options.asOf)
-      .filter(assignment => assignment.roomId === room.id && assignment.tenantId !== options.tenantId)
-      .map(assignment => assignment.tenantId))
-    if (occupants.size >= room.capacity) errors.roomId = 'This room is already full.'
+    if (isIsoDate(draft.moveInDate)) {
+      const conflict = roomCapacityConflict(data, {
+        roomId: room.id, tenantId: options.tenantId ?? '__new-tenant__', startDate: draft.moveInDate,
+        endDate: null, capacity: room.capacity,
+      })
+      if (conflict) errors.roomId = `This room would exceed its capacity on ${conflict.date}.`
+    }
   }
 
   if (tenant) {
+    const futureReservation = data.roomAssignments.some(assignment => assignment.tenantId === tenant.id && assignment.startDate > options.asOf)
+    if (currentAssignment && futureReservation && (draft.roomId !== currentAssignment.roomId || draft.moveInDate !== currentAssignment.startDate)) {
+      errors.general = 'This tenant has an approved future room reservation. Cancel or reschedule that reservation before changing the current tenancy.'
+    }
     if (currentAssignment && !draft.roomId) {
       errors.roomId = 'Use Move Out to end this tenant’s current room assignment. The edit form does not clear assignments.'
     }
@@ -208,6 +216,9 @@ export function moveOutBlockers(data: PrototypeAppState, tenantId: string, asOf:
   const tenant = data.tenants.find(item => item.id === tenantId)
   if (!tenant) return ['This tenant no longer exists.']
   if (tenant.status === 'MOVED_OUT') return ['This tenant has already moved out.']
+  if (data.roomAssignments.some(assignment => assignment.tenantId === tenantId && assignment.startDate > asOf)) {
+    return ['This tenant has an approved future room reservation. Cancel or reschedule that reservation before moving out.']
+  }
   const account = tenantAccount(data, tenantId, asOf)
   const blockers: string[] = []
   if (account.balance > 0) blockers.push('This tenant still has an outstanding balance. Settle it through the existing Billing or Payments workflow before moving out.')

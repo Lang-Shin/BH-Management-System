@@ -263,7 +263,7 @@ describe('tenant room change requests', () => {
     expect(approved.ok).toBe(true)
     if (!approved.ok) return
     expect(roomOccupants(approved.data, room02.id, DEMO_DATE)).toEqual([])
-    expect(roomOccupancy(approved.data, room02, DEMO_DATE)).toBe('AVAILABLE')
+    expect(roomOccupancy(approved.data, room02, DEMO_DATE)).toBe('RESERVED')
     expect(roomOccupants(approved.data, room02.id, futureDate).map(tenant => tenant.id)).toEqual([mover.id])
     expect(roomOccupancy(approved.data, room02, futureDate)).toBe('OCCUPIED')
     expect(roomOccupants(approved.data, room06.id, futureDate)).toHaveLength(1)

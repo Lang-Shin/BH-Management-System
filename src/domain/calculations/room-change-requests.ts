@@ -4,6 +4,7 @@ import { activeAssignments, tenantAccount } from './summary'
 import { roomMonthlyRentCents } from './billing-rates'
 import { transferTenantRoom } from './tenant-management'
 import { reconcileOccupancy } from './move-in'
+import { roomCapacityConflict } from './room-capacity'
 
 export interface RoomChangeRequestDraft {
   tenantId: string
@@ -33,6 +34,12 @@ export type RoomChangeRequestResult =
 export type RoomChangeDecisionResult =
   | { ok: true; data: PrototypeAppState; request: RoomChangeRequest; effectiveDate?: string }
   | { ok: false; errors: RoomChangeRequestErrors }
+
+function previousDate(date: string): string {
+  const value = new Date(`${date}T00:00:00Z`)
+  value.setUTCDate(value.getUTCDate() - 1)
+  return value.toISOString().slice(0, 10)
+}
 
 function requestId(): string {
   return `room-change-${globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`}`
@@ -80,12 +87,9 @@ export function roomChangeFinancialWarnings(data: PrototypeAppState, tenantId: s
 export function eligibleRoomChangeTargets(data: PrototypeAppState, tenantId: string, startDate: string) {
   const assignment = activeAssignments(data, startDate).find(item => item.tenantId === tenantId)
   return data.rooms.filter(room => room.id !== assignment?.roomId && room.status !== 'maintenance')
-    .filter(room => {
-      const occupants = new Set(activeAssignments(data, startDate)
-        .filter(item => item.roomId === room.id && item.tenantId !== tenantId)
-        .map(item => item.tenantId))
-      return occupants.size < room.capacity
-    })
+    .filter(room => !roomCapacityConflict(data, {
+      roomId: room.id, tenantId, startDate, endDate: null, capacity: room.capacity,
+    }))
 }
 
 function validateRequest(data: PrototypeAppState, draft: RoomChangeRequestDraft, options: { asOf: string; currentAssignmentId?: string; ignoreRequestId?: string }): RoomChangeRequestErrors {
@@ -110,10 +114,10 @@ function validateRequest(data: PrototypeAppState, draft: RoomChangeRequestDraft,
   else if (draft.requestedStartDate <= current.startDate) errors.startDate = 'The requested move date must be after the current tenancy began.'
   else if (draft.requestedStartDate < options.asOf) errors.startDate = 'The requested move date cannot be in the past.'
   if (room && isIsoDate(draft.requestedStartDate)) {
-    const occupants = new Set(activeAssignments(data, draft.requestedStartDate)
-      .filter(item => item.roomId === room.id && item.tenantId !== tenant.id)
-      .map(item => item.tenantId))
-    if (occupants.size >= room.capacity) errors.roomId = 'This room is already full on the requested date.'
+    const conflict = roomCapacityConflict(data, {
+      roomId: room.id, tenantId: tenant.id, startDate: draft.requestedStartDate, endDate: null, capacity: room.capacity,
+    })
+    if (conflict) errors.roomId = `This room would exceed its capacity on ${conflict.date}.`
     const overlap = data.roomAssignments.some(item => item.tenantId === tenant.id && item.id !== current.id
       && item.startDate <= '9999-12-31' && (item.endDate === null || item.endDate >= draft.requestedStartDate))
     if (overlap) errors.startDate = 'This move date overlaps another recorded room assignment.'
@@ -220,6 +224,90 @@ export function approveRoomChangeRequest(data: PrototypeAppState, requestIdToApp
     auditEvents: audit(transfer.data, next, 'ROOM_CHANGE_APPROVED', 'demo-admin', input.decidedAt, next.decisionReason),
   }
   return { ok: true, request: next, effectiveDate: input.effectiveDate, data: reconcileOccupancy(data, approvedData, input.decidedAt, { createMoveInObligations: false }) }
+}
+
+/** Releases an approved future reservation. The request and its history remain auditable. */
+export function cancelApprovedRoomChangeRequest(data: PrototypeAppState, requestIdToCancel: string, reason: string, asOf: string): RoomChangeDecisionResult {
+  const request = data.roomChangeRequests.find(item => item.id === requestIdToCancel)
+  if (!request || request.status !== 'APPROVED' || !request.approvedStartDate || !request.resultingAssignmentId) {
+    return { ok: false, errors: { general: 'Only an approved future reservation can be cancelled here.' } }
+  }
+  if (request.approvedStartDate <= asOf) {
+    return { ok: false, errors: { general: 'This transfer is already effective. Use the tenancy transfer or move-out workflow instead.' } }
+  }
+  if (reason.trim().length < 3) return { ok: false, errors: { reason: 'Enter a short cancellation reason.' } }
+  if (reason.trim().length > 500) return { ok: false, errors: { reason: 'Keep the reason within 500 characters.' } }
+  const resulting = data.roomAssignments.find(item => item.id === request.resultingAssignmentId)
+  const source = data.roomAssignments.find(item => item.id === request.currentAssignmentId)
+  if (!resulting || !source || resulting.tenantId !== request.tenantId || resulting.roomId !== request.requestedRoomId
+    || resulting.startDate !== request.approvedStartDate || resulting.endDate !== null
+    || source.tenantId !== request.tenantId || source.endDate !== previousDate(request.approvedStartDate)) {
+    return { ok: false, errors: { general: 'The assignments changed. Review the request before cancelling the reservation.' } }
+  }
+  const next = {
+    ...request, status: 'CANCELLED' as const, decidedAt: asOf, decidedBy: 'demo-admin',
+    decisionReason: reason.trim(), resultingAssignmentId: null,
+  }
+  const auditEvent = {
+    id: `audit-${request.id}-room_change_reservation_cancelled`, actorId: 'demo-admin', occurredOn: asOf,
+    action: 'ROOM_CHANGE_RESERVATION_CANCELLED' as const, entityType: 'ROOM_CHANGE_REQUEST' as const,
+    entityId: request.id, reason: reason.trim(), beforeSnapshot: JSON.stringify(request), afterSnapshot: JSON.stringify(next),
+  }
+  return { ok: true, request: next, data: {
+    ...data,
+    roomAssignments: data.roomAssignments
+      .filter(item => item.id !== resulting.id)
+      .map(item => item.id === source.id ? { ...item, endDate: null } : item),
+    roomChangeRequests: data.roomChangeRequests.map(item => item.id === request.id ? next : item),
+    auditEvents: [...data.auditEvents, auditEvent],
+  } }
+}
+
+/** Moves an approved future reservation to another date after rechecking all overlapping capacity. */
+export function rescheduleApprovedRoomChangeRequest(data: PrototypeAppState, requestIdToReschedule: string, newDate: string, reason: string, asOf: string): RoomChangeDecisionResult {
+  const request = data.roomChangeRequests.find(item => item.id === requestIdToReschedule)
+  if (!request || request.status !== 'APPROVED' || !request.approvedStartDate || !request.resultingAssignmentId) {
+    return { ok: false, errors: { general: 'Only an approved future reservation can be rescheduled here.' } }
+  }
+  if (request.approvedStartDate <= asOf) {
+    return { ok: false, errors: { general: 'This transfer is already effective. Use the tenancy transfer workflow instead.' } }
+  }
+  if (!isIsoDate(newDate) || newDate <= asOf) return { ok: false, errors: { startDate: 'Choose a future effective date.' } }
+  if (newDate === request.approvedStartDate) return { ok: false, errors: { startDate: 'Choose a different effective date.' } }
+  if (reason.trim().length > 500) return { ok: false, errors: { general: 'Keep the reason within 500 characters.' } }
+  const resulting = data.roomAssignments.find(item => item.id === request.resultingAssignmentId)
+  const source = data.roomAssignments.find(item => item.id === request.currentAssignmentId)
+  const room = data.rooms.find(item => item.id === request.requestedRoomId)
+  if (!resulting || !source || !room || resulting.tenantId !== request.tenantId || resulting.roomId !== room.id
+    || resulting.startDate !== request.approvedStartDate || resulting.endDate !== null
+    || source.tenantId !== request.tenantId || source.endDate !== previousDate(request.approvedStartDate)) {
+    return { ok: false, errors: { general: 'The assignments changed. Review the request before rescheduling the reservation.' } }
+  }
+  if (newDate <= source.startDate) return { ok: false, errors: { startDate: 'The new date must be after the current tenancy began.' } }
+  const conflict = roomCapacityConflict(data, {
+    roomId: room.id, tenantId: request.tenantId, startDate: newDate, endDate: null, capacity: room.capacity,
+    excludeAssignmentIds: [resulting.id],
+  })
+  if (conflict) return { ok: false, errors: { roomId: `This room would exceed its capacity on ${conflict.date}.` } }
+  const period = data.billingPeriods.find(item => item.startDate <= newDate && item.endDate >= newDate)
+  const next = {
+    ...request, approvedStartDate: newDate, decidedAt: asOf, decidedBy: 'demo-admin',
+    decisionReason: reason.trim() || 'Reservation rescheduled.',
+    billingReviewPeriodIds: period && newDate > period.startDate ? [period.id] : [],
+  }
+  const nextData = {
+    ...data,
+    roomAssignments: data.roomAssignments.map(item => item.id === resulting.id
+      ? { ...item, startDate: newDate, agreedRentCents: roomMonthlyRentCents(data, room, newDate) }
+      : item.id === source.id ? { ...item, endDate: previousDate(newDate) } : item),
+    roomChangeRequests: data.roomChangeRequests.map(item => item.id === request.id ? next : item),
+    auditEvents: [...data.auditEvents, {
+      id: `audit-${request.id}-rescheduled-${request.approvedStartDate}-${newDate}`, actorId: 'demo-admin', occurredOn: asOf,
+      action: 'ROOM_CHANGE_RESCHEDULED' as const, entityType: 'ROOM_CHANGE_REQUEST' as const,
+      entityId: request.id, reason: next.decisionReason, beforeSnapshot: JSON.stringify(request), afterSnapshot: JSON.stringify(next),
+    }],
+  }
+  return { ok: true, request: next, effectiveDate: newDate, data: nextData }
 }
 
 /** A direct landlord transfer, move-out, or deletion expires pending requests safely. */

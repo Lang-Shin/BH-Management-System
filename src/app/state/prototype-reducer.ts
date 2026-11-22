@@ -1,7 +1,8 @@
-import { createDemoData, DEMO_DATE, OCCUPANCY_DATE } from '@/data/fixtures/demo'
+import { createDemoData, DEMO_DATE } from '@/data/fixtures/demo'
 import type { PrototypeData } from '@/domain/types/models'
 import type { StateAction } from './actions'
 import { activeAssignments } from '@/domain/calculations/summary'
+import { futureReservationCount } from '@/domain/calculations/room-capacity'
 import { applyRateChange } from '@/domain/calculations/billing-rates'
 import { prepareElectricityPayment } from '@/domain/calculations/electricity-payment'
 import { prepareMeterInitialization } from '@/domain/calculations/meter-initialization'
@@ -9,14 +10,14 @@ import { prepareRoomPayment } from '@/domain/calculations/room-payment'
 import { preparePaymentCorrection } from '@/domain/calculations/payment-correction'
 import { prepareMoveInPayment, reconcileOccupancy } from '@/domain/calculations/move-in'
 import { activeMoveInPolicy } from '@/domain/calculations/move-in-policy'
-import { approveRoomChangeRequest, cancelRoomChangeRequest, expirePendingRoomChangeRequests, rejectRoomChangeRequest, submitRoomChangeRequest } from '@/domain/calculations/room-change-requests'
+import { approveRoomChangeRequest, cancelApprovedRoomChangeRequest, cancelRoomChangeRequest, expirePendingRoomChangeRequests, rejectRoomChangeRequest, rescheduleApprovedRoomChangeRequest, submitRoomChangeRequest } from '@/domain/calculations/room-change-requests'
 import { createRoom, deleteRoom, updateRoom } from '@/domain/calculations/room-management'
 import { createTenant, deleteTenant, moveOutTenant, updateTenant } from '@/domain/calculations/tenant-management'
 
 export function prototypeReducer(state: PrototypeData, action: StateAction): PrototypeData {
   switch (action.type) {
     case 'data/loaded':
-      return reconcileOccupancy(action.data, action.data, OCCUPANCY_DATE, { createMoveInObligations: false })
+      return reconcileOccupancy(action.data, action.data, action.occupancyDate, { createMoveInObligations: false })
     case 'tenant/noteUpdated':
       return {
         ...state,
@@ -61,8 +62,9 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
       return result.ok ? result.data : state
     }
     case 'room/statusToggled': {
-      // An occupied room cannot be removed from available capacity.
-      if (activeAssignments(state, DEMO_DATE).some(assignment => assignment.roomId === action.roomId)) return state
+      const asOf = action.asOf ?? DEMO_DATE
+      // An occupied or reserved room cannot be removed from available capacity.
+      if (activeAssignments(state, asOf).some(assignment => assignment.roomId === action.roomId) || futureReservationCount(state, action.roomId, asOf) > 0) return state
       return {
         ...state,
         rooms: state.rooms.map(room => room.id === action.roomId
@@ -128,11 +130,11 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
       }
     }
     case 'roomChange/requested': {
-      const result = submitRoomChangeRequest(state, action.draft, OCCUPANCY_DATE)
+      const result = submitRoomChangeRequest(state, action.draft, action.asOf)
       return result.ok ? result.data : state
     }
     case 'roomChange/cancelled': {
-      const result = cancelRoomChangeRequest(state, action.requestId, action.tenantId, action.reason, OCCUPANCY_DATE)
+      const result = cancelRoomChangeRequest(state, action.requestId, action.tenantId, action.reason, action.asOf)
       return result.ok ? result.data : state
     }
     case 'roomChange/rejected': {
@@ -142,8 +144,18 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
     case 'roomChange/approved': {
       const result = approveRoomChangeRequest(state, action.requestId, action)
       if (!result.ok) return state
-      return reconcileOccupancy(state, result.data, OCCUPANCY_DATE, { createMoveInObligations: false })
+      return reconcileOccupancy(state, result.data, action.decidedAt, { createMoveInObligations: false })
     }
+    case 'roomChange/reservationCancelled': {
+      const result = cancelApprovedRoomChangeRequest(state, action.requestId, action.reason, action.asOf)
+      return result.ok ? result.data : state
+    }
+    case 'roomChange/reservationRescheduled': {
+      const result = rescheduleApprovedRoomChangeRequest(state, action.requestId, action.effectiveDate, action.reason, action.asOf)
+      return result.ok ? result.data : state
+    }
+    case 'occupancy/dateChanged':
+      return reconcileOccupancy(state, state, action.asOf, { createMoveInObligations: false })
     case 'demo/reset':
       return createDemoData()
   }

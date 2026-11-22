@@ -1,17 +1,20 @@
 import { Input } from '@/components/ui/input'
 import { usePrototype } from '@/hooks/use-prototype'
+import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { activeAssignments } from '@/domain/calculations/summary'
 import type { TenantDraft, TenantDraftErrors } from '@/domain/calculations/tenant-management'
-import { DEMO_DATE } from '@/data/fixtures/demo'
+import { roomCapacityConflict } from '@/domain/calculations/room-capacity'
 
-export function TenantFormFields({ idPrefix, values, errors, onChange }: {
+export function TenantFormFields({ idPrefix, values, errors, onChange, tenantId }: {
   idPrefix: string
   values: TenantDraft
   errors: TenantDraftErrors
   onChange: (field: keyof TenantDraft, value: string | null) => void
+  tenantId?: string
 }) {
   const { data } = usePrototype()
-  const active = activeAssignments(data, DEMO_DATE)
+  const occupancyDate = useOccupancyDate()
+  const active = activeAssignments(data, occupancyDate)
 
   return <>
     <div className="grid gap-2">
@@ -43,8 +46,8 @@ export function TenantFormFields({ idPrefix, values, errors, onChange }: {
           <option value="">No room</option>
           {data.rooms.map(room => {
             const occupants = new Set(active.filter(assignment => assignment.roomId === room.id).map(assignment => assignment.tenantId)).size
-            const full = occupants >= room.capacity
-            return <option key={room.id} value={room.id}>Room {room.name} · {occupants}/{room.capacity} tenants{room.status === 'maintenance' ? ' · Under repair' : full ? ' · Full' : ''}</option>
+            const conflict = roomCapacityConflict(data, { roomId: room.id, tenantId: tenantId ?? '__new-tenant__', startDate: values.moveInDate, endDate: null, capacity: room.capacity })
+            return <option key={room.id} value={room.id}>Room {room.name} · {occupants}/{room.capacity} current{room.status === 'maintenance' ? ' · Under repair' : conflict ? ` · Unavailable for ${values.moveInDate}` : ''}</option>
           })}
         </select>
         <p className="text-xs text-muted-foreground">A room must exist, be free of repairs, and have available capacity. Choosing a different room records a transfer.</p>

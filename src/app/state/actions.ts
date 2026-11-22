@@ -15,7 +15,7 @@ export type PrototypeAction =
   | { type: 'room/created'; draft: RoomDraft }
   | { type: 'room/updated'; roomId: string; draft: RoomDraft }
   | { type: 'room/deleted'; roomId: string }
-  | { type: 'room/statusToggled'; roomId: string }
+  | { type: 'room/statusToggled'; roomId: string; asOf?: string }
   | { type: 'room/washingMachineUpdated'; roomId: string; enabled: boolean }
   | { type: 'electricity/paymentConfirmed'; obligationId: string; currentReadingMilliKwh: number; paidOn: string }
   | ({ type: 'electricity/meterInitialized' } & MeterInitializationInput)
@@ -23,10 +23,13 @@ export type PrototypeAction =
   | { type: 'payment/corrected'; paymentId: string; selectedCategories: ChargeCategory[]; correctedElectricityReadingMilliKwh: number | null; reason: string; settlementStatus: CorrectionSettlementStatus | ''; moneyExchangeConfirmed: boolean; correctedAt: string }
   | { type: 'moveIn/paymentRecorded'; obligationId: string; categories: ('ADVANCE' | 'SECURITY_DEPOSIT')[]; paidOn: string }
   | { type: 'moveIn/policyUpdated'; advanceApplication?: 'FIRST_MONTH' | 'LAST_MONTH' | 'MANUAL'; depositDisposition?: DepositDisposition }
-  | { type: 'roomChange/requested'; draft: RoomChangeRequestDraft }
-  | { type: 'roomChange/cancelled'; requestId: string; tenantId: string; reason: string }
+  | { type: 'roomChange/requested'; draft: RoomChangeRequestDraft; asOf: string }
+  | { type: 'roomChange/cancelled'; requestId: string; tenantId: string; reason: string; asOf: string }
   | { type: 'roomChange/approved'; requestId: string; effectiveDate: string; note: string; billingReviewAcknowledged: boolean; decidedAt: string }
   | { type: 'roomChange/rejected'; requestId: string; reason: string; decidedAt: string }
+  | { type: 'roomChange/reservationCancelled'; requestId: string; reason: string; asOf: string }
+  | { type: 'roomChange/reservationRescheduled'; requestId: string; effectiveDate: string; reason: string; asOf: string }
+  | { type: 'occupancy/dateChanged'; asOf: string }
   | { type: 'demo/reset' }
 
-export type StateAction = PrototypeAction | { type: 'data/loaded'; data: PrototypeData }
+export type StateAction = PrototypeAction | { type: 'data/loaded'; data: PrototypeData; occupancyDate: string }

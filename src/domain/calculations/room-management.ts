@@ -2,6 +2,7 @@ import type { PrototypeAppState, Room, RoomCategoryId } from '@/domain/types/mod
 import { ROOM_RATE_CATEGORY_IDS } from './billing-rates'
 import { activeAssignments, chargeBalance } from './summary'
 import { metersForRoom } from './meter-baseline'
+import { futureReservationCount, roomPeakOccupancy } from './room-capacity'
 
 export interface RoomDraft {
   name: string
@@ -95,14 +96,18 @@ export function validateRoomDraft(data: PrototypeAppState, draft: RoomDraft, opt
       return errors
     }
     const occupants = new Set(activeAssignments(data, options.asOf).filter(assignment => assignment.roomId === room.id).map(assignment => assignment.tenantId))
-    if (draft.capacity !== null && Number.isSafeInteger(draft.capacity) && draft.capacity < occupants.size) {
-      errors.capacity = `This room has ${occupants.size} assigned ${occupants.size === 1 ? 'tenant' : 'tenants'}. Beds cannot be fewer than the current occupancy.`
+    const peak = roomPeakOccupancy(data, room.id)
+    if (draft.capacity !== null && Number.isSafeInteger(draft.capacity) && draft.capacity < peak) {
+      errors.capacity = `This room has ${peak} assigned or reserved ${peak === 1 ? 'tenant' : 'tenants'}. Beds cannot be fewer than its peak occupancy.`
     }
     if (occupants.size > 0 && draft.status !== room.status) {
       errors.status = 'Occupied rooms cannot be changed to Available or Under repair while tenants remain assigned. Change tenant assignments before changing room status; this form does not change assignments.'
     }
     if (occupants.size > 0 && draft.status === 'maintenance') {
       errors.status = 'An occupied room cannot be marked Under repair while tenants remain assigned.'
+    }
+    if (futureReservationCount(data, room.id, options.asOf) > 0 && draft.status === 'maintenance') {
+      errors.status = 'A room with an approved future reservation cannot be marked Under repair. Release or reschedule the reservation first.'
     }
   }
 

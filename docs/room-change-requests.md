@@ -28,6 +28,14 @@ Schema v14 adds `roomChangeRequests`; v15 adds persisted `billingReviewPeriodIds
 
 ## Effective dates and occupancy
 
-Room occupancy is derived from active room assignments using stable room IDs, not from stored room-status labels. Landlord rooms, tenant selection, and tenant room views share one occupancy date: the later of the sample financial date and the local calendar date. A transfer effective today is visible immediately after approval and after a browser refresh. A future-dated transfer remains scheduled until its effective date, then becomes active when the refreshed app loads.
+Room occupancy is derived from active room assignments using stable room IDs, not from stored room-status labels. Landlord rooms, tenant selection, and tenant room views share one occupancy date: the later of the sample financial date and the local calendar date. A transfer effective today is visible immediately after approval and after a browser refresh. A future-dated transfer remains scheduled until its effective date; the timeline shows **Scheduled** before that date and **Effective** on or after it. Date-dependent UI refreshes automatically at local midnight and on every reload.
 
 Financial reporting and receipt history remain anchored to the documented sample date so the demonstration totals stay deterministic.
+
+## Reservations and capacity
+
+Pending requests do not reserve a room. Approval creates a future room assignment, which is the reservation record; there is no separate reservation-status field to drift from tenancy data. A room with no current occupants but an approved future assignment displays **Reserved**. An occupied room keeps its current occupants and separately shows its upcoming reservation. Future residents are never counted as current occupants.
+
+Capacity is checked at every overlapping assignment start for the requested interval. Shared rooms reserve only the required slots. Capacity changes, new tenancies, transfers, and approval all use the same check. The room selector excludes rooms that cannot accept the selected date and marks unavailable options in the tenancy form.
+
+Approved future reservations can be explicitly rescheduled or cancelled from the landlord request queue. These workflows recheck capacity, preserve request/audit history, release or move the assignment safely, and do not create or rewrite financial transactions. Effective or already-active transfers are not silently cancelled.

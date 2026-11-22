@@ -11,17 +11,19 @@ import { TransactionHistoryDialog } from '@/components/shared/transaction-histor
 import { BillPaymentChart, RoomOccupancyChart } from './dashboard-analytics'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { usePrototype } from '@/hooks/use-prototype'
+import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { selectSummary } from '@/domain/calculations/summary'
 import { selectRoomDues, selectRoomFinance } from '@/domain/calculations/room-finance'
 import { OutstandingBalances } from './outstanding-balances'
 import { PendingPaymentsDialog } from './pending-payments-dialog'
-import { DEMO_DATE, DEMO_PERIOD, OCCUPANCY_DATE } from '@/data/fixtures/demo'
+import { DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
 import { formatMoney } from '@/lib/format'
 import { CHARGE_STATUS_LABELS } from '@/lib/labels'
 
 export default function Dashboard() {
   const { data } = usePrototype()
-  const summary = selectSummary(data, DEMO_DATE, DEMO_PERIOD, OCCUPANCY_DATE)
+  const occupancyDate = useOccupancyDate()
+  const summary = selectSummary(data, DEMO_DATE, DEMO_PERIOD, occupancyDate)
   const upcoming = selectRoomDues(data, DEMO_DATE)
   const rooms = selectRoomFinance(data, DEMO_DATE)
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)

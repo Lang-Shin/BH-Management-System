@@ -10,7 +10,7 @@ describe('shared fictional financial model', () => {
   it('starts with consistent references, allocations, credits, and November summaries', () => {
     const data = createDemoData()
     expect(isPrototypeData(data)).toBe(true)
-    expect(selectSummary(data, DEMO_DATE, DEMO_PERIOD)).toEqual({ tenants: 7, totalRooms: 15, occupiedRooms: 4, availableRooms: 10, maintenanceRooms: 1,
+    expect(selectSummary(data, DEMO_DATE, DEMO_PERIOD)).toEqual({ tenants: 7, totalRooms: 15, occupiedRooms: 4, reservedRooms: 0, availableRooms: 10, maintenanceRooms: 1,
       billed: 1_522_500, applied: 1_152_500, received: 2_011_100, outstanding: 370_000, unresolved: 2, credit: 50_000, overdue: 0, paid: 12, partial: 0, unpaid: 3 })
     const received = data.payments.reduce((sum, p) => sum + p.amountCents, 0)
     const allocated = data.paymentAllocations.reduce((sum, a) => sum + a.amountCents, 0)

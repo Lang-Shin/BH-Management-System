@@ -31,7 +31,7 @@ describe('room-based occupancy', () => {
     expect(roomOccupants(data, 'room-1', DEMO_DATE)).toHaveLength(1)
     expect(roomOccupants(data, 'room-2', DEMO_DATE)).toHaveLength(2)
     expect(roomOccupants(data, 'room-3', DEMO_DATE)).toHaveLength(2)
-    expect(selectRoomSummary(data, DEMO_DATE)).toEqual({ totalRooms: 15, occupiedRooms: 4, availableRooms: 10, maintenanceRooms: 1 })
+    expect(selectRoomSummary(data, DEMO_DATE)).toEqual({ totalRooms: 15, occupiedRooms: 4, reservedRooms: 0, availableRooms: 10, maintenanceRooms: 1 })
   })
 
   it('treats one person renting a two-bed room as occupied, not available', () => {
@@ -56,6 +56,6 @@ describe('room-based occupancy', () => {
     const room = data.rooms[0]!
     data.rooms = Array.from({ length: 10 }, (_, i) => ({ ...room, id: `room-${i + 1}`, name: String(101 + i), status: 'available' }))
     data.roomAssignments = data.roomAssignments.slice(0, 6).map((a, i) => ({ ...a, roomId: `room-${i + 1}` }))
-    expect(selectRoomSummary(data, DEMO_DATE)).toEqual({ totalRooms: 10, occupiedRooms: 6, availableRooms: 4, maintenanceRooms: 0 })
+    expect(selectRoomSummary(data, DEMO_DATE)).toEqual({ totalRooms: 10, occupiedRooms: 6, reservedRooms: 0, availableRooms: 4, maintenanceRooms: 0 })
   })
 })

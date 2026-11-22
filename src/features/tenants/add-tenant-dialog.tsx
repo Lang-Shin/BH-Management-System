@@ -13,9 +13,10 @@ const emptyTenantForm: TenantDraft = {
 
 export function AddTenantDialog({ onSaved }: { onSaved?: (message: string) => void }) {
   const { data, dispatch } = usePrototype()
+
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState<'form' | 'success'>('form')
-  const [values, setValues] = useState(emptyTenantForm)
+  const [values, setValues] = useState<TenantDraft>(emptyTenantForm)
   const [errors, setErrors] = useState<TenantDraftErrors>({})
   const [savedName, setSavedName] = useState('')
   const submitting = useRef(false)

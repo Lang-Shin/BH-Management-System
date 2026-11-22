@@ -6,16 +6,18 @@ import { Input } from '@/components/ui/input'
 import { useAnimatedDialogClose } from '@/components/ui/use-animated-dialog-close'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { usePrototype } from '@/hooks/use-prototype'
+import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { roomOccupancy, roomOccupants } from '@/domain/calculations/summary'
 import { RoomElectricityMeter } from './room-electricity-meter'
 import { roomDeletionBlockers, validateRoomDraft, type RoomDraft, type RoomDraftErrors } from '@/domain/calculations/room-management'
+import { futureRoomReservations } from '@/domain/calculations/room-capacity'
 import { activeRoomRentRate, activeWashingRate, roomMonthlyRentCents, ROOM_RATE_CATEGORY_IDS } from '@/domain/calculations/billing-rates'
-import { DEMO_DATE, OCCUPANCY_DATE } from '@/data/fixtures/demo'
-import { formatMoney } from '@/lib/format'
+import { DEMO_DATE } from '@/data/fixtures/demo'
+import { formatDate, formatMoney } from '@/lib/format'
 import { roomCategoryLabel } from '@/lib/room-rates'
 import type { RoomCategoryId } from '@/domain/types/models'
 
-const statusLabels = { OCCUPIED: 'Occupied', AVAILABLE: 'Available', UNDER_REPAIR: 'Under repair' } as const
+const statusLabels = { OCCUPIED: 'Occupied', RESERVED: 'Reserved', AVAILABLE: 'Available', UNDER_REPAIR: 'Under repair' } as const
 const fieldClass = 'h-12 w-full rounded-xl border border-input bg-card px-3 text-base outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50'
 
 export function RoomDetailsDialog({ roomId, onClose, onReturnFocus, onNotice }: {
@@ -25,6 +27,7 @@ export function RoomDetailsDialog({ roomId, onClose, onReturnFocus, onNotice }: 
   onNotice: (message: string) => void
 }) {
   const { data, dispatch } = usePrototype()
+  const occupancyDate = useOccupancyDate()
   const room = data.rooms.find(item => item.id === roomId)
   const [washingEnabled, setWashingEnabled] = useState(room?.washingMachineEnabled ?? false)
   const [saving, setSaving] = useState(false)
@@ -40,8 +43,9 @@ export function RoomDetailsDialog({ roomId, onClose, onReturnFocus, onNotice }: 
   const { open, requestClose, onOpenChange, onAnimationEnd } = useAnimatedDialogClose(onClose)
   if (!room) return null
 
-  const status = roomOccupancy(data, room, OCCUPANCY_DATE)
-  const tenants = roomOccupants(data, room.id, OCCUPANCY_DATE)
+  const status = roomOccupancy(data, room, occupancyDate)
+  const tenants = roomOccupants(data, room.id, occupancyDate)
+  const reservations = futureRoomReservations(data, room.id, occupancyDate)
   const monthlyRentCents = roomMonthlyRentCents(data, room, DEMO_DATE)
   const washingRateCents = activeWashingRate(data, DEMO_DATE)?.rateCents ?? null
   const dirty = washingEnabled !== room.washingMachineEnabled
@@ -112,8 +116,8 @@ export function RoomDetailsDialog({ roomId, onClose, onReturnFocus, onNotice }: 
             <div><dt>Current occupancy</dt><dd>{tenants.length} {tenants.length === 1 ? 'tenant' : 'tenants'}</dd></div>
             <div><dt>Room status</dt><dd>{statusLabels[status]}</dd></div>
           </dl>
-          {status !== 'OCCUPIED' && <><Button variant="outline" className="mt-4" onClick={() => {
-            dispatch({ type: 'room/statusToggled', roomId: room.id })
+          {status !== 'OCCUPIED' && status !== 'RESERVED' && <><Button variant="outline" className="mt-4" onClick={() => {
+            dispatch({ type: 'room/statusToggled', roomId: room.id, asOf: occupancyDate })
             onNotice(`Room ${room.name} is now ${status === 'UNDER_REPAIR' ? 'available' : 'under repair'}.`)
           }}>{status === 'UNDER_REPAIR' ? 'Mark as available' : 'Needs repair'}</Button><p className="mt-2 text-xs text-muted-foreground">Room status changes apply immediately; Cancel only discards unsaved washing-machine changes.</p></>}
           <div className="room-details-management">
@@ -126,6 +130,14 @@ export function RoomDetailsDialog({ roomId, onClose, onReturnFocus, onNotice }: 
         <section className="room-details-section" aria-labelledby="room-tenants-title">
           <h2 id="room-tenants-title">Tenants</h2>
           {tenants.length > 0 ? <ul className="room-details-tenants">{tenants.map(tenant => <li key={tenant.id}><span className="font-semibold">{tenant.name}</span><span className="text-xs text-muted-foreground">{tenant.status === 'ACTIVE' ? 'Current tenant' : 'Moved out'}</span></li>)}</ul> : <p className="room-details-empty">No tenants are currently assigned.</p>}
+        </section>
+
+        <section className="room-details-section" aria-labelledby="room-reservations-title">
+          <h2 id="room-reservations-title">Upcoming reservations</h2>
+          {reservations.length > 0
+            ? <ul className="room-details-tenants">{reservations.map(reservation => <li key={reservation.assignment.id}><span className="font-semibold">{reservation.tenant.name}</span><span className="text-xs text-muted-foreground">Effective {formatDate(reservation.effectiveDate)}</span></li>)}</ul>
+            : <p className="room-details-empty">No approved future reservations.</p>}
+          {reservations.length > 0 && <p className="mt-3 text-xs text-muted-foreground">Reservations come from approved future transfer assignments and are not counted as current occupants.</p>}
         </section>
 
         <section className="room-details-section" aria-labelledby="room-washing-title">
@@ -184,7 +196,9 @@ export function RoomDetailsDialog({ roomId, onClose, onReturnFocus, onNotice }: 
               <label htmlFor="edit-room-status" className="text-sm font-semibold">Room status</label>
               {tenants.length > 0
                 ? <><Input id="edit-room-status" value="Occupied" readOnly aria-describedby="edit-room-status-help" className="h-12 bg-muted" /><p id="edit-room-status-help" className="text-xs text-muted-foreground">Occupied comes from tenant assignments and cannot be changed here.</p></>
-                : <><select id="edit-room-status" value={roomStatus} onChange={event => { setRoomStatus(event.target.value as RoomDraft['status']); setErrors({}) }} aria-invalid={Boolean(errors.status)} className={fieldClass}><option value="available">Available</option><option value="maintenance">Under repair</option></select>{errors.status && <p role="alert" className="text-sm text-destructive">{errors.status}</p>}</>}
+                : reservations.length > 0
+                  ? <><Input id="edit-room-status" value="Reserved" readOnly aria-describedby="edit-room-status-help" className="h-12 bg-muted" /><p id="edit-room-status-help" className="text-xs text-muted-foreground">An approved future tenancy reserves this room. Release or reschedule the reservation before changing room status.</p></>
+                  : <><select id="edit-room-status" value={roomStatus} onChange={event => { setRoomStatus(event.target.value as RoomDraft['status']); setErrors({}) }} aria-invalid={Boolean(errors.status)} className={fieldClass}><option value="available">Available</option><option value="maintenance">Under repair</option></select>{errors.status && <p role="alert" className="text-sm text-destructive">{errors.status}</p>}</>}
             </div>
           </div>
           <p className="mt-4 text-sm text-muted-foreground">Changing the monthly rate does not rewrite already issued rent charges or existing tenant agreements.</p>

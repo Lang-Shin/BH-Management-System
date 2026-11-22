@@ -68,7 +68,7 @@ describe('tenant management', () => {
 
   it('blocks a full room and a room under repair', () => {
     const data = createDemoData()
-    expect(validateTenantDraft(data, { ...draft, roomId: 'room-2' }, { asOf: DEMO_DATE }).roomId).toMatch(/already full/)
+    expect(validateTenantDraft(data, { ...draft, roomId: 'room-2' }, { asOf: DEMO_DATE }).roomId).toMatch(/exceed its capacity/)
     expect(validateTenantDraft(data, { ...draft, roomId: 'room-6' }, { asOf: DEMO_DATE }).roomId).toMatch(/under repair/)
   })
 

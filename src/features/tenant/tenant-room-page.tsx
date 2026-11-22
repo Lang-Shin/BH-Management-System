@@ -4,20 +4,21 @@ import { EmptyState } from '@/components/shared/states'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { usePrototype } from '@/hooks/use-prototype'
+import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { useTenantDemo } from '@/app/providers/tenant-demo'
 import { roomOccupancy } from '@/domain/calculations/summary'
-import { OCCUPANCY_DATE } from '@/data/fixtures/demo'
 import { formatDate } from '@/lib/format'
 import { selectTenantPersona } from './tenant-persona'
 import { RoomChangeRequestSection } from './room-change-request-status'
 
-const occupancyLabels = { OCCUPIED: 'Occupied', AVAILABLE: 'Available', UNDER_REPAIR: 'Under repair' } as const
+const occupancyLabels = { OCCUPIED: 'Occupied', RESERVED: 'Reserved', AVAILABLE: 'Available', UNDER_REPAIR: 'Under repair' } as const
 
 /** Layout-phase room summary; service requests and management arrive in a later phase. */
 export default function TenantRoom() {
   const { data } = usePrototype()
   const { tenantId } = useTenantDemo()
-  const persona = selectTenantPersona(data, tenantId)
+  const occupancyDate = useOccupancyDate()
+  const persona = selectTenantPersona(data, tenantId, occupancyDate)
   const room = persona?.room ?? null
   const assignment = persona?.assignment ?? null
   const movedOut = persona?.tenant.status === 'MOVED_OUT'
@@ -39,7 +40,7 @@ export default function TenantRoom() {
           <div><dt>Room number</dt><dd>Room {room.name}</dd></div>
           <div><dt>Floor</dt><dd>Floor {room.floor}</dd></div>
           <div><dt>Stay started</dt><dd>{formatDate(assignment.startDate)}</dd></div>
-          <div><dt>Room status</dt><dd><StatusBadge status={occupancyLabels[roomOccupancy(data, room, OCCUPANCY_DATE)]} /></dd></div>
+          <div><dt>Room status</dt><dd><StatusBadge status={occupancyLabels[roomOccupancy(data, room, occupancyDate)]} /></dd></div>
           <div><dt>Room type</dt><dd>{room.kind === 'SHARED' ? 'Shared-capacity room' : 'Private room'}</dd></div>
           <div><dt>Number of beds</dt><dd>{room.capacity} {room.capacity === 1 ? 'bed' : 'beds'}</dd></div>
           <div><dt>Washing machine</dt><dd className="flex items-center justify-end gap-2"><WashingMachine className="size-4 text-muted-foreground" aria-hidden="true" />{room.washingMachineEnabled ? 'Included' : 'Not subscribed'}</dd></div>

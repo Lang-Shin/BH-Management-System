@@ -1,11 +1,12 @@
 import type { selectRoomSummary } from '@/domain/calculations/summary'
-import { Building2, DoorOpen, KeyRound, Wrench } from 'lucide-react'
+import { Building2, CalendarClock, DoorOpen, KeyRound, Wrench } from 'lucide-react'
 import type { CSSProperties } from 'react'
 import { AnimatedNumber } from './animated-number'
 
 export function RoomSummary({ summary }: { summary: ReturnType<typeof selectRoomSummary> }) {
   const metrics = [
     { label: 'Occupied rooms', value: summary.occupiedRooms, detail: 'Currently rented', icon: KeyRound, color: 'var(--forest-green)' },
+    { label: 'Reserved rooms', value: summary.reservedRooms, detail: 'Approved future tenancy', icon: CalendarClock, color: '#9a6400' },
     { label: 'Available rooms', value: summary.availableRooms, detail: 'Ready for a new tenant', icon: DoorOpen, color: '#527346' },
     { label: 'Under repair', value: summary.maintenanceRooms, detail: 'Temporarily unavailable', icon: Wrench, color: '#a84625' },
   ]
@@ -15,7 +16,7 @@ export function RoomSummary({ summary }: { summary: ReturnType<typeof selectRoom
       <h2 className="text-base font-semibold">Room availability</h2>
       <p className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground"><Building2 className="size-3.5" aria-hidden="true" /><span><AnimatedNumber value={summary.totalRooms} /> rooms total</span></p>
     </div>
-    <div className="grid gap-4 sm:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {metrics.map(({ label, value, detail, icon: Icon, color }, index) => {
         const share = summary.totalRooms > 0 ? value / summary.totalRooms * 100 : 0
         return <div key={label} role="group" aria-label={label} className="room-metric" style={{ '--metric-color': color, '--metric-delay': `${index * 60}ms` } as CSSProperties}>

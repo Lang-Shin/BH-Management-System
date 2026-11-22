@@ -77,7 +77,7 @@ describe('room management', () => {
     const result = updateRoom(data, 'room-2', { name: '2', capacity: 1, categoryId: 'RATE_3500', kind: 'SHARED', status: 'available' }, DEMO_DATE)
     expect(result.ok).toBe(false)
     if (result.ok) return
-    expect(result.errors.capacity).toMatch(/2 assigned tenants/)
+    expect(result.errors.capacity).toMatch(/2 assigned or reserved tenants/)
   })
 
   it('rejects changing an occupied room to under repair', () => {

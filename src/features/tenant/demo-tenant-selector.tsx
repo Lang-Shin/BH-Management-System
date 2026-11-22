@@ -1,18 +1,19 @@
 import { useId } from 'react'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { usePrototype } from '@/hooks/use-prototype'
+import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { useTenantDemo } from '@/app/providers/tenant-demo'
 import { activeAssignments } from '@/domain/calculations/summary'
-import { OCCUPANCY_DATE } from '@/data/fixtures/demo'
 
 const statusLabel = (status: 'ACTIVE' | 'MOVED_OUT') => status === 'ACTIVE' ? 'Active' : 'Moved out'
 
 /** Clearly labeled prototype-only selector; it never creates accounts or changes tenant records. */
 export function DemoTenantSelector() {
   const { data } = usePrototype()
+  const occupancyDate = useOccupancyDate()
   const { tenantId, selectTenant } = useTenantDemo()
   const selectId = useId()
-  const assignments = activeAssignments(data, OCCUPANCY_DATE)
+  const assignments = activeAssignments(data, occupancyDate)
   const selected = data.tenants.find(item => item.id === tenantId) ?? null
   const selectedAssignment = selected ? assignments.find(item => item.tenantId === selected.id) : undefined
   const selectedRoom = selectedAssignment ? data.rooms.find(item => item.id === selectedAssignment.roomId) : undefined

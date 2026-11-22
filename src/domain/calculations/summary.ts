@@ -1,5 +1,6 @@
 import type { Charge, ChargeStatus, PrototypeAppState, Room, RoomAssignment, TenantCredit } from '@/domain/types/models'
 import { electricityObligations } from './electricity-obligations'
+import { futureReservationCount } from './room-capacity'
 
 export function unresolvedElectricity(data: PrototypeAppState, asOf: string, periodId?: string, roomId?: string) {
   return electricityObligations(data, asOf).filter(item => item.state === 'AWAITING_READING' && item.createdAt <= asOf
@@ -15,11 +16,12 @@ export function roomOccupants(data: PrototypeAppState, roomId: string, asOf: str
   return data.tenants.filter(t => ids.has(t.id))
 }
 
-export type RoomOccupancy = 'OCCUPIED' | 'AVAILABLE' | 'UNDER_REPAIR'
+export type RoomOccupancy = 'OCCUPIED' | 'RESERVED' | 'AVAILABLE' | 'UNDER_REPAIR'
 
 /** A room is occupied as soon as someone rents it, regardless of its bed count. */
 export function roomOccupancy(data: PrototypeAppState, room: Room, asOf: string): RoomOccupancy {
   if (roomOccupants(data, room.id, asOf).length > 0) return 'OCCUPIED'
+  if (futureReservationCount(data, room.id, asOf) > 0) return 'RESERVED'
   return room.status === 'maintenance' ? 'UNDER_REPAIR' : 'AVAILABLE'
 }
 
@@ -28,6 +30,7 @@ export function selectRoomSummary(data: PrototypeAppState, asOf: string) {
   return {
     totalRooms: data.rooms.length,
     occupiedRooms: states.filter(status => status === 'OCCUPIED').length,
+    reservedRooms: states.filter(status => status === 'RESERVED').length,
     availableRooms: states.filter(status => status === 'AVAILABLE').length,
     maintenanceRooms: states.filter(status => status === 'UNDER_REPAIR').length,
   }

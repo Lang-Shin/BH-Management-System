@@ -51,7 +51,7 @@ describe('admin workspace integration', () => {
   })
 
   it('renders an empty room chart without invalid percentages or phantom segments', () => {
-    render(<RoomOccupancyChart summary={{ totalRooms: 0, occupiedRooms: 0, availableRooms: 0, maintenanceRooms: 0 }} />)
+    render(<RoomOccupancyChart summary={{ totalRooms: 0, occupiedRooms: 0, reservedRooms: 0, availableRooms: 0, maintenanceRooms: 0 }} />)
     const chart = screen.getByRole('figure', { name: 'Room occupancy analytics' })
     expect(chart).toHaveTextContent('No rooms recorded yet.')
     expect(chart).not.toHaveTextContent(/NaN|Infinity/)
@@ -783,7 +783,7 @@ describe('admin workspace integration', () => {
     const rentedRoom = await screen.findByRole('button', { name: 'Room 2 details' })
     expect(rentedRoom).toHaveTextContent('Occupied')
     expect(rentedRoom).toHaveTextContent('₱3,500.00/month')
-    expect(rentedRoom).toHaveTextContent('Occupied — 2 tenants')
+    expect(rentedRoom).toHaveTextContent('Occupied · 2 current tenants')
     expect(screen.queryByLabelText('Rental rate')).not.toBeInTheDocument()
     expect(within(screen.getByRole('group', { name: 'Occupied rooms' })).getByText('4')).toBeInTheDocument()
     expect(within(screen.getByRole('group', { name: 'Available rooms' })).getByText('10')).toBeInTheDocument()

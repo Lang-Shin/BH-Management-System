@@ -3,7 +3,7 @@ import { ArrowRight, DoorOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { usePrototype } from '@/hooks/use-prototype'
-import { OCCUPANCY_DATE } from '@/data/fixtures/demo'
+import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { formatMoney } from '@/lib/format'
 import { roomCategoryLabel } from '@/lib/room-rates'
 import { roomMonthlyRentCents } from '@/domain/calculations/billing-rates'
@@ -18,14 +18,15 @@ export function RoomChangeRequestDialog({ tenantId, room, onClose, onSaved }: {
   onSaved: (message: string) => void
 }) {
   const { data, dispatch, persistSnapshot } = usePrototype()
+  const occupancyDate = useOccupancyDate()
   const [requestedRoomId, setRequestedRoomId] = useState('')
-  const [requestedStartDate, setRequestedStartDate] = useState(OCCUPANCY_DATE)
+  const [requestedStartDate, setRequestedStartDate] = useState(occupancyDate)
   const [reason, setReason] = useState('')
   const [errors, setErrors] = useState<RoomChangeRequestErrors>({})
   const [saving, setSaving] = useState(false)
   const targets = eligibleRoomChangeTargets(data, tenantId, requestedStartDate)
   const target = targets.find(item => item.id === requestedRoomId)
-  const assignment = activeAssignments(data, OCCUPANCY_DATE).find(item => item.tenantId === tenantId)
+  const assignment = activeAssignments(data, occupancyDate).find(item => item.tenantId === tenantId)
   const warnings = target ? roomChangeFinancialWarnings(data, tenantId, target.id, requestedStartDate) : null
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -36,7 +37,7 @@ export function RoomChangeRequestDialog({ tenantId, room, onClose, onSaved }: {
       return
     }
     const draft: RoomChangeRequestDraft = { tenantId, requestedRoomId, requestedStartDate, reason }
-    const result = submitRoomChangeRequest(data, draft, OCCUPANCY_DATE)
+    const result = submitRoomChangeRequest(data, draft, occupancyDate)
     if (!result.ok) {
       setErrors(result.errors)
       return
@@ -49,7 +50,7 @@ export function RoomChangeRequestDialog({ tenantId, room, onClose, onSaved }: {
       setErrors({ general: `Request was not saved. ${warning}` })
       return
     }
-    dispatch({ type: 'roomChange/requested', draft: { ...draft, requestId: result.request.id } })
+    dispatch({ type: 'roomChange/requested', draft: { ...draft, requestId: result.request.id }, asOf: occupancyDate })
     onSaved('Room change request submitted. The landlord must review it before any transfer occurs.')
     onClose()
   }
@@ -69,7 +70,7 @@ export function RoomChangeRequestDialog({ tenantId, room, onClose, onSaved }: {
         </div>
         <div className="grid gap-2">
           <label htmlFor="room-change-date" className="text-sm font-semibold">Requested move date</label>
-          <input id="room-change-date" type="date" min={OCCUPANCY_DATE} value={requestedStartDate} onChange={event => { setRequestedStartDate(event.target.value); setErrors({}) }} className="min-h-12 rounded-xl border border-input bg-card px-3" aria-invalid={Boolean(errors.startDate)} aria-describedby={errors.startDate ? 'room-change-date-error' : undefined} />
+          <input id="room-change-date" type="date" min={occupancyDate} value={requestedStartDate} onChange={event => { setRequestedStartDate(event.target.value); setErrors({}) }} className="min-h-12 rounded-xl border border-input bg-card px-3" aria-invalid={Boolean(errors.startDate)} aria-describedby={errors.startDate ? 'room-change-date-error' : undefined} />
           {errors.startDate && <p id="room-change-date-error" role="alert" className="text-sm text-destructive">{errors.startDate}</p>}
           <p className="text-xs text-muted-foreground">The landlord may adjust this date during review. The app has no automatic proration rule.</p>
         </div>
