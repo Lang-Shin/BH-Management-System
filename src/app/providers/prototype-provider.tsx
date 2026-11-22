@@ -7,6 +7,7 @@ import { PrototypeContext } from '@/app/state/prototype-context'
 import { prototypeReducer } from '@/app/state/prototype-reducer'
 import type { PrototypeAction } from '@/app/state/actions'
 import type { PrototypeData } from '@/domain/types/models'
+import { repairMissingAdvanceApplications } from '@/domain/calculations/advance-reconciliation'
 import { ApplicationDateProvider, type ApplicationClock } from './application-date'
 import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { usePrototype } from '@/hooks/use-prototype'
@@ -52,11 +53,15 @@ export function PrototypeProvider({ children, repository, now }: { children: Rea
     let cancelled = false
     repository.load().then(snapshot => {
       if (cancelled) return
-      confirmedData.current = snapshot.data
+      const occupancyDate = civilDateInTimeZone(clock())
+      const loadedData = serverRepository
+        ? snapshot.data
+        : repairMissingAdvanceApplications(snapshot.data, occupancyDate).data
+      confirmedData.current = loadedData
       confirmedRevision.current = snapshot.revision ?? null
       reduce(serverRepository
-        ? { type: 'data/serverSynced', data: snapshot.data }
-        : { type: 'data/loaded', data: snapshot.data, occupancyDate: civilDateInTimeZone(clock()) })
+        ? { type: 'data/serverSynced', data: loadedData }
+        : { type: 'data/loaded', data: loadedData, occupancyDate })
       setStorageWarning(snapshot.warning)
       setCanPersist(serverRepository ? true : snapshot.canPersist)
       setCanClearRecords(serverRepository ? snapshot.capabilities?.clearAllRecords === true : repository.mode !== 'server')

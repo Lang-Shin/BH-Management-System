@@ -9,6 +9,7 @@ import { withServerDate } from './validation'
 import { businessDate } from './date'
 import { ensureRegularRentPeriodsThrough } from '@/domain/calculations/rent-schedule'
 import { ensureBillingPeriodsThrough } from '@/domain/calculations/billing-periods'
+import { repairMissingAdvanceApplications } from '@/domain/calculations/advance-reconciliation'
 
 export interface CommandOutcome {
   data: PrototypeAppState
@@ -70,24 +71,38 @@ export class D1StateRepository {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const current = await this.load()
       let next = ensureBillingPeriodsThrough(current.data, serverDate)
-      next = ensureRegularRentPeriodsThrough(next, serverDate)
+      const repaired = repairMissingAdvanceApplications(next, serverDate)
+      next = ensureRegularRentPeriodsThrough(repaired.data, serverDate)
       if (JSON.stringify(next) === JSON.stringify(current.data)) return current
       const revision = current.revision + 1
       const now = new Date().toISOString()
-      next = {
-        ...next,
-        auditEvents: [...next.auditEvents, {
-          id: `audit-periods-${revision}-${now}`, actorId: 'system-maintenance', occurredOn: serverDate,
-          action: 'RENT_PERIODS_ENSURED', entityType: 'PROTOTYPE', entityId: this.workspaceId,
-          reason: 'Materialized due anniversary rent periods and calendar billing months.',
-          beforeSnapshot: JSON.stringify({ revision: current.revision }), afterSnapshot: JSON.stringify({ revision }),
-        }],
+      const periodsChanged = JSON.stringify(next) !== JSON.stringify(repaired.data)
+      if (periodsChanged) {
+        next = {
+          ...next,
+          auditEvents: [...next.auditEvents, {
+            id: `audit-periods-${revision}-${now}`, actorId: 'system-maintenance', occurredOn: serverDate,
+            action: 'RENT_PERIODS_ENSURED', entityType: 'PROTOTYPE', entityId: this.workspaceId,
+            reason: 'Materialized due anniversary rent periods and calendar billing months.',
+            beforeSnapshot: JSON.stringify({ revision: current.revision }), afterSnapshot: JSON.stringify({ revision }),
+          }],
+        }
       }
-      const results = await this.db.batch([
+      const statements = [
         this.db.prepare('UPDATE workspace_state SET revision = ?, data_json = ?, updated_at = ?, updated_by = ? WHERE workspace_id = ? AND revision = ?')
           .bind(revision, JSON.stringify(next), now, 'system-maintenance', this.workspaceId, current.revision),
         ...this.projectionStatements(next),
-      ])
+      ]
+      if (repaired.repaired.length > 0) {
+        statements.push(this.db.prepare(`INSERT INTO audit_events
+          (id, workspace_id, actor_id, actor_source, action, entity_type, entity_id, reason, occurred_on, request_id, idempotency_key, before_json, after_json, created_at)
+          VALUES (?, ?, ?, 'DEV', 'ADVANCE_APPLIED', 'WORKSPACE_STATE', ?, ?, ?, ?, NULL, ?, ?, ?)`)
+          .bind(`server-advance-repair-${revision}`, this.workspaceId, 'system-reconciliation', this.workspaceId,
+            `Repaired ${repaired.repaired.length} missing move-in advance application${repaired.repaired.length === 1 ? '' : 's'}.`,
+            serverDate, `maintenance-${revision}`, JSON.stringify({ revision: current.revision }),
+            JSON.stringify({ revision, repaired: repaired.repaired }), now))
+      }
+      const results = await this.db.batch(statements)
       if (results[0]?.meta.changes === 1) return { data: next, revision }
     }
     return this.load()

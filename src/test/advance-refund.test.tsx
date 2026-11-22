@@ -32,6 +32,11 @@ function createPaidRoom(preserveFirstRentApplication = false) {
     ...paid.data,
     advanceApplications: [],
     auditEvents: paid.data.auditEvents.filter(event => !(event.entityType === 'ADVANCE_APPLICATION' && applicationIds.has(event.entityId))),
+    occupancyCycles: paid.data.occupancyCycles.map(cycle => cycle.roomId === 'room-5'
+      ? { ...cycle, rentSchedule: 'LEGACY_CALENDAR' as const, rentAnchorDate: null, rentAnchorDay: null }
+      : cycle),
+    rentalPeriods: [],
+    rentObligations: [],
   }
   return { data, tenant, obligationId: view.obligation.id }
 }

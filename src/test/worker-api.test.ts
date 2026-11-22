@@ -5,6 +5,9 @@ import { build } from 'esbuild'
 import { Miniflare } from 'miniflare3'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createDemoData } from '@/data/fixtures/demo'
+import { calendarBillingPeriods } from '@/domain/calculations/billing-periods'
+import { selectBillingRent } from '@/domain/calculations/billing-rent'
+import { buildRoomPaymentQuote } from '@/domain/calculations/room-payment'
 
 const root = process.cwd()
 const src = path.join(root, 'src')
@@ -176,16 +179,49 @@ describe('Worker and D1 integration', () => {
     expect(paid.data.payments.filter(item => item.id.startsWith('payment-move-in-'))[0]!.amountCents).toBe(800_000)
     expect(paid.data.receipts.filter(item => item.paymentId === paid.data.payments.find(payment => payment.id.startsWith('payment-move-in-'))!.id)).toHaveLength(1)
 
+    const period = calendarBillingPeriods(paid.data, seeded.serverDate)
+      .find(item => item.startDate <= seeded.serverDate && item.endDate >= seeded.serverDate)!
+    const rentLine = selectBillingRent(paid.data, assignment.roomId, period, seeded.serverDate)
+    expect(rentLine).toMatchObject({
+      source: 'ANNIVERSARY', billedCents: 400_000, paidCents: 400_000,
+      outstandingCents: 0, advanceAppliedCents: 400_000, cashPaidCents: 0, status: 'PAID',
+    })
+    const quote = buildRoomPaymentQuote(paid.data, {
+      roomId: assignment.roomId, periodId: period.id, selected: ['RENT'],
+      electricityReadingMilliKwh: null, asOf: seeded.serverDate,
+    })
+    expect(quote.options.find(option => option.category === 'RENT')).toMatchObject({ state: 'PAID', amountCents: 0 })
+    expect(quote.selected).toEqual([])
+
     const replay = await jsonRequest('/api/v1/commands', 'POST', paymentBody, { 'idempotency-key': 'worker-move-in-payment-0001' })
     expect(replay.status).toBe(200)
     const replayed = await replay.json() as { replayed: boolean; revision: number }
     expect(replayed).toMatchObject({ replayed: true, revision: paid.revision })
+
+    const duplicate = await jsonRequest('/api/v1/commands', 'POST', paymentBody, { 'idempotency-key': 'worker-move-in-payment-duplicate-0001' })
+    expect(duplicate.status).toBe(422)
 
     const db = await worker.getD1Database('DB')
     const applicationCount = await db.prepare('SELECT COUNT(*) AS count FROM advance_applications WHERE workspace_id = ?').bind('test-workspace').first<{ count: number }>()
     expect(applicationCount?.count).toBe(1)
     const rentCount = await db.prepare('SELECT COUNT(*) AS count FROM rent_obligations WHERE workspace_id = ?').bind('test-workspace').first<{ count: number }>()
     expect(rentCount?.count).toBe(1)
+
+    const broken = { ...paid.data, advanceApplications: [], auditEvents: paid.data.auditEvents.filter(event => event.entityType !== 'ADVANCE_APPLICATION') }
+    await db.prepare('UPDATE workspace_state SET data_json = ? WHERE workspace_id = ?')
+      .bind(JSON.stringify(broken), 'test-workspace').run()
+    const repaired = await bootstrap()
+    expect(repaired.data.advanceApplications).toHaveLength(1)
+    expect(repaired.data.advanceApplications[0]).toMatchObject({
+      occupancyCycleId: cycle.id, rentObligationId: firstRent.id, sourcePaymentId: paid.data.advanceApplications[0]!.sourcePaymentId,
+    })
+    expect(repaired.data.auditEvents.some(event => event.id === `audit-advance-repair-${cycle.id}`)).toBe(true)
+    expect(repaired.data.payments.filter(item => item.id.startsWith('payment-move-in-'))).toHaveLength(1)
+    const repairedApplicationCount = await db.prepare('SELECT COUNT(*) AS count FROM advance_applications WHERE workspace_id = ?').bind('test-workspace').first<{ count: number }>()
+    expect(repairedApplicationCount?.count).toBe(1)
+    const repairAuditCount = await db.prepare("SELECT COUNT(*) AS count FROM audit_events WHERE workspace_id = ? AND action = 'ADVANCE_APPLIED' AND actor_id = 'system-reconciliation'")
+      .bind('test-workspace').first<{ count: number }>()
+    expect(repairAuditCount?.count).toBe(1)
   }, 30_000)
 
   it('quotes and records one multi-period prepayment excluding the advance-covered period', async () => {
@@ -224,6 +260,56 @@ describe('Worker and D1 integration', () => {
     const repeated = await repeat.json() as { replayed: boolean; revision: number; payment: { id: string } }
     expect(repeated.replayed).toBe(true)
     expect(repeated.payment.id).toBe(prepaid.payment.id)
+  }, 30_000)
+
+  it('rolls back a move-in payment when its advance application projection fails', async () => {
+    const db = await worker.getD1Database('DB')
+    const before = await bootstrap()
+    const createResponse = await jsonRequest('/api/v1/commands', 'POST', {
+      action: {
+        type: 'tenant/created',
+        draft: {
+          name: 'Advance Rollback Tenant', email: 'advance.rollback@example.com', phone: '+63 900 555 0187',
+          address: '2 Rollback Street, Demo City', roomId: 'room-2', moveInDate: before.serverDate, notes: '',
+        },
+      },
+    }, { 'idempotency-key': 'worker-advance-rollback-tenant-0001' })
+    expect(createResponse.status).toBe(200)
+    const created = await createResponse.json() as { data: ReturnType<typeof createDemoData>; revision: number }
+    const tenant = created.data.tenants.find(item => item.name === 'Advance Rollback Tenant')!
+    const cycle = created.data.occupancyCycles.find(item => item.roomId === 'room-2' && item.status === 'ACTIVE')!
+    const obligation = created.data.moveInObligations.find(item => item.occupancyCycleId === cycle.id)!
+    const paymentCount = created.data.payments.length
+    const applicationCount = created.data.advanceApplications.length
+    const revisionBeforePayment = created.revision
+
+    await db.prepare(`CREATE TRIGGER fail_advance_application_projection BEFORE INSERT ON advance_applications
+      BEGIN SELECT RAISE(ABORT, 'forced advance application failure'); END`).run()
+    try {
+      const failed = await jsonRequest('/api/v1/commands', 'POST', {
+        action: {
+          type: 'moveIn/paymentRecorded', obligationId: obligation.id,
+          categories: ['ADVANCE', 'SECURITY_DEPOSIT'], paidOn: before.serverDate,
+        },
+      }, { 'idempotency-key': 'worker-advance-rollback-payment-0001' })
+      expect(failed.status).toBe(409)
+      expect(await failed.json()).toMatchObject({ error: { code: 'STATE_CONFLICT' } })
+    } finally {
+      await db.prepare('DROP TRIGGER IF EXISTS fail_advance_application_projection').run()
+    }
+
+    const after = await bootstrap()
+    expect(after.revision).toBe(revisionBeforePayment)
+    expect(after.data.payments).toHaveLength(paymentCount)
+    expect(after.data.advanceApplications).toHaveLength(applicationCount)
+    expect(after.data.payments.some(payment => payment.occupancyCycleId === cycle.id)).toBe(false)
+    expect(after.data.advanceApplications.some(application => application.occupancyCycleId === cycle.id)).toBe(false)
+    const firstRent = after.data.rentObligations.find(item => item.occupancyCycleId === cycle.id)!
+    const view = selectBillingRent(after.data, 'room-2', calendarBillingPeriods(after.data, before.serverDate)
+      .find(item => item.startDate <= before.serverDate && item.endDate >= before.serverDate)!, before.serverDate)
+    expect(view.billedCents).toBe(firstRent.amountCents)
+    expect(view.outstandingCents).toBe(firstRent.amountCents)
+    expect(tenant.id).toBeTruthy()
   }, 30_000)
 
   it('rolls back the state, audit, and idempotency writes when a projection insert fails', async () => {
