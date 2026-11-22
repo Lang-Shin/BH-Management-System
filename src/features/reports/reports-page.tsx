@@ -10,7 +10,6 @@ import { PageHeader, PreviewNotice, StatCard } from '@/components/shared/page'
 import { AnimatedNumber } from '@/components/shared/animated-number'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PaginatedDataTable } from '@/components/shared/table-pagination'
-import { WorkflowPlaceholders } from '@/components/shared/workflow-placeholders'
 import { ResetDemoButton } from '@/components/shared/reset-demo-button'
 import { usePrototype } from '@/hooks/use-prototype'
 import { selectSummary } from '@/domain/calculations/summary'
@@ -142,9 +141,5 @@ export default function Reports() {
     ]} /></section>
       <p className="mt-5 text-sm text-muted-foreground">Your changes are saved only in this browser. This is not a backup.</p>
     </details>
-    <WorkflowPlaceholders title="More report tools" items={[
-      { title: 'Print other reports', description: 'A room summary CSV is available above. Printing and other report formats will be available later.' },
-      { title: 'Save a backup', description: 'Making a backup copy and bringing back saved records will be added later.' },
-    ]} />
   </>
 }
