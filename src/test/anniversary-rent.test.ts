@@ -4,8 +4,9 @@ import { prototypeReducer } from '@/app/state/prototype-reducer'
 import { prepareMoveInPayment, selectMoveInObligations } from '@/domain/calculations/move-in'
 import { prepareRentPrepayment, quoteRentPrepayment } from '@/domain/calculations/rent-schedule'
 import {
-  addMonthsClamped, rentObligationPaidCents, rentalPeriodBounds, rentalPeriodsForCycle,
+  addMonthsClamped, rentDueDate, rentObligationPaidCents, rentalPeriodBounds, rentalPeriodsForCycle,
 } from '@/domain/calculations/rental-periods'
+import { selectRentCycleReport } from '@/domain/calculations/rent-reporting'
 import { isPrototypeData } from '@/domain/validation/prototype-data'
 import type { PrototypeAppState } from '@/domain/types/models'
 import type { TenantDraft } from '@/domain/calculations/tenant-management'
@@ -45,6 +46,11 @@ describe('anniversary rent periods', () => {
     expect(addMonthsClamped('2028-01-31', 2)).toBe('2028-03-31')
     expect(addMonthsClamped('2026-12-31', 1)).toBe('2027-01-31')
     expect(rentalPeriodBounds('2026-01-31', 1)).toEqual({ startDate: '2026-01-31', endDateExclusive: '2026-02-28' })
+    expect(rentDueDate('2026-01-31')).toBe('2026-01-31')
+    expect(rentDueDate(rentalPeriodBounds('2026-01-31', 2).startDate)).toBe('2026-02-28')
+    expect(rentDueDate(rentalPeriodBounds('2026-01-31', 3).startDate)).toBe('2026-03-31')
+    expect(rentDueDate(rentalPeriodBounds('2028-01-31', 2).startDate)).toBe('2028-02-29')
+    expect(rentDueDate(rentalPeriodBounds('2026-12-31', 2).startDate)).toBe('2027-01-31')
   })
 
   it('establishes one anchor for a new cycle and does not reset it for a roommate', () => {
@@ -54,7 +60,10 @@ describe('anniversary rent periods', () => {
     })
     const periods = rentalPeriodsForCycle(first.data, first.cycle.id)
     expect(periods).toHaveLength(1)
-    expect(periods[0]).toMatchObject({ sequence: 1, startDate: '2026-11-13', endDateExclusive: '2026-12-13' })
+    expect(periods[0]).toMatchObject({
+      sequence: 1, startDate: '2026-11-13', endDateExclusive: '2026-12-13', dueDate: '2026-11-13',
+    })
+    expect(first.data.rentObligations.find(item => item.rentalPeriodId === periods[0]!.id)?.dueDate).toBe('2026-11-13')
 
     const second = createTenant(first.data, {
       name: 'Anniversary Roommate', email: 'anniversary.roommate@example.com', moveInDate: '2026-11-20',
@@ -118,6 +127,7 @@ describe('anniversary rent periods', () => {
     expect(quote.quote.periods.map(line => line.sequence)).toEqual([2, 3, 4])
     expect(quote.quote.periods.map(line => line.amountCents)).toEqual([400_000, 400_000, 400_000])
     expect(quote.quote.periods.map(line => line.startDate)).toEqual(['2026-12-13', '2027-01-13', '2027-02-13'])
+    expect(quote.quote.periods.map(line => line.dueDate)).toEqual(['2026-12-13', '2027-01-13', '2027-02-13'])
     expect(quote.quote.totalCents).toBe(1_200_000)
     expect(quote.quote.rateCents).toBe(400_000)
   })
@@ -138,6 +148,45 @@ describe('anniversary rent periods', () => {
     const obligations = prepayment.data.rentObligations.filter(item => item.occupancyCycleId === created.cycle.id)
     expect(obligations.map(item => item.amountCents)).toEqual([400_000, 400_000, 400_000])
     expect(obligations.every(item => item.rateSnapshotCents === item.amountCents)).toBe(true)
+    expect(obligations.map(item => item.dueDate)).toEqual(['2026-11-13', '2026-12-13', '2027-01-13'])
+    expect(obligations.map(item => item.issuedOn)).toEqual(['2026-11-13', '2026-11-13', '2026-11-13'])
+
+    const report = selectRentCycleReport(prepayment.data, created.cycle.id, '2026-11-13')!
+    expect(report.periods.map(period => period.status)).toEqual(['PAID', 'PAID', 'PAID'])
+    expect(report.periods.slice(1).every(period => period.cashPaidCents === 400_000)).toBe(true)
+    expect(report.periods[0]).toMatchObject({ cashPaidCents: 0, advanceAppliedCents: 400_000 })
+
+    const remaining = quoteRentPrepayment(prepayment.data, { cycleId: created.cycle.id, periodCount: 2, asOf: '2026-11-13' })
+    expect(remaining.ok).toBe(true)
+    if (!remaining.ok) return
+    expect(remaining.quote.periods.map(line => line.sequence)).toEqual([4, 5])
+    expect(remaining.quote.periods.some(line => line.rentalPeriodId === prepayment.quote.periods[0]!.rentalPeriodId)).toBe(false)
+  })
+
+  it('keeps the destination room anniversary when moving into an occupied room', () => {
+    const first = createTenant(createDemoData())
+    const second = createTenant(first.data, {
+      name: 'Occupied Destination Tenant', email: 'occupied-destination@example.com',
+      roomId: 'room-15', moveInDate: '2026-11-14',
+    }, '2026-11-14')
+    const destinationCycle = second.data.occupancyCycles.find(item => item.roomId === 'room-14' && item.status === 'ACTIVE')!
+    expect(destinationCycle.id).toBe(first.cycle.id)
+
+    const transferred = prototypeReducer(second.data, {
+      type: 'tenant/updated', tenantId: second.tenant.id, asOf: '2026-11-16',
+      draft: draft({
+        name: second.tenant.name, email: second.tenant.email, phone: second.tenant.phone, address: second.tenant.address,
+        roomId: 'room-14', moveInDate: '2026-11-16',
+      }),
+    })
+    const active = transferred.occupancyCycles.find(item => item.roomId === 'room-14' && item.status === 'ACTIVE')!
+    expect(active.id).toBe(first.cycle.id)
+    expect(active).toMatchObject({ rentAnchorDate: '2026-11-13', rentAnchorDay: 13 })
+    expect(transferred.rentalPeriods.filter(item => item.occupancyCycleId === active.id)).toHaveLength(1)
+    expect(transferred.rentObligations.filter(item => item.occupancyCycleId === active.id)).toHaveLength(1)
+    expect(transferred.moveInObligations.filter(item => item.roomId === 'room-14')).toHaveLength(1)
+    expect(transferred.charges.filter(item => item.category === 'ADVANCE' || item.category === 'SECURITY_DEPOSIT')).toHaveLength(4)
+    expect(transferred.occupancyCycles.find(item => item.roomId === 'room-15')?.status).toBe('CLOSED')
   })
 
   it('starts a transfer destination cycle without another advance or deposit', () => {

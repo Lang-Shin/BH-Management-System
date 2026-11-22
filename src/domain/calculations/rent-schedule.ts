@@ -6,7 +6,7 @@ import { activeRoomRentRate, DEFAULT_RENT_CENTS, roomMonthlyRentCents } from './
 import { nextReceiptNumbers } from './receipt-numbering'
 import {
   anniversaryAnchor, dateParts, firstUnpaidSequence, isCivilDate, rentObligationForPeriod,
-  rentObligationPaidCents, rentObligationStatus, rentalPeriodBounds, rentalPeriodId, rentalPeriodsForCycle,
+  rentDueDate, rentObligationPaidCents, rentObligationStatus, rentalPeriodBounds, rentalPeriodId, rentalPeriodsForCycle,
   rentObligationId,
 } from './rental-periods'
 
@@ -95,13 +95,13 @@ export function ensureFirstRentalPeriod(
   const periodId = rentalPeriodId(cycle.id, 1)
   const period: RentalPeriod = {
     id: periodId, occupancyCycleId: cycle.id, roomId: room.id, sequence: 1,
-    startDate: bounds.startDate, endDateExclusive: bounds.endDateExclusive, dueDate: bounds.startDate,
+    startDate: bounds.startDate, endDateExclusive: bounds.endDateExclusive, dueDate: rentDueDate(bounds.startDate),
     status: 'OPEN', origin: 'ANNIVERSARY',
   }
   const obligation: RentObligation = {
     id: rentObligationId(cycle.id, 1), occupancyCycleId: cycle.id, rentalPeriodId: periodId, roomId: room.id,
     amountCents, rateId: rate.id, rateEffectiveFrom: rate.effectiveFrom, rateSnapshotCents: amountCents,
-    issuedOn: cycle.startedAt, dueDate: bounds.startDate, source, state: 'ISSUED', correction: null,
+    issuedOn: cycle.startedAt, dueDate: rentDueDate(bounds.startDate), source, state: 'ISSUED', correction: null,
   }
   return {
     ...data,
@@ -124,13 +124,13 @@ function materializePeriod(
   const periodId = rentalPeriodId(cycle.id, sequence)
   const period: RentalPeriod = {
     id: periodId, occupancyCycleId: cycle.id, roomId: cycle.roomId, sequence,
-    startDate: bounds.startDate, endDateExclusive: bounds.endDateExclusive, dueDate: bounds.startDate,
+    startDate: bounds.startDate, endDateExclusive: bounds.endDateExclusive, dueDate: rentDueDate(bounds.startDate),
     status: 'OPEN', origin: 'ANNIVERSARY',
   }
   const obligation: RentObligation = {
     id: rentObligationId(cycle.id, sequence), occupancyCycleId: cycle.id, rentalPeriodId: periodId, roomId: cycle.roomId,
     amountCents: rate.monthlyRentCents, rateId: rate.id, rateEffectiveFrom: rate.effectiveFrom,
-    rateSnapshotCents: rate.monthlyRentCents, issuedOn, dueDate: bounds.startDate,
+    rateSnapshotCents: rate.monthlyRentCents, issuedOn, dueDate: rentDueDate(bounds.startDate),
     source: 'PREPAYMENT', state: 'ISSUED', correction: null,
   }
   return {

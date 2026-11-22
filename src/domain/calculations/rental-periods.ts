@@ -54,6 +54,12 @@ export function rentalPeriodBounds(anchorDate: string, sequence: number): { star
   }
 }
 
+/** Approved policy: rent is due on the first day of each anniversary period. */
+export function rentDueDate(periodStartDate: string): string {
+  if (!isCivilDate(periodStartDate)) throw new Error(`Invalid rent period start: ${periodStartDate}`)
+  return periodStartDate
+}
+
 export function rentalPeriodId(cycleId: string, sequence: number): string {
   return `rent-period-${cycleId}-${sequence}`
 }
@@ -131,7 +137,7 @@ export function rentalPeriodsFrom(
   return Array.from({ length: count }, (_, index) => {
     const sequence = firstSequence + index
     const bounds = rentalPeriodBounds(anchor, sequence)
-    return { sequence, ...bounds, dueDate: bounds.startDate }
+    return { sequence, ...bounds, dueDate: rentDueDate(bounds.startDate) }
   })
 }
 

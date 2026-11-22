@@ -49,12 +49,17 @@ beforeAll(async () => {
   const migrations = path.join(root, 'migrations')
   for (const file of readdirSync(migrations).filter(name => name.endsWith('.sql')).sort()) {
     const sql = readFileSync(path.join(migrations, file), 'utf8')
-      .replace(/CREATE TRIGGER[\s\S]*?END;/gi, '')
       .split(/\r?\n/)
       .filter(line => !line.trimStart().startsWith('--') && !line.trimStart().startsWith('PRAGMA'))
       .join('\n')
-    for (const statement of sql.split(';').map(item => item.trim()).filter(Boolean)) {
+    const triggerPattern = /CREATE\s+TRIGGER[\s\S]*?END;/gi
+    const triggers = [...sql.matchAll(triggerPattern)].map(match => match[0])
+    const tables = sql.replace(triggerPattern, '')
+    for (const statement of tables.split(';').map(item => item.trim()).filter(Boolean)) {
       await db.prepare(statement).run()
+    }
+    for (const trigger of triggers) {
+      await db.prepare(trigger).run()
     }
   }
 }, 60_000)
@@ -103,6 +108,26 @@ describe('Worker and D1 integration', () => {
     expect(await rejected.json()).toMatchObject({ error: { code: 'AUTH_NOT_CONFIGURED' } })
   })
 
+  it('enforces the approved due-date policy in the D1 schema', async () => {
+    await bootstrap()
+    const db = await worker.getD1Database('DB')
+    await expect(db.prepare(`INSERT INTO rental_periods
+      (id, workspace_id, occupancy_cycle_id, room_id, sequence_no, start_date, end_date_exclusive, due_date, status, origin)
+      VALUES ('guard-bad-period', 'test-workspace', 'cycle-room-1', 'room-1', 99, '2026-01-01', '2026-02-01', '2026-01-02', 'OPEN', 'ANNIVERSARY')`).run())
+      .rejects.toThrow(/rent due date must equal period start date/)
+
+    await db.prepare(`INSERT INTO rental_periods
+      (id, workspace_id, occupancy_cycle_id, room_id, sequence_no, start_date, end_date_exclusive, due_date, status, origin)
+      VALUES ('guard-good-period', 'test-workspace', 'cycle-room-1', 'room-1', 98, '2026-01-01', '2026-02-01', '2026-01-01', 'OPEN', 'ANNIVERSARY')`).run()
+    await expect(db.prepare(`INSERT INTO rent_obligations
+      (id, workspace_id, occupancy_cycle_id, rental_period_id, room_id, amount_cents, rate_id, rate_effective_from,
+       rate_snapshot_cents, issued_on, due_date, source, state)
+      VALUES ('guard-bad-obligation', 'test-workspace', 'cycle-room-1', 'guard-good-period', 'room-1', 100000,
+       'rate-test', '2026-01-01', 100000, '2026-01-01', '2026-01-02', 'REGULAR', 'ISSUED')`).run())
+      .rejects.toThrow(/rent obligation due date must equal rental period start date/)
+    await db.prepare("DELETE FROM rental_periods WHERE id = 'guard-good-period'").run()
+  })
+
   it('settles the first anniversary period from the paid advance without duplicate cash', async () => {
     const seeded = await bootstrap()
     const createResponse = await jsonRequest('/api/v1/commands', 'POST', {
@@ -121,6 +146,10 @@ describe('Worker and D1 integration', () => {
     const cycle = created.data.occupancyCycles.find(item => item.roomId === assignment.roomId && item.status === 'ACTIVE')!
     expect(cycle).toMatchObject({ rentSchedule: 'ANNIVERSARY', rentAnchorDate: seeded.serverDate, rentAnchorDay: Number(seeded.serverDate.slice(8, 10)) })
     const obligation = created.data.moveInObligations.find(item => item.occupancyCycleId === cycle.id)!
+    const firstPeriod = created.data.rentalPeriods.find(item => item.occupancyCycleId === cycle.id)!
+    const firstRent = created.data.rentObligations.find(item => item.occupancyCycleId === cycle.id)!
+    expect(firstPeriod.dueDate).toBe(firstPeriod.startDate)
+    expect(firstRent.dueDate).toBe(firstPeriod.startDate)
     expect(created.data.rentalPeriods.filter(item => item.occupancyCycleId === cycle.id)).toHaveLength(1)
     expect(created.data.rentObligations.filter(item => item.occupancyCycleId === cycle.id)).toHaveLength(1)
 
@@ -156,8 +185,9 @@ describe('Worker and D1 integration', () => {
     if (!cycle) throw new Error('Anniversary cycle missing from integration setup')
     const quoteResponse = await jsonRequest('/api/v1/rent/quote', 'POST', { cycleId: cycle.id, periodCount: 2 })
     expect(quoteResponse.status).toBe(200)
-    const quote = await quoteResponse.json() as { quote: { periods: { sequence: number; amountCents: number }[]; totalCents: number; rateCents: number } }
+    const quote = await quoteResponse.json() as { quote: { periods: { sequence: number; amountCents: number; startDate: string; dueDate: string }[]; totalCents: number; rateCents: number } }
     expect(quote.quote.periods.map(period => period.sequence)).toEqual([2, 3])
+    expect(quote.quote.periods.every(period => period.dueDate === period.startDate)).toBe(true)
     expect(quote.quote.totalCents).toBe(800_000)
     expect(quote.quote.rateCents).toBe(400_000)
 

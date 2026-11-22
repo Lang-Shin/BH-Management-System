@@ -1,46 +1,58 @@
-# Room-level move-in advance and security deposit
-
-Version 12 adds explicit room-level payment ownership beside the existing monthly billing ledger. Tenant names and amounts remain fictional demo data.
+# Room-level move-in advance, first rent, and security deposit
 
 ## Rules
 
-- One advance and one security deposit are required per **room occupancy cycle**, not per tenant. Roommates share the same room-level obligation.
-- Tenant creation reconciles the new assignment using the current occupancy date, so a newly occupied room gets its obligation immediately even when the move-in date is later than the fixed sample financial date.
-- Billing therefore shows the room before any payment is recorded; a second occupant joins the existing cycle without creating another obligation.
-- Adding or replacing an occupant does not create another move-in obligation. The room cycle closes when the room becomes fully vacant, while its historical obligation remains.
-- A same-day full replacement keeps the room cycle and its existing obligation. A vacancy followed by a later occupancy starts a new cycle and obligation.
-- Advance and deposit are each one month of the room's agreed rent snapshot at move-in. They are separate charges and may be paid partially and independently.
-- The security deposit is recorded as **non-refundable** under the current policy. Each obligation stores the deposit terms and recognition policy that applied when it was created.
-- Move-in charges use the shared payment, allocation, receipt, and correction workflow. They are excluded from monthly billed totals, applied rent totals, and rent-income reporting.
-- Non-refundable does **not** mean automatically recognized as rental income. The prototype never refunds, forfeits, consumes, or recognizes a deposit as income automatically.
-- Transferring an existing tenant never creates another full deposit. Moving to a more expensive room produces a read-only top-up proposal; nothing is posted automatically.
+- One advance and one security deposit are required per **room occupancy cycle**, not per tenant. Roommates share the room-level obligation.
+- The mandatory one-month advance is the rent for the tenant's **first anniversary-based rental period**. A successful advance payment creates a non-cash application to that rent obligation; the first period immediately displays **PAID**.
+- Rent is due on the **first day of each anniversary period**. `rental_periods.due_date` and the rent obligation due date equal the period start date. No late fee, grace period, or penalty is applied.
+- Business dates use **Asia/Manila**. Rental period ends are exclusive internally.
+- The advance and deposit are separate full-category categories. The deposit is never applied to rent, never recognized as rental income automatically, and never added to a destination room's price difference during a transfer.
+- Adding a roommate does not create another advance, deposit, rent obligation, or anniversary. The first occupant establishes the cycle anchor; later occupants join it.
+- If the first occupant leaves while another remains, the cycle and rent anchor remain. A fully vacant room closes the cycle; a later occupancy starts a new cycle and anchor.
+- Transfers into an occupied room preserve the destination room's existing anniversary. Transfers into a vacant room create a new destination cycle at the destination rate without automatically collecting another advance or deposit.
+- Advance and deposit payment categories are collected in full; partial category payments are rejected, while legacy partial allocations remain readable.
+- A payment correction that removes an advance reverses its first-rent application with an audit event. The first period then returns to unpaid rather than keeping a duplicate cash or rent record.
+- Transfers during an already-paid rent period and transfers with future prepaid rent create manual financial-review cases. Settled payments are not modified automatically.
 - New obligations store the active policy version. Policy changes do not rewrite historical obligations or charges.
-- Move-in payments are room-level transactions: they store the room and occupancy cycle, not an invented tenant payer or payment method. Every authorized occupant of that cycle sees the same obligation and receipt.
-- A selected advance or deposit category is always collected in full. The two categories may be recorded on different dates. Legacy partial allocations remain readable and display their actual remaining balance.
 
-## Policy v2 (Policy B)
+## Policy v3
 
 | Area | Default |
 | --- | --- |
-| Advance application | `LAST_MONTH` — review before applying; nothing is consumed automatically |
+| Advance application | `FIRST_MONTH` — settles the first anniversary rent period |
+| Rent due date | First day of each anniversary period |
 | Deposit terms | `NON_REFUNDABLE` |
 | Deposit income recognition | `NOT_RECOGNIZED` |
-| Transfer to a more expensive room | Propose the rent difference as a top-up; do not post it |
-| Transfer to a cheaper room | Manual settlement review |
-| Move-out | Manual settlement review; no automatic refund or forfeiture |
+| Transfer into a more expensive room | Review only; no advance or deposit top-up |
+| Transfer into a cheaper room | Manual settlement review |
+| Move-out | Manual settlement review; no automatic refund, forfeiture, or income recognition |
+| Short-stay refund after advance application | Blocked from automatic refund; owner reconciliation required |
 
-Deposit terms remain configurable from Billing. Switching to `MANUAL_REVIEW` affects future obligations only and still does not create an automatic refund. The Billing page shows the non-refundable terms, records payments, and surfaces transfer/move-out notes. Tenant Overview and digital receipts state that the deposit is non-refundable and separate from rent. Payments and Reports show advance-collected, deposit-held, and outstanding amounts separately from monthly rent.
+## Multi-month prepayment
+
+- Voluntary prepayment starts from the next unpaid anniversary period and never includes an advance-covered first period.
+- One cash payment can cover multiple consecutive periods, with one allocation and one receipt.
+- The current rent rate at payment time is locked across newly prepaid periods. Later rate changes do not rewrite those obligations.
+- Fully prepaid periods display **PAID** and are excluded from later prepayment quotes and duplicate collection.
+- Transfers do not move prepaid rent automatically; affected periods are flagged for review.
 
 ## Persistence and migration
 
-The localStorage key stays `bhms:prototype:v1`. Version 13 reads valid version 7–12 snapshots non-destructively. Existing occupied rooms receive an active cycle but **no invented deposits or advances**. Version 10 obligations keep their recorded provisional deposit terms and are not rewritten; only the current policy advances to v2. Existing rooms, labels, assignments, bills, payments, receipts, corrections, rates, meters, and readings are retained. Saving writes a version 13 envelope. Version 11 payments retain their historical tenant payer, method, and tenant-owned scope. Restore sample records remains an explicit replacement, not a migration.
+The localStorage key remains `bhms:prototype:v1`, with schema **version 17**. Supported older snapshots are migrated non-destructively. Existing occupied rooms receive legacy calendar billing and no invented advances or deposits. Legacy cycles are not converted to anniversary rent until the room becomes vacant. Paid legacy advances that predate first-period application are listed for owner review; no historical payment or receipt is rewritten.
 
 ## Verification
 
-Domain tests cover obligation creation, non-refundable snapshots, roommate sharing, partial and full payments, overpayment rejection, payer validation, cycle closure, repeat occupancy, move-out preservation without refunds or income, transfer proposals without duplicate deposits, policy versioning, and v9/v10 migration. UI tests cover shared room obligations, full-category collection, payer/method-free room payments, both tenants seeing the same paid state and receipts, historical transfer access, monthly category status, corrections, persistence, and versioned policy changes.
+Domain and integration tests cover:
 
-## Short-stay advance refunds
+- first and second occupants;
+- first-period advance settlement;
+- advance-application reversal through corrections;
+- due dates at period start;
+- short-month and leap-year boundaries;
+- year-crossing periods;
+- multi-period prepayment, current-rate locking, and PAID display;
+- duplicate collection prevention and idempotent Worker commands;
+- destination anniversary preservation for occupied-room transfers;
+- D1 batch rollback and import dry-run safety.
 
-A tenant who moves out before completing seven calendar days may receive the unused advance back. The security deposit remains non-refundable. The refund is never automatic: the landlord must use the explicit move-out workflow and confirm that the money was actually returned.
-
-Eligibility requires a fully paid advance, no outstanding tenant bills or electricity awaiting a reading, and no remaining occupant in the same shared room. A roommate leaving a still-occupied shared room requires manual review. Refunds are recorded separately from the original payment and receipt, preserve the original allocations, retain the deposit, and are limited to one refund per occupancy-cycle advance. Schema v16 stores these refunds and the seven-day policy window.
+The automatic short-stay refund remains unavailable after first-period application until a separate owner-approved refund/reversal policy is defined.

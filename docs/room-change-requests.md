@@ -18,13 +18,13 @@ Landlord approval revalidates capacity and the current assignment, records the a
 
 ## Financial review
 
-Submission and approval show outstanding balance, held advance credit, rent difference, any deposit top-up proposal, and mid-period billing review. Approval requires acknowledgment when review is needed. Nothing is posted automatically: no advance application, deposit adjustment, refund, or income recognition. No proration rule is introduced.
+Submission and approval show outstanding balance, held advance credit, rent difference, and mid-period/paid-period billing review. Approval requires acknowledgment when review is needed. Nothing is posted automatically: no advance application, deposit adjustment, refund, or income recognition. Transfers never create another advance or deposit, never collect a deposit top-up, and keep the original deposit amount unchanged. No proration rule is introduced. A transfer during a paid anniversary period or with future prepaid rent creates a manual financial-review case.
 
 When an approved transfer starts after the first day of a billing period, the request stores that period's ID in `billingReviewPeriodIds`. The Billing page flags the affected period for manual rent review and lists the tenant and effective date. The flag never changes bills on its own.
 
 ## Schema and Phase 2
 
-Schema v14 adds `roomChangeRequests`; v15 adds persisted `billingReviewPeriodIds` and derives them for approved v14 requests during migration. The current browser implementation uses the shared reducer and repository. A future backend must enforce tenant ownership, landlord authorization, room capacity, idempotency, concurrency, and decision transitions server-side.
+Schema v14 adds `roomChangeRequests`; v15 adds persisted `billingReviewPeriodIds`; v17 adds anniversary cycles, paid-period review cases, and preserved destination anchors. Approved transfers into occupied rooms preserve the destination anniversary. The Worker backend enforces capacity, decisions, idempotency, and batched writes; tenant self-service authorization remains Phase 3 work.
 
 ## Effective dates and occupancy
 

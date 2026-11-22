@@ -4,13 +4,14 @@ import {
   initialRoomRentRates, initialWashingRates, initialWaterRates,
 } from '@/domain/calculations/billing-rates'
 import { DEFAULT_MOVE_IN_POLICY } from '@/domain/calculations/move-in-policy'
+import { civilDateInTimeZone } from '@/lib/business-date'
 
 export const DEMO_DATE = '2026-11-13'
 export const DEMO_PERIOD = 'period-nov'
 
-/** Occupancy follows the calendar, while sample financial records stay anchored to DEMO_DATE. */
+/** Occupancy follows the Asia/Manila calendar, while sample financial records stay anchored to DEMO_DATE. */
 export function resolveOccupancyDate(now = new Date()): string {
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const today = civilDateInTimeZone(now)
   return today > DEMO_DATE ? today : DEMO_DATE
 }
 export const OCCUPANCY_DATE = resolveOccupancyDate()

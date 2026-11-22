@@ -1,16 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { resolveOccupancyDate } from '@/data/fixtures/demo'
+import { millisecondsUntilNextBusinessMidnight } from '@/lib/business-date'
 import { ApplicationDateContext } from './application-date-context'
 
 export type ApplicationClock = () => Date
 
 const systemClock: ApplicationClock = () => new Date()
-
-function nextMidnight(date: Date): Date {
-  const next = new Date(date)
-  next.setHours(24, 0, 0, 0)
-  return next
-}
 
 /**
  * Keeps date-dependent UI current without reloading. Tests and future adapters can inject a clock
@@ -26,7 +21,7 @@ export function ApplicationDateProvider({ children, now = systemClock }: {
     let timer: ReturnType<typeof setTimeout>
     function schedule() {
       const current = now()
-      const delay = Math.max(1_000, nextMidnight(current).getTime() - current.getTime() + 1_000)
+      const delay = millisecondsUntilNextBusinessMidnight(current)
       timer = setTimeout(() => {
         setOccupancyDate(resolveOccupancyDate(now()))
         schedule()
