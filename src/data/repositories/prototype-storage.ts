@@ -3,7 +3,7 @@ import { initialRoomRentRates, initialWashingRates, initialWaterRates } from '@/
 import { DEFAULT_MOVE_IN_POLICY } from '@/domain/calculations/move-in-policy'
 import { isPrototypeData, isRecord } from '@/domain/validation/prototype-data'
 
-export const STORAGE_SCHEMA_VERSION = 14
+export const STORAGE_SCHEMA_VERSION = 15
 
 type ParseResult =
   | { ok: true; data: PrototypeAppState }
@@ -41,7 +41,17 @@ function withPaymentScope(value: unknown): unknown {
 
 function withRoomChangeRequests(value: unknown): unknown {
   if (!isRecord(value)) return value
-  return { ...value, roomChangeRequests: Array.isArray(value.roomChangeRequests) ? value.roomChangeRequests : [] }
+  const periods = Array.isArray(value.billingPeriods) ? value.billingPeriods.filter(isRecord) : []
+  const requests = (Array.isArray(value.roomChangeRequests) ? value.roomChangeRequests : []).map(request => {
+    if (!isRecord(request) || Array.isArray(request.billingReviewPeriodIds)) return request
+    const approvedStart = typeof request.approvedStartDate === 'string' ? request.approvedStartDate : null
+    const requestedStart = typeof request.requestedStartDate === 'string' ? request.requestedStartDate : null
+    const date = approvedStart ?? requestedStart
+    const period = date === null ? undefined : periods.find(item => typeof item.id === 'string' && typeof item.startDate === 'string' && typeof item.endDate === 'string' && item.startDate <= date && item.endDate >= date)
+    const ids = request.status === 'APPROVED' && period && typeof period.startDate === 'string' && date !== null && date > period.startDate && typeof period.id === 'string' ? [period.id] : []
+    return { ...request, billingReviewPeriodIds: ids }
+  })
+  return { ...value, roomChangeRequests: requests }
 }
 
 /**
@@ -102,7 +112,7 @@ export function parsePrototypeSnapshot(raw: string): ParseResult {
   }
   if (!isRecord(parsed)) return { ok: false, reason: 'INVALID_DATA' }
   // Version 14 adds tenant room-change requests. Older versions receive an empty request queue.
-  if (parsed.version === 13 || parsed.version === 12) {
+  if (parsed.version === 14 || parsed.version === 13 || parsed.version === 12) {
     const migrated = withRoomChangeRequests(parsed.data)
     return isPrototypeData(migrated) ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }
   }

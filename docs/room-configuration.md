@@ -12,9 +12,9 @@ Labels are strings, not identifiers. Room `2` (`room-2`) and room `02` (`room-15
 
 Tenant names, occupancy, bed counts, repair status, meter readings, bills, and payments remain fictional demonstration scenarios. They are not assertions about actual tenants or actual occupancy. Fresh demo tenants are seeded on rooms 1–5, room 6 demonstrates repair status, and the other rooms are vacant. This seed configuration is not a migration mapping from old rooms 101–115.
 
-## Storage version 14
+## Storage version 15
 
-The key remains `bhms:prototype:v1`. Fresh initialization uses the actual room configuration only when no saved snapshot exists. Valid version 7�13 data keeps its room labels, assignments, bills, payments, receipts, and rate history. Version 14 adds tenant room-change requests; older versions receive an empty request queue. No historical readings are reclassified or invented. Saving writes a version 14 envelope; subsequent loads are idempotent. See [move-in billing notes](move-in-billing.md), [meter initialization](meter-initialization.md), and [room change requests](room-change-requests.md).
+The key remains `bhms:prototype:v1`. Fresh initialization uses the actual room configuration only when no saved snapshot exists. Valid version 7�13 data keeps its room labels, assignments, bills, payments, receipts, and rate history. Version 14 added tenant room-change requests; version 15 adds persisted billing-review period flags to those requests. Older versions receive an empty request queue and compatible defaults. No historical readings are reclassified or invented. Saving writes a version 15 envelope; subsequent loads are idempotent. See [move-in billing notes](move-in-billing.md), [meter initialization](meter-initialization.md), and [room change requests](room-change-requests.md).
 
 There is no authoritative correspondence between historical fictional rooms 101–115 and actual rooms. Automatic relabeling is deliberately blocked. Saved room IDs, labels, custom rooms, assignments, agreements, issued bills, payment ownership, allocations, receipts, corrections, rate history, meter identities, and readings remain intact. A Rooms notice calls out numbers matching the previous sample layout; it never performs a conversion.
 
@@ -22,6 +22,6 @@ An owner-approved room-to-room correspondence is required before any future hist
 
 ## Verification
 
-Configuration and meter tests cover leading-zero labels, stable references, v7–12 input, v13 round trips, and initial-versus-settled history without changing payment records.
+Configuration and meter tests cover leading-zero labels, stable references, v7-14 input, v15 round trips, and initial-versus-settled history without changing payment records.
 
 Legacy meters retain the stable-ID lookup convention (`room-N` → `meter-room-N`). Newly initialized meters also store the explicit stable `roomId`. Setup is inside the Rooms details dialog, not a separate management page. Archived reports may retain their original 101–115 terminology.

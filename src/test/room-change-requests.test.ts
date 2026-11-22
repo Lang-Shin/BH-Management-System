@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createDemoData, DEMO_DATE } from '@/data/fixtures/demo'
 import { prototypeReducer } from '@/app/state/prototype-reducer'
 import {
-  approveRoomChangeRequest, cancelRoomChangeRequest, latestRoomChangeRequest, pendingRoomChangeRequests,
+  approveRoomChangeRequest, approvedRoomChangeBillingReviews, cancelRoomChangeRequest, latestRoomChangeRequest, pendingRoomChangeRequests,
   rejectRoomChangeRequest, roomChangeFinancialWarnings, roomChangeRequestsForTenant, submitRoomChangeRequest,
 } from '@/domain/calculations/room-change-requests'
 import { selectNotifications } from '@/features/notifications/select-notifications'
@@ -21,7 +21,7 @@ describe('tenant room change requests', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(JSON.stringify(data)).toBe(before)
-    expect(result.request).toMatchObject({ tenantId: 'tenant-1', currentRoomId: 'room-1', requestedRoomId: 'room-13', status: 'PENDING' })
+    expect(result.request).toMatchObject({ tenantId: 'tenant-1', currentRoomId: 'room-1', requestedRoomId: 'room-13', status: 'PENDING', billingReviewPeriodIds: [] })
     expect(result.data.roomAssignments).toEqual(data.roomAssignments)
     expect(result.data.charges).toEqual(data.charges)
     expect(result.data.payments).toEqual(data.payments)
@@ -109,7 +109,8 @@ describe('tenant room change requests', () => {
     const newAssignment = assignments.find(item => item.id === approved.request.resultingAssignmentId)!
     expect(oldAssignment.endDate).toBe('2026-11-12')
     expect(newAssignment).toMatchObject({ roomId: 'room-13', startDate: DEMO_DATE, endDate: null })
-    expect(approved.request).toMatchObject({ status: 'APPROVED', approvedStartDate: DEMO_DATE, billingReviewAcknowledged: true })
+    expect(approved.request).toMatchObject({ status: 'APPROVED', approvedStartDate: DEMO_DATE, billingReviewAcknowledged: true, billingReviewPeriodIds: ['period-nov'] })
+    expect(approvedRoomChangeBillingReviews(approved.data, 'period-nov').map(item => item.id)).toEqual([approved.request.id])
     expect(approved.data.charges).toEqual(base.charges)
     expect(approved.data.payments).toEqual(base.payments)
     expect(approved.data.paymentAllocations).toEqual(base.paymentAllocations)
@@ -117,6 +118,8 @@ describe('tenant room change requests', () => {
     expect(approved.data.paymentCorrections).toEqual(base.paymentCorrections)
     expect(approved.data.meterReadings).toEqual(base.meterReadings)
     expect(approved.data.moveInObligations).toEqual(base.moveInObligations)
+    expect(approved.data.occupancyCycles.find(cycle => cycle.roomId === 'room-1')).toMatchObject({ status: 'CLOSED', endedAt: DEMO_DATE })
+    expect(approved.data.occupancyCycles.find(cycle => cycle.roomId === 'room-13')).toMatchObject({ status: 'ACTIVE', endedAt: null })
     expect(isPrototypeData(approved.data)).toBe(true)
   })
 
@@ -155,6 +158,8 @@ describe('tenant room change requests', () => {
     expect(approved.request.requestedStartDate).toBe('2026-11-15')
     expect(approved.request.approvedStartDate).toBe('2026-11-20')
     expect(approved.data.roomAssignments.find(item => item.id === approved.request.resultingAssignmentId)?.startDate).toBe('2026-11-20')
+    const oldAssignment = approved.data.roomAssignments.find(item => item.id === approved.request.currentAssignmentId)!
+    expect(oldAssignment.endDate).toBe('2026-11-19')
   })
 
   it('keeps request history per tenant and exposes pending request notifications', () => {
@@ -167,6 +172,58 @@ describe('tenant room change requests', () => {
     expect(selectNotifications(first.data, DEMO_DATE).find(item => item.kind === 'room-change')?.href).toBe('/tenants')
   })
 
+  it('flags the affected billing period only when the effective date is inside that period', () => {
+    const base = createDemoData()
+    const withDecember = { ...base, billingPeriods: [...base.billingPeriods, { id: 'period-dec', label: 'December 2026 (sample)', startDate: '2026-12-01', endDate: '2026-12-31', status: 'OPEN' as const }] }
+    const boundary = submitRoomChangeRequest(withDecember, { ...draft, requestedStartDate: '2026-12-01' }, DEMO_DATE)
+    if (!boundary.ok) throw new Error(JSON.stringify(boundary.errors))
+    const approvedBoundary = approveRoomChangeRequest(boundary.data, boundary.request.id, { ...approval(), effectiveDate: '2026-12-01' })
+    expect(approvedBoundary.ok).toBe(true)
+    if (!approvedBoundary.ok) return
+    expect(approvedBoundary.request.billingReviewPeriodIds).toEqual([])
+    expect(approvedRoomChangeBillingReviews(approvedBoundary.data, 'period-dec')).toEqual([])
+
+    const middle = submitRoomChangeRequest(createDemoData(), { ...draft, requestedStartDate: '2026-11-15' }, DEMO_DATE)
+    if (!middle.ok) throw new Error('request failed')
+    const approvedMiddle = approveRoomChangeRequest(middle.data, middle.request.id, approval())
+    expect(approvedMiddle.ok).toBe(true)
+    if (!approvedMiddle.ok) return
+    expect(approvedMiddle.request.billingReviewPeriodIds).toEqual(['period-nov'])
+    expect(approvedRoomChangeBillingReviews(approvedMiddle.data, 'period-nov')).toHaveLength(1)
+  })
+
+  it('moves a tenant into an occupied shared room without replacing either room cycle or creating obligations', () => {
+    const base = createDemoData()
+    const request = submitRoomChangeRequest(base, { ...draft, tenantId: 'tenant-2', requestedRoomId: 'room-1' }, DEMO_DATE)
+    if (!request.ok) throw new Error(JSON.stringify(request.errors))
+    const approved = approveRoomChangeRequest(request.data, request.request.id, approval())
+    expect(approved.ok).toBe(true)
+    if (!approved.ok) return
+    expect(approved.data.occupancyCycles).toEqual(base.occupancyCycles)
+    expect(approved.data.moveInObligations).toEqual(base.moveInObligations)
+    expect(approved.data.occupancyCycles.find(cycle => cycle.roomId === 'room-1')).toMatchObject({ status: 'ACTIVE', endedAt: null })
+    expect(approved.data.occupancyCycles.find(cycle => cycle.roomId === 'room-2')).toMatchObject({ status: 'ACTIVE', endedAt: null })
+    expect(approved.data.roomAssignments.filter(item => item.roomId === 'room-1' && item.endDate === null).map(item => item.tenantId).sort()).toEqual(['tenant-1', 'tenant-2'])
+    expect(approved.data.roomAssignments.filter(item => item.roomId === 'room-2' && item.endDate === null).map(item => item.tenantId)).toEqual(['tenant-4'])
+  })
+
+  it('does not duplicate move-in obligations when joining an occupied room with an existing cycle', () => {
+    let data = prototypeReducer(createDemoData(), { type: 'tenant/created', draft: { name: 'Target Occupant', email: 'target@example.com', phone: '+63 900 555 0001', address: 'Test', roomId: 'room-10', moveInDate: '2026-11-01', notes: '' } })
+    data = prototypeReducer(data, { type: 'tenant/created', draft: { name: 'Moving Tenant', email: 'moving@example.com', phone: '+63 900 555 0002', address: 'Test', roomId: 'room-9', moveInDate: '2026-11-01', notes: '' } })
+    const mover = data.tenants.find(tenant => tenant.email === 'moving@example.com')!
+    const targetCycle = data.occupancyCycles.find(cycle => cycle.roomId === 'room-10' && cycle.status === 'ACTIVE')!
+    const request = submitRoomChangeRequest(data, { ...draft, tenantId: mover.id, requestedRoomId: 'room-10' }, DEMO_DATE)
+    if (!request.ok) throw new Error(JSON.stringify(request.errors))
+    const approved = approveRoomChangeRequest(request.data, request.request.id, approval())
+    expect(approved.ok).toBe(true)
+    if (!approved.ok) return
+    expect(approved.data.moveInObligations).toHaveLength(2)
+    expect(approved.data.charges.filter(charge => charge.category === 'ADVANCE' || charge.category === 'SECURITY_DEPOSIT')).toHaveLength(4)
+    expect(approved.data.occupancyCycles.find(cycle => cycle.id === targetCycle.id)).toEqual(targetCycle)
+    expect(approved.data.roomAssignments.filter(item => item.roomId === 'room-10' && item.endDate === null)).toHaveLength(2)
+    expect(approved.data.occupancyCycles.find(cycle => cycle.roomId === 'room-9')).toMatchObject({ status: 'CLOSED' })
+  })
+
   it('persists requests and migrates version 13 with an empty request queue', async () => {
     const first = submitRoomChangeRequest(createDemoData(), draft, DEMO_DATE)
     if (!first.ok) throw new Error('request failed')
@@ -177,6 +234,14 @@ describe('tenant room change requests', () => {
     const parsed = parsePrototypeSnapshot(JSON.stringify({ version: 13, data: legacy }))
     expect(parsed.ok).toBe(true)
     if (parsed.ok) expect(parsed.data.roomChangeRequests).toEqual([])
+
+    const approved = approveRoomChangeRequest(first.data, first.request.id, approval())
+    if (!approved.ok) throw new Error('approval failed')
+    const { billingReviewPeriodIds: legacyField, ...legacyRequest } = approved.data.roomChangeRequests[0]!
+    expect(legacyField).toEqual(['period-nov'])
+    const version14 = parsePrototypeSnapshot(JSON.stringify({ version: 14, data: { ...approved.data, roomChangeRequests: [legacyRequest] } }))
+    expect(version14.ok).toBe(true)
+    if (version14.ok) expect(version14.data.roomChangeRequests[0]?.billingReviewPeriodIds).toEqual(['period-nov'])
   })
 
   it('does not change existing landlord transfer behavior', () => {

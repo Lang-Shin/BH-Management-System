@@ -212,6 +212,8 @@ export interface RoomChangeRequest {
   approvedStartDate: string | null
   resultingAssignmentId: string | null
   billingReviewAcknowledged: boolean
+  /** Approved mid-period transfers that require manual rent review. */
+  billingReviewPeriodIds: string[]
 }
 
 export type PaymentScope = 'TENANT' | 'ROOM'

@@ -3,6 +3,7 @@ import { isIsoDate } from '@/domain/validation/date'
 import { activeAssignments, tenantAccount } from './summary'
 import { roomMonthlyRentCents } from './billing-rates'
 import { transferTenantRoom } from './tenant-management'
+import { reconcileOccupancy } from './move-in'
 
 export interface RoomChangeRequestDraft {
   tenantId: string
@@ -21,6 +22,7 @@ export interface RoomChangeFinancialWarnings {
   rentDifferenceCents: number
   depositTopUpProposalCents: number
   billingReviewRequired: boolean
+  affectedBillingPeriodIds: string[]
   notes: string[]
 }
 
@@ -60,6 +62,7 @@ export function roomChangeFinancialWarnings(data: PrototypeAppState, tenantId: s
   const difference = targetRentCents - currentRentCents
   const period = data.billingPeriods.find(item => item.startDate <= startDate && item.endDate >= startDate)
   const midPeriod = Boolean(period && startDate > period.startDate)
+  const affectedBillingPeriodIds = midPeriod && period ? [period.id] : []
   const notes: string[] = []
   if (account.balance > 0) notes.push('The tenant has an outstanding balance.')
   if (account.credit > 0) notes.push('The tenant has held advance credit that is not automatically applied.')
@@ -70,7 +73,7 @@ export function roomChangeFinancialWarnings(data: PrototypeAppState, tenantId: s
     outstandingCents: account.balance, creditCents: account.credit,
     currentRentCents, targetRentCents, rentDifferenceCents: difference,
     depositTopUpProposalCents: Math.max(0, difference),
-    billingReviewRequired: notes.length > 0, notes,
+    billingReviewRequired: notes.length > 0, affectedBillingPeriodIds, notes,
   }
 }
 
@@ -139,7 +142,7 @@ export function submitRoomChangeRequest(data: PrototypeAppState, draft: RoomChan
     id: draft.requestId ?? requestId(), tenantId: draft.tenantId, currentAssignmentId: current.id, currentRoomId: current.roomId,
     requestedRoomId: draft.requestedRoomId, requestedStartDate: draft.requestedStartDate, reason: draft.reason.trim(),
     status: 'PENDING', createdAt: asOf, decidedAt: null, decidedBy: null, decisionReason: null,
-    approvedStartDate: null, resultingAssignmentId: null, billingReviewAcknowledged: false,
+    approvedStartDate: null, resultingAssignmentId: null, billingReviewAcknowledged: false, billingReviewPeriodIds: [],
   }
   return { ok: true, request, data: {
     ...data,
@@ -209,12 +212,14 @@ export function approveRoomChangeRequest(data: PrototypeAppState, requestIdToApp
     decisionReason: input.note.trim() || 'Approved by landlord.',
     approvedStartDate: input.effectiveDate, resultingAssignmentId: transfer.assignment.id,
     billingReviewAcknowledged: input.billingReviewAcknowledged,
+    billingReviewPeriodIds: warnings?.affectedBillingPeriodIds ?? [],
   }
-  return { ok: true, request: next, effectiveDate: input.effectiveDate, data: {
+  const approvedData = {
     ...transfer.data,
     roomChangeRequests: transfer.data.roomChangeRequests.map(item => item.id === request.id ? next : item),
     auditEvents: audit(transfer.data, next, 'ROOM_CHANGE_APPROVED', 'demo-admin', input.decidedAt, next.decisionReason),
-  } }
+  }
+  return { ok: true, request: next, effectiveDate: input.effectiveDate, data: reconcileOccupancy(data, approvedData, input.decidedAt, { createMoveInObligations: false }) }
 }
 
 /** A direct landlord transfer, move-out, or deletion expires pending requests safely. */
@@ -231,4 +236,9 @@ export function expirePendingRoomChangeRequests(data: PrototypeAppState, tenantI
       beforeSnapshot: null, afterSnapshot: JSON.stringify(request),
     }))],
   }
+}
+
+/** Approved mid-period transfers whose rent effects need manual review in a billing period. */
+export function approvedRoomChangeBillingReviews(data: PrototypeAppState, periodId: string): RoomChangeRequest[] {
+  return data.roomChangeRequests.filter(request => request.status === 'APPROVED' && request.billingReviewPeriodIds.includes(periodId))
 }

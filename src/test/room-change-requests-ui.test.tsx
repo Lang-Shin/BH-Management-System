@@ -6,7 +6,7 @@ import { AppRouter } from '@/app/router/app-router'
 import { PrototypeProvider } from '@/app/providers/prototype-provider'
 import { createDemoData, DEMO_DATE } from '@/data/fixtures/demo'
 import { localStorageRepository, STORAGE_KEY } from '@/data/repositories/local-storage-repository'
-import { submitRoomChangeRequest } from '@/domain/calculations/room-change-requests'
+import { approveRoomChangeRequest, submitRoomChangeRequest } from '@/domain/calculations/room-change-requests'
 
 function renderApp(route: string) {
   return render(<PrototypeProvider repository={localStorageRepository}><MemoryRouter initialEntries={[route]}><AppRouter /></MemoryRouter></PrototypeProvider>)
@@ -46,7 +46,36 @@ describe('tenant room change request UI', () => {
     await user.click(await screen.findByRole('button', { name: 'Cancel request' }))
     await waitFor(() => expect(stored().roomChangeRequests[0].status).toBe('CANCELLED'))
     expect(stored().roomAssignments).toEqual(first.data.roomAssignments)
-    expect(screen.getByText('Cancelled')).toBeInTheDocument()
+    expect(screen.getAllByText('Cancelled').length).toBeGreaterThan(0)
+  })
+
+  it('shows the tenant a clear request timeline and flagged billing period after approval', async () => {
+    const first = submitRoomChangeRequest(createDemoData(), { tenantId: 'tenant-1', requestedRoomId: 'room-13', requestedStartDate: DEMO_DATE, reason: 'Need more space' }, DEMO_DATE)
+    if (!first.ok) throw new Error('request failed')
+    const approved = approveRoomChangeRequest(first.data, first.request.id, { effectiveDate: DEMO_DATE, note: 'Approved after review', billingReviewAcknowledged: true, decidedAt: DEMO_DATE })
+    if (!approved.ok) throw new Error('approval failed')
+    await localStorageRepository.save(approved.data)
+    renderApp('/tenant/room')
+    const timeline = await screen.findByRole('list', { name: 'Room change request status timeline' })
+    expect(within(timeline).getByText('Request submitted')).toBeInTheDocument()
+    expect(within(timeline).getByText('Landlord review completed')).toBeInTheDocument()
+    expect(within(timeline).getByText('Approved')).toBeInTheDocument()
+    expect(within(timeline).getByText('Transfer effective')).toBeInTheDocument()
+    expect(within(timeline).getByText('Billing review flagged')).toBeInTheDocument()
+    expect(within(timeline).getByText('November 2026 (sample)')).toBeInTheDocument()
+  })
+})
+
+describe('billing room change review flag', () => {
+  it('shows approved mid-period transfers without posting rent or proration', async () => {
+    const first = submitRoomChangeRequest(createDemoData(), { tenantId: 'tenant-1', requestedRoomId: 'room-13', requestedStartDate: DEMO_DATE, reason: 'Need more space' }, DEMO_DATE)
+    if (!first.ok) throw new Error('request failed')
+    const approved = approveRoomChangeRequest(first.data, first.request.id, { effectiveDate: DEMO_DATE, note: 'Approved after review', billingReviewAcknowledged: true, decidedAt: DEMO_DATE })
+    if (!approved.ok) throw new Error('approval failed')
+    await localStorageRepository.save(approved.data)
+    renderApp('/billing')
+    expect(await screen.findByText('Room change billing review')).toBeInTheDocument()
+    expect(screen.getByText(/Alex Rivera: Room 1.*Room 06.*effective Nov 13, 2026/)).toBeInTheDocument()
   })
 })
 
@@ -74,6 +103,8 @@ describe('landlord room change review UI', () => {
     expect(saved.payments).toEqual(base.payments)
     expect(saved.receipts).toEqual(base.receipts)
     expect(saved.meterReadings).toEqual(base.meterReadings)
+    expect(saved.occupancyCycles.find((cycle: { roomId: string }) => cycle.roomId === 'room-1')).toMatchObject({ status: 'CLOSED' })
+    expect(saved.occupancyCycles.find((cycle: { roomId: string }) => cycle.roomId === 'room-13')).toMatchObject({ status: 'ACTIVE' })
     expect(screen.getByText('APPROVED')).toBeInTheDocument()
   })
 

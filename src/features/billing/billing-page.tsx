@@ -5,7 +5,7 @@ import { AnimatedNumber } from '@/components/shared/animated-number'
 import { usePrototype } from '@/hooks/use-prototype'
 import { selectSummary } from '@/domain/calculations/summary'
 import { DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
-import { formatMoney } from '@/lib/format'
+import { formatDate, formatMoney } from '@/lib/format'
 import { BillingStatusMatrix } from './billing-status-matrix'
 import { BillingRatesSection } from './billing-rates-section'
 import { PaymentCalculator } from './payment-calculator'
@@ -14,6 +14,7 @@ import { BillingStatusChart } from './billing-status-chart'
 import { selectBillingRooms } from './billing-room-status'
 import { BillingFiltersMenu } from './billing-filters-menu'
 import type { BillingRoomStatus } from './billing-room-status'
+import { approvedRoomChangeBillingReviews } from '@/domain/calculations/room-change-requests'
 
 export default function Billing() {
   const { data } = usePrototype()
@@ -21,11 +22,17 @@ export default function Billing() {
   const [statusFilter, setStatusFilter] = useState<BillingRoomStatus | null>(null)
   const summary = selectSummary(data, DEMO_DATE, periodId)
   const billingRooms = selectBillingRooms(data, periodId, DEMO_DATE, false)
+  const billingReviews = approvedRoomChangeBillingReviews(data, periodId)
 
   return <>
     <PageHeader title="Billing" description="Check rent, electricity, water, and washing payments in one place." />
     <PreviewNotice>Electricity bills are created only when you confirm a payment-time meter reading. Calculate Payment settles existing rent, water, washing, and electricity bills. Advance and security deposit are separate room-level balances below. Recorded payment corrections are available from Payments &amp; Receipts.</PreviewNotice>
     <div className="mb-6"><div className="max-w-full"><label htmlFor="billing-period" className="mb-2 block text-base font-semibold">Choose a month</label><select id="billing-period" value={periodId} onChange={e => { setPeriodId(e.target.value); setStatusFilter(null) }} className="min-h-14 max-w-full rounded-lg border bg-card px-4 py-3 text-base">{data.billingPeriods.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}</select></div></div>
+    {billingReviews.length > 0 && <div className="room-change-billing-review" role="note">
+      <strong>Room change billing review</strong>
+      <p>{billingReviews.length === 1 ? 'One approved mid-period transfer affects' : `${billingReviews.length} approved mid-period transfers affect`} this billing period. Review room rent manually; no proration or duplicate rent was generated automatically.</p>
+      <ul>{billingReviews.map(request => <li key={request.id}>{data.tenants.find(tenant => tenant.id === request.tenantId)?.name ?? 'Tenant'}: Room {data.rooms.find(room => room.id === request.currentRoomId)?.name ?? '—'} → Room {data.rooms.find(room => room.id === request.requestedRoomId)?.name ?? '—'}{request.approvedStartDate ? `, effective ${formatDate(request.approvedStartDate)}` : ''}</li>)}</ul>
+    </div>}
     <section className="mb-7 grid gap-5 xl:grid-cols-3" aria-label="Bills overview">
       <StatCard label="Total bills" value={formatMoney(summary.billed)} detail="All bills for the month you chose." icon={ReceiptText} />
       <StatCard label="Already paid" value={formatMoney(summary.applied)} detail="Payments used to pay these bills." icon={Wallet} />

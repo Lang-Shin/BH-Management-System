@@ -90,7 +90,7 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     && (r.decisionReason === null || (text(r.decisionReason) && r.decisionReason.length <= 500))
     && (r.approvedStartDate === null || date(r.approvedStartDate))
     && (r.resultingAssignmentId === null || id(r.resultingAssignmentId))
-    && typeof r.billingReviewAcknowledged === 'boolean'
+    && typeof r.billingReviewAcknowledged === 'boolean' && Array.isArray(r.billingReviewPeriodIds) && r.billingReviewPeriodIds.every(id)
     && (r.status === 'PENDING'
       ? r.decidedAt === null && r.decidedBy === null && r.decisionReason === null && r.approvedStartDate === null && r.resultingAssignmentId === null
       : r.status === 'APPROVED'
@@ -313,6 +313,7 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
       && (request.status !== 'APPROVED' || (resulting?.tenantId === request.tenantId && resulting.roomId === request.requestedRoomId
         && resulting.startDate === request.approvedStartDate))
   })) return false
+  if (!data.roomChangeRequests.every(request => request.billingReviewPeriodIds.every(periodId => data.billingPeriods.some(period => period.id === periodId)))) return false
   if (new Set(data.roomChangeRequests.filter(request => request.status === 'PENDING').map(request => request.tenantId)).size
     !== data.roomChangeRequests.filter(request => request.status === 'PENDING').length) return false
   return data.auditEvents.every(a => a.entityType === 'PROTOTYPE'

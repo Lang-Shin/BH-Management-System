@@ -156,7 +156,7 @@ describe('admin workspace integration', () => {
     await user.click(screen.getByRole('button', { name: 'Restore sample records' }))
     await user.click(within(screen.getByRole('dialog', { name: 'Restore the sample records?' })).getByRole('button', { name: 'Yes, restore records' }))
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 14)
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 15)
   })
 
   it('shows a log-out button that opens a centered clarification dialog without signing out', async () => {
