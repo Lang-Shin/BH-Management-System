@@ -52,18 +52,19 @@ describe('shared table pagination', () => {
     const { rerender } = render(<PaginatedDataTable rows={rows} columns={columns} caption="Rooms" recordLabel="rooms" resetKey="all" />)
 
     const table = screen.getByRole('table', { name: 'Rooms' })
-    expect(within(table).getAllByRole('row')).toHaveLength(11)
-    expect(screen.getByText('Showing 1–10 of 23 rooms')).toBeInTheDocument()
+    expect(within(table).getAllByRole('row')).toHaveLength(6)
+    expect(screen.getByText('Showing 1–5 of 23 rooms')).toBeInTheDocument()
+    expect(screen.getByText('Page 1 of 5')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Next page of rooms' }))
-    expect(within(table).getAllByRole('row')).toHaveLength(11)
-    expect(screen.getByText('Showing 11–20 of 23 rooms')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Next page of rooms' }))
-    expect(within(table).getAllByRole('row')).toHaveLength(4)
-    expect(screen.getByText('Showing 21–23 of 23 rooms')).toBeInTheDocument()
+    expect(within(table).getAllByRole('row')).toHaveLength(6)
+    expect(screen.getByText('Showing 6–10 of 23 rooms')).toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('Rows per page for rooms'), '20')
+    expect(within(table).getAllByRole('row')).toHaveLength(21)
+    expect(screen.getByText('Showing 1–20 of 23 rooms')).toBeInTheDocument()
 
     rerender(<PaginatedDataTable rows={rows} columns={columns} caption="Rooms" recordLabel="rooms" resetKey="refreshed" />)
-    expect(screen.getByText('Showing 1–10 of 23 rooms')).toBeInTheDocument()
-    expect(within(screen.getByRole('table', { name: 'Rooms' })).getAllByRole('row')).toHaveLength(11)
+    expect(screen.getByText('Showing 1–20 of 23 rooms')).toBeInTheDocument()
+    expect(within(screen.getByRole('table', { name: 'Rooms' })).getAllByRole('row')).toHaveLength(21)
   })
 
   it('shows the table empty state without pagination controls', () => {

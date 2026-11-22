@@ -111,6 +111,7 @@ describe('short-stay advance refunds', () => {
     const { data } = createPaidRoom()
     await localStorageRepository.save(data)
     render(<PrototypeProvider repository={localStorageRepository}><MemoryRouter initialEntries={['/tenants']}><AppRouter /></MemoryRouter></PrototypeProvider>)
+    await user.selectOptions(await screen.findByLabelText('Rows per page for tenants'), '20')
     await user.click(await screen.findByRole('button', { name: 'View Kate' }))
     await user.click(within(screen.getByRole('dialog', { name: 'Kate' })).getByRole('button', { name: 'Move Out / Archive' }))
     const dialog = screen.getByRole('dialog', { name: 'Move Out / Archive Kate' })

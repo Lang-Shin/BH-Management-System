@@ -58,6 +58,7 @@ describe('functional room and tenant management', () => {
 
     const nav = screen.getByRole('navigation', { name: 'Main navigation' })
     await user.click(within(nav).getByRole('link', { name: 'Tenants' }))
+    await user.selectOptions(await screen.findByLabelText('Rows per page for tenants'), '20')
     await user.click(await screen.findByRole('button', { name: 'Add tenant' }))
     dialog = await screen.findByRole('dialog', { name: 'Add a tenant' })
     const assignment = within(dialog).getByLabelText('Room assignment')

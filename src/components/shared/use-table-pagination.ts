@@ -6,7 +6,7 @@ type ResetKey = string | number | boolean | null | undefined
 
 export function useTablePagination<T>(rows: readonly T[], resetKey?: ResetKey) {
   const datasetKey = `${String(resetKey ?? '')}:${rows.length}`
-  const [state, setState] = useState<{ page: number; pageSize: PageSize; datasetKey: string }>({ page: 1, pageSize: 10, datasetKey })
+  const [state, setState] = useState<{ page: number; pageSize: PageSize; datasetKey: string }>({ page: 1, pageSize: 5, datasetKey })
   const page = state.datasetKey === datasetKey ? state.page : 1
   const pageSize = state.pageSize
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize))

@@ -11,6 +11,10 @@ function renderApp(route = '/') {
   return render(<PrototypeProvider repository={localStorageRepository}><MemoryRouter initialEntries={[route]}><AppRouter /></MemoryRouter></PrototypeProvider>)
 }
 
+async function showAllTenants(user: ReturnType<typeof userEvent.setup>) {
+  await user.selectOptions(await screen.findByLabelText('Rows per page for tenants'), '20')
+}
+
 async function addTenant(user: ReturnType<typeof userEvent.setup>, { name, roomId }: { name: string; roomId?: string }) {
   await user.click(await screen.findByRole('button', { name: 'Add tenant' }))
   const dialog = await screen.findByRole('dialog', { name: 'Add a tenant' })
@@ -26,6 +30,7 @@ describe('tenant management UI', { timeout: 15000 }, () => {
   it('validates and adds a tenant without a room, then persists after a remount', async () => {
     const user = userEvent.setup()
     const app = renderApp('/tenants')
+    await showAllTenants(user)
     await user.click(await screen.findByRole('button', { name: 'Add tenant' }))
     const dialog = await screen.findByRole('dialog', { name: 'Add a tenant' })
     expect(dialog).not.toHaveTextContent('Nothing is saved yet')
@@ -58,12 +63,14 @@ describe('tenant management UI', { timeout: 15000 }, () => {
 
     app.unmount()
     renderApp('/tenants')
+    await showAllTenants(user)
     expect(await screen.findByText('Test Tenant')).toBeInTheDocument()
   })
 
   it('assigns an available room, blocks full or repaired rooms, and updates Room Details', async () => {
     const user = userEvent.setup()
     renderApp('/tenants')
+    await showAllTenants(user)
     await user.click(await screen.findByRole('button', { name: 'Add tenant' }))
     const dialog = await screen.findByRole('dialog', { name: 'Add a tenant' })
     await user.type(within(dialog).getByLabelText('Full name'), 'Room Seven Tenant')
@@ -94,6 +101,7 @@ describe('tenant management UI', { timeout: 15000 }, () => {
     const user = userEvent.setup()
     const original = createDemoData()
     renderApp('/tenants')
+    await showAllTenants(user)
     await user.click(await screen.findByRole('button', { name: 'View Alex Rivera' }))
     await user.click(within(screen.getByRole('dialog', { name: 'Alex Rivera' })).getByRole('button', { name: 'Edit Tenant' }))
     let dialog = screen.getByRole('dialog', { name: 'Edit Tenant Alex Rivera' })
@@ -127,6 +135,7 @@ describe('tenant management UI', { timeout: 15000 }, () => {
     const user = userEvent.setup()
     const original = createDemoData()
     renderApp('/tenants')
+    await showAllTenants(user)
     await user.click(await screen.findByRole('button', { name: 'View Alex Rivera' }))
     await user.click(within(screen.getByRole('dialog', { name: 'Alex Rivera' })).getByRole('button', { name: 'Edit Tenant' }))
     const dialog = screen.getByRole('dialog', { name: 'Edit Tenant Alex Rivera' })
@@ -154,6 +163,7 @@ describe('tenant management UI', { timeout: 15000 }, () => {
   it('deletes an eligible tenant after confirmation and cancellation', async () => {
     const user = userEvent.setup()
     const app = renderApp('/tenants')
+    await showAllTenants(user)
     await addTenant(user, { name: 'Delete Me' })
     await user.click(screen.getByRole('button', { name: 'View Delete Me' }))
     let dialog = screen.getByRole('dialog', { name: 'Delete Me' })
@@ -174,6 +184,7 @@ describe('tenant management UI', { timeout: 15000 }, () => {
     })
     app.unmount()
     renderApp('/tenants')
+    await showAllTenants(user)
     expect(await screen.findByText('Alex Rivera')).toBeInTheDocument()
     expect(screen.queryByText('Delete Me')).not.toBeInTheDocument()
   })
@@ -182,6 +193,7 @@ describe('tenant management UI', { timeout: 15000 }, () => {
     const user = userEvent.setup()
     const original = createDemoData()
     renderApp('/tenants')
+    await showAllTenants(user)
     await user.click(await screen.findByRole('button', { name: 'View Alex Rivera' }))
     await user.click(within(screen.getByRole('dialog', { name: 'Alex Rivera' })).getByRole('button', { name: 'Delete Tenant' }))
     let dialog = screen.getByRole('dialog', { name: 'Delete Tenant Alex Rivera' })
@@ -210,6 +222,7 @@ describe('tenant management UI', { timeout: 15000 }, () => {
   it('blocks move-out while unresolved advance credit exists', async () => {
     const user = userEvent.setup()
     renderApp('/tenants')
+    await showAllTenants(user)
     await user.click(await screen.findByRole('button', { name: 'View Jordan Flores' }))
     await user.click(within(screen.getByRole('dialog', { name: 'Jordan Flores' })).getByRole('button', { name: 'Move Out / Archive' }))
     const dialog = screen.getByRole('dialog', { name: 'Move Out / Archive Jordan Flores' })
