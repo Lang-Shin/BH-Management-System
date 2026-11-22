@@ -1,9 +1,12 @@
 import type {
-  Charge, MoveInObligation, OccupancyCycle, OccupancyCycle as Cycle, Payment, PrototypeAppState, Receipt, Room,
+  AdvanceApplication, Charge, MoveInObligation, OccupancyCycle, OccupancyCycle as Cycle, Payment, PrototypeAppState, Receipt,
+  RentObligation, RentalPeriod, Room,
 } from '@/domain/types/models'
 import { activeAssignments, chargePaid } from './summary'
 import { activeMoveInPolicy } from './move-in-policy'
 import { nextReceiptNumbers } from './receipt-numbering'
+import { dateParts, rentObligationForPeriod, rentObligationPaidCents, rentalPeriodsForCycle } from './rental-periods'
+import { ensureFirstRentalPeriod, openFinancialReviewCase } from './rent-schedule'
 
 export type MoveInSettlementStatus = 'NOT PAID' | 'PARTLY PAID' | 'PAID' | 'REFUNDED'
 export type MoveInCategory = 'ADVANCE' | 'SECURITY_DEPOSIT'
@@ -99,11 +102,17 @@ export function reconcileOccupancy(
           .filter(assignment => assignment.roomId === room.id)
           .map(assignment => assignment.startDate)
           .sort()[0] ?? asOf
+        const anchorDay = dateParts(startedAt).day
         cycle = {
           id: `cycle-${room.id}-${startedAt}`, roomId: room.id, startedAt, endedAt: null, status: 'ACTIVE',
+          rentSchedule: 'ANNIVERSARY', rentAnchorDate: startedAt, rentAnchorDay: anchorDay,
+          cycleOrigin: options.createMoveInObligations ? 'NEW_MOVE_IN' : 'TRANSFER',
           createdAt: asOf, updatedAt: asOf,
         }
         data = { ...data, occupancyCycles: [...data.occupancyCycles, cycle] }
+      }
+      if (cycle.rentSchedule === 'ANNIVERSARY') {
+        data = ensureFirstRentalPeriod(data, cycle, options.createMoveInObligations ? 'MOVE_IN_ADVANCE' : 'REGULAR')
       }
       if (options.createMoveInObligations && previousOccupants.length === 0 && !sameDayReplacement) {
         data = ensureMoveInObligation(data, cycle, asOf)
@@ -134,6 +143,7 @@ export function repairNewCycleMoveInObligations(data: PrototypeAppState, asOf: s
     })
     if (hasPriorMoveIn) continue
     next = ensureMoveInObligation(next, cycle, asOf)
+    next = ensureFirstRentalPeriod(next, cycle, 'MOVE_IN_ADVANCE')
   }
   return next
 }
@@ -155,6 +165,11 @@ export interface MoveInObligationView {
   advanceStatus: MoveInSettlementStatus
   depositStatus: MoveInSettlementStatus
   status: MoveInSettlementStatus
+  firstRentalPeriod: RentalPeriod | null
+  firstRentObligation: RentObligation | null
+  firstRentPaidCents: number
+  firstRentStatus: MoveInSettlementStatus
+  advanceApplication: AdvanceApplication | null
 }
 
 function settlementStatus(required: number, paid: number): MoveInSettlementStatus {
@@ -178,6 +193,11 @@ export function selectMoveInObligations(data: PrototypeAppState, asOf: string, r
     const totalRequiredCents = obligation.advanceRequiredCents + obligation.depositRequiredCents
     const totalPaidCents = advancePaidCents + depositPaidCents
     const totalRemainingCents = advanceRemainingCents + depositRemainingCents
+    const firstRentalPeriod = rentalPeriodsForCycle(data, cycle.id).find(period => period.sequence === 1) ?? null
+    const firstRentObligation = firstRentalPeriod ? rentObligationForPeriod(data, firstRentalPeriod.id) ?? null : null
+    const firstRentPaidCents = firstRentObligation ? rentObligationPaidCents(data, firstRentObligation.id, asOf) : 0
+    const advanceApplication = data.advanceApplications.find(application =>
+      application.occupancyCycleId === cycle.id && application.state === 'ACTIVE') ?? null
     result.push({
       obligation, cycle, room, payerName: data.tenants.find(tenant => tenant.id === advanceCharge.tenantId)?.name ?? 'Unknown tenant',
       advancePaidCents, advanceRefundedCents, advanceNetCents: Math.max(0, advancePaidCents - advanceRefundedCents), depositPaidCents, advanceRemainingCents, depositRemainingCents,
@@ -185,6 +205,9 @@ export function selectMoveInObligations(data: PrototypeAppState, asOf: string, r
       advanceStatus: advanceRefundedCents >= obligation.advanceRequiredCents ? 'REFUNDED' : settlementStatus(obligation.advanceRequiredCents, advancePaidCents),
       depositStatus: settlementStatus(obligation.depositRequiredCents, depositPaidCents),
       status: totalRemainingCents === 0 ? 'PAID' : settlementStatus(totalRequiredCents, totalPaidCents),
+      firstRentalPeriod, firstRentObligation, firstRentPaidCents,
+      firstRentStatus: firstRentObligation ? settlementStatus(firstRentObligation.amountCents, firstRentPaidCents) : 'NOT PAID',
+      advanceApplication,
     })
   }
   return result.sort((a, b) => a.room.name.localeCompare(b.room.name, 'en', { numeric: true }) || a.obligation.id.localeCompare(b.obligation.id))
@@ -204,12 +227,15 @@ export function moveInSummary(data: PrototypeAppState, asOf: string) {
 export interface MoveInAdjustmentProposal {
   previousRentCents: number
   currentRentCents: number
-  advanceTopUpCents: number
-  depositTopUpCents: number
-  kind: 'TOP_UP' | 'REVIEW'
+  advanceTopUpCents: 0
+  depositTopUpCents: 0
+  kind: 'REVIEW'
 }
 
-/** Read-only transfer proposal; nothing is posted until an explicit future landlord action. */
+/**
+ * Read-only transfer review. Existing advances are already consumed by their first rental period,
+ * and the original deposit does not change when the destination room costs more.
+ */
 export function proposedMoveInAdjustment(data: PrototypeAppState, room: Room, cycle: Cycle): MoveInAdjustmentProposal | null {
   const occupantIds = new Set(data.roomAssignments
     .filter(assignment => assignment.roomId === room.id && assignment.endDate === null)
@@ -225,9 +251,13 @@ export function proposedMoveInAdjustment(data: PrototypeAppState, room: Room, cy
   if (!previousObligation) return null
   const difference = currentRent - previousObligation.agreedMonthlyRentCents
   if (difference === 0) return null
-  return difference > 0
-    ? { previousRentCents: previousObligation.agreedMonthlyRentCents, currentRentCents: currentRent, advanceTopUpCents: difference, depositTopUpCents: difference, kind: 'TOP_UP' }
-    : { previousRentCents: previousObligation.agreedMonthlyRentCents, currentRentCents: currentRent, advanceTopUpCents: 0, depositTopUpCents: 0, kind: 'REVIEW' }
+  return {
+    previousRentCents: previousObligation.agreedMonthlyRentCents,
+    currentRentCents: currentRent,
+    advanceTopUpCents: 0,
+    depositTopUpCents: 0,
+    kind: 'REVIEW',
+  }
 }
 
 export type MoveInPaymentError = 'OBLIGATION_NOT_FOUND' | 'INVALID_AMOUNT' | 'PARTIAL_CATEGORY' | 'ALREADY_PAID' | 'NO_SELECTION' | 'DUPLICATE_PAYMENT' | 'INVALID_DATE'
@@ -303,7 +333,7 @@ export function prepareMoveInPayment(data: PrototypeAppState, input: {
     id: paymentId, scope: 'ROOM', tenantId: null, roomId: obligation.roomId, occupancyCycleId: obligation.occupancyCycleId,
     amountCents, paidOn: input.paidOn, method: null, state: 'RECORDED', correction: null,
   }
-  const next: PrototypeAppState = {
+  let next: PrototypeAppState = {
     ...data,
     payments: [...data.payments, payment],
     paymentAllocations: [...data.paymentAllocations, ...allocations],
@@ -314,6 +344,40 @@ export function prepareMoveInPayment(data: PrototypeAppState, input: {
       beforeSnapshot: JSON.stringify({ obligationId: obligation.id, advanceRemaining, depositRemaining }),
       afterSnapshot: JSON.stringify({ paymentId, roomId: obligation.roomId, occupancyCycleId: obligation.occupancyCycleId, advanceCents, depositCents }),
     }],
+  }
+
+  if (advanceCents > 0) {
+    next = ensureFirstRentalPeriod(next, cycle, 'MOVE_IN_ADVANCE')
+    const firstPeriod = rentalPeriodsForCycle(next, cycle.id).find(period => period.sequence === 1)
+    const firstRent = firstPeriod ? rentObligationForPeriod(next, firstPeriod.id) : undefined
+    if (firstRent && !next.advanceApplications.some(application => application.advanceChargeId === advance.id && application.state === 'ACTIVE')) {
+      const firstRentPaidCents = rentObligationPaidCents(next, firstRent.id, input.paidOn)
+      if (firstRent.amountCents === advanceCents && firstRentPaidCents === 0) {
+        const applicationId = `advance-application-${cycle.id}`
+        const application: AdvanceApplication = {
+          id: applicationId, occupancyCycleId: cycle.id, roomId: obligation.roomId,
+          advanceChargeId: advance.id, sourcePaymentId: paymentId, rentObligationId: firstRent.id,
+          amountCents: advanceCents, appliedOn: input.paidOn, state: 'ACTIVE', reversalAuditEventId: null,
+        }
+        next = {
+          ...next,
+          advanceApplications: [...next.advanceApplications, application],
+          auditEvents: [...next.auditEvents, {
+            id: `audit-${applicationId}`, actorId: 'demo-admin', occurredOn: input.paidOn, action: 'ADVANCE_APPLIED',
+            entityType: 'ADVANCE_APPLICATION', entityId: applicationId,
+            reason: `Mandatory advance settled the first anniversary rent period for Room ${data.rooms.find(room => room.id === obligation.roomId)?.name ?? obligation.roomId}.`,
+            beforeSnapshot: JSON.stringify({ advanceChargeId: advance.id, firstRentPaidCents }),
+            afterSnapshot: JSON.stringify(application),
+          }],
+        }
+      } else if (firstRentPaidCents > 0 || firstRent.amountCents !== advanceCents) {
+        next = openFinancialReviewCase(next, {
+          type: 'ADVANCE_APPLICATION_REVIEW', roomId: obligation.roomId, occupancyCycleId: cycle.id,
+          tenantId: advance.tenantId, rentalPeriodId: firstPeriod!.id, asOf: input.paidOn,
+          note: 'The paid advance and first anniversary rent differ or that rent already has payment. No duplicate application was posted.',
+        })
+      }
+    }
   }
   return { ok: true, data: next, payment, receipt }
 }

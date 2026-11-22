@@ -20,13 +20,20 @@ function tenantDraft(name = 'Kate'): TenantDraft {
   return { name, email: `${name.toLowerCase()}@example.com`, phone: '+63 900 555 0600', address: 'Test', roomId: 'room-5', moveInDate, notes: '' }
 }
 
-function createPaidRoom() {
+function createPaidRoom(preserveFirstRentApplication = false) {
   const first = prototypeReducer(createDemoData(), { type: 'tenant/created', draft: tenantDraft(), asOf: OCCUPANCY_DATE })
   const tenant = first.tenants.find(item => item.name === 'Kate')!
   const view = selectMoveInObligations(first, OCCUPANCY_DATE, 'room-5')[0]!
   const paid = prepareMoveInPayment(first, { obligationId: view.obligation.id, categories: ['ADVANCE', 'SECURITY_DEPOSIT'], paidOn: '2026-11-16' })
   if (!paid.ok) throw new Error(paid.reason)
-  return { data: paid.data, tenant, obligationId: view.obligation.id }
+  // Legacy refund tests model a paid advance that predates first-period application.
+  const applicationIds = new Set(paid.data.advanceApplications.map(application => application.id))
+  const data = preserveFirstRentApplication ? paid.data : {
+    ...paid.data,
+    advanceApplications: [],
+    auditEvents: paid.data.auditEvents.filter(event => !(event.entityType === 'ADVANCE_APPLICATION' && applicationIds.has(event.entityId))),
+  }
+  return { data, tenant, obligationId: view.obligation.id }
 }
 
 describe('short-stay advance refunds', () => {
@@ -39,6 +46,19 @@ describe('short-stay advance refunds', () => {
       expect(evaluateShortStayAdvanceRefund(data, tenant.id, iso)).toMatchObject({ eligible: true, stayDays: day, refundableCents: 350_000 })
     }
     expect(evaluateShortStayAdvanceRefund(data, tenant.id, '2026-11-23')).toMatchObject({ eligible: false, stayDays: 7 })
+  })
+
+  it('blocks automatic refund once the advance has settled the first anniversary period', () => {
+    const { data, tenant } = createPaidRoom(true)
+    const eligibility = evaluateShortStayAdvanceRefund(data, tenant.id, moveOutDate)
+    expect(eligibility.eligible).toBe(false)
+    expect(eligibility.blockers.join(' ')).toMatch(/already settled the first anniversary rent period/)
+    const attempt = prepareShortStayAdvanceRefund(data, {
+      tenantId: tenant.id, moveOutDate, refundedOn: moveOutDate, reason: 'Automatic refund should be blocked.',
+    })
+    expect(attempt.ok).toBe(false)
+    if (!attempt.ok) expect(attempt.blockers?.join(' ')).toMatch(/owner reconciliation is required/)
+    expect(data.advanceRefunds).toHaveLength(0)
   })
 
   it('blocks outstanding bills, shared remaining occupants, and duplicate refunds', () => {

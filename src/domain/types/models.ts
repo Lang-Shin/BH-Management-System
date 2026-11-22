@@ -151,6 +151,9 @@ export type Charge = ChargeRecord & (
   | { category: 'ADVANCE' | 'SECURITY_DEPOSIT'; moveInObligationId: string }
 )
 
+export type RentScheduleKind = 'ANNIVERSARY' | 'LEGACY_CALENDAR'
+export type OccupancyCycleOrigin = 'NEW_MOVE_IN' | 'TRANSFER' | 'LEGACY' | 'SAME_DAY_REPLACEMENT'
+
 /** One continuous period of occupancy for a room; a fully vacant room ends the cycle. */
 export interface OccupancyCycle {
   id: string
@@ -158,8 +161,90 @@ export interface OccupancyCycle {
   startedAt: string
   endedAt: string | null
   status: 'ACTIVE' | 'CLOSED'
+  /** New cycles use one immutable anniversary anchor. Imported cycles remain calendar-based. */
+  rentSchedule: RentScheduleKind
+  rentAnchorDate: string | null
+  rentAnchorDay: number | null
+  cycleOrigin: OccupancyCycleOrigin
   createdAt: string
   updatedAt: string
+}
+
+/** Inclusive-start, exclusive-end monthly window derived from a cycle's anniversary. */
+export interface RentalPeriod {
+  id: string
+  occupancyCycleId: string
+  roomId: string
+  sequence: number
+  startDate: string
+  endDateExclusive: string
+  dueDate: string
+  status: 'OPEN' | 'CLOSED'
+  origin: 'ANNIVERSARY' | 'LEGACY_CALENDAR'
+}
+
+/** Rent is recorded separately from calendar utility billing periods. */
+export interface RentObligation {
+  id: string
+  occupancyCycleId: string
+  rentalPeriodId: string
+  roomId: string
+  amountCents: number
+  rateId: string
+  rateEffectiveFrom: string
+  rateSnapshotCents: number
+  issuedOn: string
+  dueDate: string
+  source: 'REGULAR' | 'MOVE_IN_ADVANCE' | 'PREPAYMENT' | 'LEGACY_CALENDAR'
+  state: 'ISSUED' | 'VOIDED'
+  correction: AuthorizedCorrection | null
+}
+
+/** A non-cash settlement of the mandatory advance against the first rent period. */
+export interface AdvanceApplication {
+  id: string
+  occupancyCycleId: string
+  roomId: string
+  advanceChargeId: string
+  sourcePaymentId: string
+  rentObligationId: string
+  amountCents: number
+  appliedOn: string
+  state: 'ACTIVE' | 'REVERSED'
+  reversalAuditEventId: string | null
+}
+
+export interface RentPrepayment {
+  id: string
+  paymentId: string
+  occupancyCycleId: string
+  roomId: string
+  rentalPeriodIds: string[]
+  periodCount: number
+  totalCents: number
+  rateCents: number
+  rateLockedOn: string
+  createdAt: string
+  reviewState: 'NONE' | 'TRANSFER_REVIEW'
+}
+
+export type FinancialReviewType =
+  | 'TRANSFER_RENT_DIFFERENCE'
+  | 'TRANSFER_PREPAID_RENT'
+  | 'LEGACY_ADVANCE_UNALLOCATED'
+  | 'ADVANCE_APPLICATION_REVIEW'
+
+export interface FinancialReviewCase {
+  id: string
+  type: FinancialReviewType
+  roomId: string
+  occupancyCycleId: string | null
+  tenantId: string | null
+  rentalPeriodId: string | null
+  status: 'OPEN' | 'RESOLVED' | 'DISMISSED'
+  note: string
+  createdAt: string
+  resolvedAt: string | null
 }
 
 /** One room-level advance/deposit requirement per occupancy cycle. */
@@ -200,11 +285,12 @@ export type DepositIncomeRecognition = 'NOT_RECOGNIZED'
 
 export interface MoveInPolicy {
   version: number
+  /** New policies always settle the first rental period; legacy values remain readable. */
   advanceApplication: 'FIRST_MONTH' | 'LAST_MONTH' | 'MANUAL'
   depositDisposition: DepositDisposition
   depositIncomeRecognition: DepositIncomeRecognition
-  transferIncrease: 'PROPOSE_TOP_UP'
-  transferDecrease: 'MANUAL_REVIEW'
+  transferIncrease: 'REVIEW_ONLY'
+  transferDecrease: 'REVIEW_ONLY'
   moveOutSettlement: 'MANUAL_REVIEW'
   shortStayAdvanceRefundDays: number
 }
@@ -318,8 +404,8 @@ export interface AuditEvent {
   id: string
   actorId: string
   occurredOn: string
-  action: 'DEMO_SEEDED' | 'READING_CORRECTED' | 'CHARGE_CORRECTED' | 'PAYMENT_CORRECTED' | 'ALLOCATION_REVERSED' | 'ELECTRICITY_PAYMENT_RECORDED' | 'ROOM_PAYMENT_RECORDED' | 'MOVE_IN_PAYMENT_RECORDED' | 'MOVE_IN_POLICY_UPDATED' | 'METER_INITIALIZED' | 'ROOM_CHANGE_REQUESTED' | 'ROOM_CHANGE_CANCELLED' | 'ROOM_CHANGE_APPROVED' | 'ROOM_CHANGE_REJECTED' | 'ROOM_CHANGE_EXPIRED' | 'ROOM_CHANGE_RESERVATION_CANCELLED' | 'ROOM_CHANGE_RESCHEDULED' | 'ADVANCE_REFUNDED'
-  entityType: 'PROTOTYPE' | 'METER_READING' | 'CHARGE' | 'PAYMENT' | 'PAYMENT_ALLOCATION' | 'ROOM_CHANGE_REQUEST'
+  action: 'DEMO_SEEDED' | 'READING_CORRECTED' | 'CHARGE_CORRECTED' | 'PAYMENT_CORRECTED' | 'ALLOCATION_REVERSED' | 'ELECTRICITY_PAYMENT_RECORDED' | 'ROOM_PAYMENT_RECORDED' | 'MOVE_IN_PAYMENT_RECORDED' | 'MOVE_IN_POLICY_UPDATED' | 'METER_INITIALIZED' | 'ROOM_CHANGE_REQUESTED' | 'ROOM_CHANGE_CANCELLED' | 'ROOM_CHANGE_APPROVED' | 'ROOM_CHANGE_REJECTED' | 'ROOM_CHANGE_EXPIRED' | 'ROOM_CHANGE_RESERVATION_CANCELLED' | 'ROOM_CHANGE_RESCHEDULED' | 'ADVANCE_REFUNDED' | 'ADVANCE_APPLIED' | 'ADVANCE_APPLICATION_REVERSED' | 'RENT_PREPAYMENT_RECORDED' | 'FINANCIAL_REVIEW_OPENED'
+  entityType: 'PROTOTYPE' | 'METER_READING' | 'CHARGE' | 'PAYMENT' | 'PAYMENT_ALLOCATION' | 'ROOM_CHANGE_REQUEST' | 'RENT_OBLIGATION' | 'ADVANCE_APPLICATION' | 'RENT_PREPAYMENT' | 'FINANCIAL_REVIEW_CASE'
   entityId: string
   reason: string
   /** Serialized before/after snapshots preserve a future correction trail. */
@@ -351,6 +437,11 @@ export interface PrototypeAppState {
   moveInPolicy: MoveInPolicy
   roomChangeRequests: RoomChangeRequest[]
   advanceRefunds: AdvanceRefund[]
+  rentalPeriods: RentalPeriod[]
+  rentObligations: RentObligation[]
+  advanceApplications: AdvanceApplication[]
+  rentPrepayments: RentPrepayment[]
+  financialReviewCases: FinancialReviewCase[]
 }
 
 /** Existing prototype reducer/repository payload name; identical to the app state. */

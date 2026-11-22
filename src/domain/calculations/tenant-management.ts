@@ -3,6 +3,7 @@ import { isIsoDate } from '@/domain/validation/date'
 import { roomMonthlyRentCents } from './billing-rates'
 import { activeAssignments, tenantAccount, unresolvedElectricity } from './summary'
 import { roomCapacityConflict } from './room-capacity'
+import { randomSuffix } from './random-id'
 
 export interface TenantDraft {
   name: string
@@ -115,8 +116,7 @@ export function hasTenantFinancialHistory(data: PrototypeAppState, tenantId: str
 }
 
 function randomId(prefix: string): string {
-  const suffix = globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
-  return `${prefix}-${suffix}`
+  return `${prefix}-${randomSuffix()}`
 }
 
 function previousDate(date: string): string {

@@ -11,6 +11,17 @@ function Consumer() {
   return <><p>{data.tenants.length} residents loaded</p>{storageWarning && <p role="alert">{storageWarning}</p>}<button onClick={() => dispatch({ type: 'tenant/noteUpdated', tenantId: 'tenant-1', notes: 'Injected adapter note' })}>Change note</button></>
 }
 
+function ServerConsumer() {
+  const { data, dispatch, commandError, pendingCommands, retryCommand } = usePrototype()
+  return <>
+    <p>{data.tenants[0]?.notes || 'empty'}</p>
+    <p role="status">{commandError ?? 'no command error'}</p>
+    <p>Pending: {pendingCommands}</p>
+    <button onClick={() => dispatch({ type: 'tenant/noteUpdated', tenantId: 'tenant-1', notes: 'Injected adapter note' })}>Change note</button>
+    <button onClick={retryCommand}>Retry command</button>
+  </>
+}
+
 describe('repository injection boundary', () => {
   it('waits for asynchronous loading and serializes saves through an injected adapter', async () => {
     let resolveLoad!: (snapshot: PrototypeSnapshot) => void
@@ -42,6 +53,37 @@ describe('repository injection boundary', () => {
     expect(await screen.findByRole('heading', { name: 'Your records could not be opened' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
     expect(repository.save).not.toHaveBeenCalled()
+  })
+
+  it('uses server commands, reverts rejected changes, and retries with the same idempotency key', async () => {
+    const initial = createDemoData()
+    initial.tenants[0]!.notes = 'Original note'
+    const updated = createDemoData()
+    updated.tenants[0]!.notes = 'Injected adapter note'
+    const command = vi.fn<NonNullable<PrototypeRepository['command']>>()
+      .mockRejectedValueOnce(new Error('Server rejected the change'))
+      .mockResolvedValueOnce({ data: updated, revision: 2, replayed: false })
+    const save = vi.fn().mockResolvedValue(null)
+    const repository: PrototypeRepository = {
+      mode: 'server',
+      load: async () => ({ data: initial, warning: null, canPersist: true, revision: 1 }),
+      save,
+      command,
+    }
+    render(<PrototypeProvider repository={repository}><ServerConsumer /></PrototypeProvider>)
+    expect(await screen.findByText('Original note')).toBeInTheDocument()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Change note' }))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Server rejected the change'))
+    expect(screen.getByText('Original note')).toBeInTheDocument()
+    expect(screen.getByText('Pending: 0')).toBeInTheDocument()
+    expect(save).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Retry command' }))
+    await waitFor(() => expect(screen.getByText('Injected adapter note')).toBeInTheDocument())
+    expect(screen.getByRole('status')).toHaveTextContent('no command error')
+    expect(command).toHaveBeenCalledTimes(2)
+    expect(command.mock.calls[0]![1]).toBe(command.mock.calls[1]![1])
   })
 
   it('retains the session and warns if an asynchronous adapter rejects saving', async () => {

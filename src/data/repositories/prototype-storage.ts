@@ -3,7 +3,7 @@ import { initialRoomRentRates, initialWashingRates, initialWaterRates } from '@/
 import { DEFAULT_MOVE_IN_POLICY } from '@/domain/calculations/move-in-policy'
 import { isPrototypeData, isRecord } from '@/domain/validation/prototype-data'
 
-export const STORAGE_SCHEMA_VERSION = 16
+export const STORAGE_SCHEMA_VERSION = 17
 
 type ParseResult =
   | { ok: true; data: PrototypeAppState }
@@ -67,7 +67,7 @@ function withRoomChangeRequests(value: unknown): unknown {
  * deposit policy explicit without rewriting obligations created under the older provisional policy.
  * Legacy snapshots receive active cycles for already-occupied rooms but no invented deposits.
  */
-function withMoveInState(value: unknown, fromVersion: 7 | 8 | 9 | 10): PrototypeAppState | null {
+function withMoveInState(value: unknown, fromVersion: 7 | 8 | 9 | 10): unknown | null {
   if (!isRecord(value)) return null
   const rooms = Array.isArray(value.rooms) ? value.rooms.filter(isRecord) : []
   const assignments = Array.isArray(value.roomAssignments) ? value.roomAssignments as RoomAssignment[] : []
@@ -107,7 +107,77 @@ function withMoveInState(value: unknown, fromVersion: 7 | 8 | 9 | 10): Prototype
   }
   const withPayments = withPaymentScope(candidate)
   const withRequests = withRoomChangeRequests(withPayments)
-  return isPrototypeData(withRequests) ? withRequests : null
+  return withRequests
+}
+
+/**
+ * Version 17 adds anniversary rent periods and advance applications. Imported cycles remain on
+ * legacy calendar billing until they become vacant; no historical rent is relabelled. Existing
+ * paid advances are listed for owner review and never auto-applied to an old first rent period.
+ */
+function withAnniversaryState(value: unknown, fromVersion: number): unknown {
+  if (!isRecord(value)) return value
+  if (fromVersion === STORAGE_SCHEMA_VERSION) return value
+  const cycles = (Array.isArray(value.occupancyCycles) ? value.occupancyCycles : []).map(cycle => {
+    if (!isRecord(cycle)) return cycle
+    const validSchedule = cycle.rentSchedule === 'ANNIVERSARY' || cycle.rentSchedule === 'LEGACY_CALENDAR'
+    const anchorDate = typeof cycle.rentAnchorDate === 'string' ? cycle.rentAnchorDate : null
+    const anchorDay = Number.isSafeInteger(cycle.rentAnchorDay) ? cycle.rentAnchorDay as number : null
+    return validSchedule
+      ? cycle
+      : {
+          ...cycle, rentSchedule: 'LEGACY_CALENDAR', rentAnchorDate: anchorDate, rentAnchorDay: anchorDay,
+          cycleOrigin: cycle.cycleOrigin === 'NEW_MOVE_IN' || cycle.cycleOrigin === 'TRANSFER' || cycle.cycleOrigin === 'SAME_DAY_REPLACEMENT'
+            ? cycle.cycleOrigin : 'LEGACY',
+        }
+  })
+  const existingPolicy = isRecord(value.moveInPolicy) ? value.moveInPolicy : null
+  const oldVersion = Number.isSafeInteger(existingPolicy?.version) && (existingPolicy?.version as number) > 0
+    ? existingPolicy!.version as number : 1
+  const depositDisposition = existingPolicy?.depositDisposition === 'MANUAL_REVIEW' ? 'MANUAL_REVIEW' : 'NON_REFUNDABLE'
+  const moveInPolicy = {
+    ...DEFAULT_MOVE_IN_POLICY, version: Math.max(DEFAULT_MOVE_IN_POLICY.version, oldVersion), depositDisposition,
+  }
+  const rentalPeriods = Array.isArray(value.rentalPeriods) ? value.rentalPeriods : []
+  const rentObligations = Array.isArray(value.rentObligations) ? value.rentObligations : []
+  const advanceApplications = Array.isArray(value.advanceApplications) ? value.advanceApplications : []
+  const rentPrepayments = Array.isArray(value.rentPrepayments) ? value.rentPrepayments : []
+  const charges = Array.isArray(value.charges) ? value.charges.filter(isRecord) : []
+  const allocations = Array.isArray(value.paymentAllocations) ? value.paymentAllocations.filter(isRecord) : []
+  const derivedReviews = (Array.isArray(value.moveInObligations) ? value.moveInObligations : []).flatMap(obligation => {
+    if (!isRecord(obligation) || advanceApplications.some(application => isRecord(application) && application.advanceChargeId === obligation.advanceChargeId)) return []
+    const advance = charges.find(charge => charge.id === obligation.advanceChargeId && charge.category === 'ADVANCE')
+    if (!advance || typeof advance.amountCents !== 'number') return []
+    const paid = allocations.filter(allocation => allocation.chargeId === advance.id && allocation.state === 'ACTIVE')
+      .reduce((sum, allocation) => sum + (typeof allocation.amountCents === 'number' ? allocation.amountCents : 0), 0)
+    if (paid < advance.amountCents) return []
+    const paidOn = allocations.filter(allocation => allocation.chargeId === advance.id && allocation.state === 'ACTIVE')
+      .map(allocation => typeof allocation.allocatedOn === 'string' ? allocation.allocatedOn : '')
+      .filter(Boolean).sort().at(-1) ?? (typeof advance.issuedOn === 'string' ? advance.issuedOn : '2026-01-01')
+    return [{
+      id: `financial-review-legacy-advance-${String(obligation.id)}`, type: 'LEGACY_ADVANCE_UNALLOCATED',
+      roomId: String(obligation.roomId), occupancyCycleId: String(obligation.occupancyCycleId),
+      tenantId: typeof advance.tenantId === 'string' ? advance.tenantId : null, rentalPeriodId: null,
+      status: 'OPEN', note: 'Paid advance predates first-period application. Owner verification is required; no historical cash or receipt was rewritten.',
+      createdAt: paidOn, resolvedAt: null,
+    }]
+  })
+  const existingReviews = Array.isArray(value.financialReviewCases) ? value.financialReviewCases : []
+  return {
+    ...value,
+    occupancyCycles: cycles,
+    moveInPolicy,
+    rentalPeriods,
+    rentObligations,
+    advanceApplications,
+    rentPrepayments,
+    financialReviewCases: existingReviews.length > 0 ? existingReviews : derivedReviews,
+  }
+}
+
+function finish(value: unknown, fromVersion: number): ParseResult {
+  const migrated = withAnniversaryState(value, fromVersion)
+  return isPrototypeData(migrated) ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }
 }
 
 /** Pure, non-throwing decoding. Storage access and recovery decisions stay in the adapter. */
@@ -119,32 +189,16 @@ export function parsePrototypeSnapshot(raw: string): ParseResult {
     return { ok: false, reason: 'MALFORMED_JSON' }
   }
   if (!isRecord(parsed)) return { ok: false, reason: 'INVALID_DATA' }
-  // Version 16 adds explicit short-stay advance refunds.
-  if (parsed.version === 15) {
-    const migrated = withAdvanceRefundState(parsed.data)
-    return isPrototypeData(migrated) ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }
-  }
+  // Version 17 adds anniversary rent and first-period advance settlement.
+  if (parsed.version === 16) return finish(withAdvanceRefundState(parsed.data), 16)
+  if (parsed.version === 15) return finish(withAdvanceRefundState(parsed.data), 15)
   if (parsed.version === 14 || parsed.version === 13 || parsed.version === 12) {
-    const migrated = withAdvanceRefundState(withRoomChangeRequests(parsed.data))
-    return isPrototypeData(migrated) ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }
+    return finish(withAdvanceRefundState(withRoomChangeRequests(parsed.data)), parsed.version)
   }
-  if (parsed.version === 11) {
-    const migrated = withAdvanceRefundState(withRoomChangeRequests(withPaymentScope(parsed.data)))
-    return isPrototypeData(migrated) ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }
-  }
-  if (parsed.version === 10) {
-    const migrated = withAdvanceRefundState(withMoveInState(parsed.data, 10))
-    return migrated && isPrototypeData(migrated) ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }
-  }
-  if (parsed.version === 9 || parsed.version === 8) {
-    const migrated = withAdvanceRefundState(withMoveInState(parsed.data, parsed.version))
-    return migrated && isPrototypeData(migrated) ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }
-  }
-  if (parsed.version === 7) {
-    const migrated = withAdvanceRefundState(withMoveInState(migrateVersion7(parsed.data), 7))
-    return migrated && isPrototypeData(migrated) ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }
-  }
+  if (parsed.version === 11) return finish(withAdvanceRefundState(withRoomChangeRequests(withPaymentScope(parsed.data))), 11)
+  if (parsed.version === 10) return finish(withAdvanceRefundState(withMoveInState(parsed.data, 10)), 10)
+  if (parsed.version === 9 || parsed.version === 8) return finish(withAdvanceRefundState(withMoveInState(parsed.data, parsed.version)), parsed.version)
+  if (parsed.version === 7) return finish(withAdvanceRefundState(withMoveInState(migrateVersion7(parsed.data), 7)), 7)
   if (parsed.version !== STORAGE_SCHEMA_VERSION) return { ok: false, reason: 'UNSUPPORTED_SCHEMA' }
-  if (!isPrototypeData(parsed.data)) return { ok: false, reason: 'INVALID_DATA' }
-  return { ok: true, data: parsed.data }
+  return finish(parsed.data, STORAGE_SCHEMA_VERSION)
 }

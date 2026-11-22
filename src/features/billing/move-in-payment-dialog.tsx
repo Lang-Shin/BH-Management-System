@@ -62,11 +62,12 @@ export function MoveInPaymentDialog({ view, onClose, onSaved }: {
       {success ? <div className="move-in-success">
         <span className="move-in-success-icon"><Check aria-hidden="true" /></span>
         <DialogTitle>Move-in payment saved.</DialogTitle>
-        <DialogDescription id="move-in-payment-description">The room-level advance and deposit balances were updated for every authorized occupant.</DialogDescription>
+        <DialogDescription id="move-in-payment-description">The room-level advance and deposit balances were updated for every authorized occupant.{selected.includes('ADVANCE') && ' The paid advance now settles the first anniversary rent period, so that rent must not be collected again.'}</DialogDescription>
         <dl className="move-in-success-details">
           <div><dt>Receipt</dt><dd>{success.receiptNumber}</dd></div>
           <div><dt>Amount received</dt><dd>{formatMoney(success.amountCents)}</dd></div>
           <div><dt>Room</dt><dd>Room {view.room.name}</dd></div>
+          {view.firstRentObligation && <div><dt>First rent period</dt><dd>{view.firstRentObligation.issuedOn} · {formatMoney(view.firstRentObligation.amountCents)}</dd></div>}
         </dl>
         <p className="move-in-policy-note"><ReceiptText aria-hidden="true" />{view.obligation.depositDisposition === 'NON_REFUNDABLE' ? 'The security deposit remains a separate non-refundable record and is not recognized as rental income here.' : 'The security deposit remains a separate record subject to manual review; no automatic refund or income recognition is posted.'}</p>
         <Button onClick={onClose} className="w-full">Done</Button>
@@ -90,7 +91,7 @@ export function MoveInPaymentDialog({ view, onClose, onSaved }: {
               <label className="room-payment-option-label">
                 <input type="checkbox" checked={selected.includes('ADVANCE')} disabled={view.advanceRemainingCents === 0} onChange={() => toggle('ADVANCE')} aria-label="Advance" />
                 <span className="payment-category-icon"><Wallet className="size-[18px]" aria-hidden="true" /></span>
-                <span className="min-w-0 flex-1"><span className="block font-semibold">Advance</span><span className="mt-0.5 block text-xs text-muted-foreground">{view.advanceRemainingCents === 0 ? 'Already paid in full' : 'Full category payment'}</span></span>
+                <span className="min-w-0 flex-1"><span className="block font-semibold">Advance — first rent</span><span className="mt-0.5 block text-xs text-muted-foreground">{view.advanceRemainingCents === 0 ? 'Already paid and applied' : 'Settles the first anniversary period'}</span></span>
                 <span className="shrink-0 text-right font-semibold tabular-nums">{view.advanceRemainingCents === 0 ? 'PAID' : formatMoney(view.advanceRemainingCents)}</span>
               </label>
             </div>
@@ -105,7 +106,7 @@ export function MoveInPaymentDialog({ view, onClose, onSaved }: {
           </fieldset>
           <label className="move-in-field"><span>Payment date</span><input type="date" value={paidOn} onChange={event => { setPaidOn(event.target.value); setError('') }} aria-invalid={Boolean(entryDateError)} /><small>{entryDateError || 'Date the money was received.'}</small></label>
           <div className="move-in-total"><span>Total received</span><strong>{formatMoney(totalCents)}</strong></div>
-          <p className="move-in-policy-note"><ReceiptText aria-hidden="true" />No partial category payments are accepted. No future-month bill is paid or modified, and no deposit refund or rental income is posted.</p>
+          <p className="move-in-policy-note"><ReceiptText aria-hidden="true" />No partial category payments are accepted. A paid advance settles only the first anniversary rent period; the deposit remains separate. No future-month rent is collected here.</p>
           {error && <p role="alert" className="move-in-error">{error}</p>}
         </div>
         <div className="move-in-dialog-actions">

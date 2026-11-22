@@ -2,10 +2,13 @@ import type { ReactNode } from 'react'
 import { BrowserRouter } from 'react-router-dom'
 import { ErrorBoundary } from '@/components/shared/states'
 import { localStorageRepository } from '@/data/repositories/local-storage-repository'
+import { configuredApiRepository } from '@/data/repositories/api-repository'
 import { PrototypeProvider } from './prototype-provider'
 import { AppearanceProvider } from './appearance'
 
-/** Composition root: replace the repository here when an API adapter is approved. */
+const repository = configuredApiRepository() ?? localStorageRepository
+
+/** Composition root: server mode is selected by VITE_BHMS_API_BASE_URL; otherwise local demo mode remains. */
 export function AppProviders({ children }: { children: ReactNode }) {
-  return <AppearanceProvider><ErrorBoundary><PrototypeProvider repository={localStorageRepository}><BrowserRouter>{children}</BrowserRouter></PrototypeProvider></ErrorBoundary></AppearanceProvider>
+  return <AppearanceProvider><ErrorBoundary><PrototypeProvider repository={repository}><BrowserRouter>{children}</BrowserRouter></PrototypeProvider></ErrorBoundary></AppearanceProvider>
 }

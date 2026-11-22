@@ -17,5 +17,6 @@
     "erasableSyntaxOnly": true,
     "paths": { "@/*": ["./src/*"] }
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/server", "src/worker"]
 }

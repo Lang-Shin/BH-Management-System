@@ -5,6 +5,8 @@ import { roomMonthlyRentCents } from './billing-rates'
 import { transferTenantRoom } from './tenant-management'
 import { reconcileOccupancy } from './move-in'
 import { roomCapacityConflict } from './room-capacity'
+import { openFinancialReviewCase, transferRentReviewNeeded } from './rent-schedule'
+import { randomSuffix } from './random-id'
 
 export interface RoomChangeRequestDraft {
   tenantId: string
@@ -42,7 +44,7 @@ function previousDate(date: string): string {
 }
 
 function requestId(): string {
-  return `room-change-${globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`}`
+  return `room-change-${randomSuffix()}`
 }
 
 export function pendingRoomChangeRequests(data: PrototypeAppState): RoomChangeRequest[] {
@@ -70,16 +72,26 @@ export function roomChangeFinancialWarnings(data: PrototypeAppState, tenantId: s
   const period = data.billingPeriods.find(item => item.startDate <= startDate && item.endDate >= startDate)
   const midPeriod = Boolean(period && startDate > period.startDate)
   const affectedBillingPeriodIds = midPeriod && period ? [period.id] : []
+  const paidAnniversaryPeriod = transferRentReviewNeeded(data, assignment.roomId, tenantId, startDate)
+  const sourceCycle = data.occupancyCycles.find(cycle => cycle.roomId === assignment.roomId && cycle.status === 'ACTIVE')
+  const paidPrepaidPeriod = sourceCycle
+    ? data.rentPrepayments.filter(prepayment => prepayment.occupancyCycleId === sourceCycle.id)
+      .flatMap(prepayment => prepayment.rentalPeriodIds)
+      .map(id => data.rentalPeriods.find(item => item.id === id))
+      .find(item => Boolean(item && item.startDate >= startDate))
+    : undefined
   const notes: string[] = []
   if (account.balance > 0) notes.push('The tenant has an outstanding balance.')
   if (account.credit > 0) notes.push('The tenant has held advance credit that is not automatically applied.')
-  if (midPeriod) notes.push('The move date is inside a billing period; review room rent manually because no proration rule exists.')
-  if (difference > 0) notes.push('The target room is more expensive. A deposit top-up is proposed only; nothing is posted automatically.')
-  if (difference < 0) notes.push('The target room is cheaper. Deposit or advance differences need manual review.')
+  if (midPeriod) notes.push('The move date is inside a legacy billing period; review room rent manually because no proration rule exists.')
+  if (paidAnniversaryPeriod) notes.push(`The source anniversary rent is already paid through ${paidAnniversaryPeriod.endDateExclusive} (exclusive). Review any destination rent difference manually; no settled payment is modified.`)
+  if (paidPrepaidPeriod) notes.push('A future rent period has been prepaid. It stays attached to the source room and requires explicit reconciliation.')
+  if (difference > 0) notes.push('The destination room is more expensive. No advance or deposit top-up is collected automatically; the original deposit remains unchanged.')
+  if (difference < 0) notes.push('The destination room is cheaper. Deposit or advance differences require manual review.')
   return {
     outstandingCents: account.balance, creditCents: account.credit,
     currentRentCents, targetRentCents, rentDifferenceCents: difference,
-    depositTopUpProposalCents: Math.max(0, difference),
+    depositTopUpProposalCents: 0,
     billingReviewRequired: notes.length > 0, affectedBillingPeriodIds, notes,
   }
 }
@@ -223,7 +235,30 @@ export function approveRoomChangeRequest(data: PrototypeAppState, requestIdToApp
     roomChangeRequests: transfer.data.roomChangeRequests.map(item => item.id === request.id ? next : item),
     auditEvents: audit(transfer.data, next, 'ROOM_CHANGE_APPROVED', 'demo-admin', input.decidedAt, next.decisionReason),
   }
-  return { ok: true, request: next, effectiveDate: input.effectiveDate, data: reconcileOccupancy(data, approvedData, input.decidedAt, { createMoveInObligations: false }) }
+  let reconciled = reconcileOccupancy(data, approvedData, input.decidedAt, { createMoveInObligations: false })
+  const sourceCycle = data.occupancyCycles.find(cycle => cycle.roomId === request.currentRoomId && cycle.status === 'ACTIVE')
+  const paidPeriod = transferRentReviewNeeded(data, request.currentRoomId, request.tenantId, input.effectiveDate)
+  if (paidPeriod) {
+    reconciled = openFinancialReviewCase(reconciled, {
+      type: 'TRANSFER_RENT_DIFFERENCE', roomId: request.currentRoomId, occupancyCycleId: sourceCycle?.id ?? null,
+      tenantId: request.tenantId, rentalPeriodId: paidPeriod.id, asOf: input.decidedAt,
+      note: `Transfer on ${input.effectiveDate} occurs during paid rent ${paidPeriod.startDate} to ${paidPeriod.endDateExclusive} (exclusive). Landlord review is required before any rent difference is charged.`,
+    })
+  }
+  const prepaidFuture = sourceCycle
+    ? data.rentPrepayments.filter(prepayment => prepayment.occupancyCycleId === sourceCycle.id)
+      .flatMap(prepayment => prepayment.rentalPeriodIds)
+      .map(id => data.rentalPeriods.find(item => item.id === id) ?? null)
+      .find(item => Boolean(item && item.startDate >= input.effectiveDate))
+    : undefined
+  if (prepaidFuture) {
+    reconciled = openFinancialReviewCase(reconciled, {
+      type: 'TRANSFER_PREPAID_RENT', roomId: request.currentRoomId, occupancyCycleId: sourceCycle?.id ?? null,
+      tenantId: request.tenantId, rentalPeriodId: prepaidFuture.id, asOf: input.decidedAt,
+      note: `Rent starting ${prepaidFuture.startDate} is prepaid and remains attached to the source room. Landlord reconciliation is required.`,
+    })
+  }
+  return { ok: true, request: next, effectiveDate: input.effectiveDate, data: reconciled }
 }
 
 /** Releases an approved future reservation. The request and its history remain auditable. */

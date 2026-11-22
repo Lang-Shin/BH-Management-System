@@ -3,6 +3,7 @@ import { ROOM_RATE_CATEGORY_IDS } from './billing-rates'
 import { activeAssignments, chargeBalance } from './summary'
 import { metersForRoom } from './meter-baseline'
 import { futureReservationCount, roomPeakOccupancy } from './room-capacity'
+import { randomSuffix } from './random-id'
 
 export interface RoomDraft {
   name: string
@@ -117,8 +118,7 @@ export function validateRoomDraft(data: PrototypeAppState, draft: RoomDraft, opt
 function newRoomId(data: PrototypeAppState): string {
   let id = ''
   do {
-    const random = globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
-    id = `room-${random}`
+    id = `room-${randomSuffix()}`
   } while (data.rooms.some(room => room.id === id))
   return id
 }

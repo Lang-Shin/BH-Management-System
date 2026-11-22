@@ -81,7 +81,7 @@ describe('move-in advance and security deposit UI', () => {
     await user.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('link', { name: 'Billing' }))
     const section = await screen.findByRole('region', { name: 'Move-in advance & security deposit' })
     let row = within(within(section).getByRole('table')).getByText('Room 06').closest('tr')!
-    expect(within(row).getAllByText(/4,000\.00/)).toHaveLength(2)
+    expect(within(row).getAllByText(/4,000\.00/)).toHaveLength(3)
     expect(within(row).getByRole('button', { name: 'Record move-in payment for room 06' })).toBeEnabled()
     expect(savedData().moveInObligations.filter(obligation => obligation.roomId === 'room-13')).toHaveLength(1)
 
@@ -89,7 +89,7 @@ describe('move-in advance and security deposit UI', () => {
     renderApp('/billing')
     const refreshedSection = await screen.findByRole('region', { name: 'Move-in advance & security deposit' })
     row = within(within(refreshedSection).getByRole('table')).getByText('Room 06').closest('tr')!
-    expect(within(row).getAllByText(/4,000\.00/)).toHaveLength(2)
+    expect(within(row).getAllByText(/4,000\.00/)).toHaveLength(3)
   })
 
   it('remembers the UI-only collapsed preference when navigating back to Billing', async () => {
@@ -152,22 +152,22 @@ describe('move-in advance and security deposit UI', () => {
     renderApp()
     const section = await screen.findByRole('region', { name: 'Move-in advance & security deposit' })
     const table = within(section).getByRole('table')
-    expect(within(table).getAllByRole('columnheader').map(header => header.textContent)).toEqual(['Room', 'Advance', 'Security deposit', 'Action'])
+    expect(within(table).getAllByRole('columnheader').map(header => header.textContent)).toEqual(['Room', 'First rent', 'Advance', 'Security deposit', 'Action'])
     expect(within(table).queryByText('Overall')).not.toBeInTheDocument()
     expect(within(table).queryByText('Room & payer')).not.toBeInTheDocument()
     const unpaid = within(table).getByText('Room 01').closest('tr')!
-    expect(within(unpaid).getAllByText('₱4,000.00')).toHaveLength(2)
+    expect(within(unpaid).getAllByText(/4,000\.00/)).toHaveLength(3)
     expect(within(unpaid).queryByText('PAID')).not.toBeInTheDocument()
     expect(within(unpaid).queryByText('NOT PAID')).not.toBeInTheDocument()
     expect(unpaid).not.toHaveTextContent('Unpaid Resident')
     const settledRow = within(table).getByText('Room 03').closest('tr')!
-    expect(within(settledRow).getAllByText('PAID')).toHaveLength(2)
-    expect(within(settledRow).queryByText(/4,000\.00/)).not.toBeInTheDocument()
+    expect(within(settledRow).getAllByText('PAID')).toHaveLength(3)
+    expect(within(settledRow).getAllByText(/4,000\.00/)).toHaveLength(1)
     expect(within(settledRow).getByText('Settled')).toBeInTheDocument()
     expect(within(settledRow).queryByRole('button')).not.toBeInTheDocument()
     const partial = within(table).getByText('Room 06').closest('tr')!
     expect(within(partial).getByText('₱3,000.00')).toBeInTheDocument()
-    expect(within(partial).getByText('₱4,000.00')).toBeInTheDocument()
+    expect(within(partial).getAllByText(/4,000\.00/)).toHaveLength(2)
     expect(within(partial).queryByText('PARTLY PAID')).not.toBeInTheDocument()
     expect(within(partial).queryByText('NOT PAID')).not.toBeInTheDocument()
     expect(within(partial).queryByText('of')).not.toBeInTheDocument()
@@ -207,7 +207,7 @@ describe('move-in advance and security deposit UI', () => {
       expect(data.paymentAllocations.filter(allocation => allocation.paymentId === payment.id)).toHaveLength(2)
       expect(data.receipts.filter(receipt => receipt.paymentId === payment.id)).toHaveLength(1)
     })
-    expect(within(section).getAllByText('PAID', { selector: '.move-in-status' })).toHaveLength(2)
+    expect(within(section).getAllByText('PAID', { selector: '.move-in-status' })).toHaveLength(3)
     expect(within(section).getByText('Settled')).toBeInTheDocument()
   }, 30000)
 
@@ -240,7 +240,7 @@ describe('move-in advance and security deposit UI', () => {
     expect(within(section).getByText('₱4,000.00 paid of ₱4,000.00')).toBeVisible()
     expect(within(section).getByText('₱0.00 remaining')).toBeVisible()
     expect(within(section).getByText('Security deposit (non-refundable)')).toBeVisible()
-    expect(within(section).getByText(/The advance is not automatically used to pay a month. The security deposit is non-refundable and is not counted as rent income/)).toBeVisible()
+    expect(within(section).getByText(/The mandatory advance is the first anniversary rental period’s rent/)).toBeVisible()
   })
 
   it('updates and persists the versioned deposit policy for future obligations only', async () => {
@@ -254,7 +254,7 @@ describe('move-in advance and security deposit UI', () => {
     expect(within(section).getByRole('status')).toHaveTextContent('Deposit policy updated for future obligations.')
     await waitFor(() => {
       const data = savedData()
-      expect(data.moveInPolicy).toMatchObject({ version: 3, depositDisposition: 'MANUAL_REVIEW', depositIncomeRecognition: 'NOT_RECOGNIZED' })
+      expect(data.moveInPolicy).toMatchObject({ version: 4, depositDisposition: 'MANUAL_REVIEW', depositIncomeRecognition: 'NOT_RECOGNIZED' })
       expect(data.moveInObligations[0]).toEqual(obligation)
     })
   })

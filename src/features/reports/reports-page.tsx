@@ -35,6 +35,10 @@ const changeLabels: Record<AuditEvent['action'], string> = {
   ROOM_CHANGE_RESERVATION_CANCELLED: 'Approved room reservation cancelled',
   ROOM_CHANGE_RESCHEDULED: 'Approved room reservation rescheduled',
   ADVANCE_REFUNDED: 'Short-stay advance refunded',
+  ADVANCE_APPLIED: 'Advance applied to first rent period',
+  ADVANCE_APPLICATION_REVERSED: 'Advance application reversed',
+  RENT_PREPAYMENT_RECORDED: 'Multi-month rent prepayment recorded',
+  FINANCIAL_REVIEW_OPENED: 'Financial review opened',
 }
 
 export default function Reports() {

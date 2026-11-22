@@ -135,7 +135,7 @@ describe('tenant room change requests', () => {
     const first = submitRoomChangeRequest(base, draft, DEMO_DATE)
     if (!first.ok) throw new Error('request failed')
     const warnings = roomChangeFinancialWarnings(base, 'tenant-1', 'room-13', DEMO_DATE)!
-    expect(warnings).toMatchObject({ currentRentCents: 350_000, targetRentCents: 400_000, rentDifferenceCents: 50_000, depositTopUpProposalCents: 50_000, billingReviewRequired: true })
+    expect(warnings).toMatchObject({ currentRentCents: 350_000, targetRentCents: 400_000, rentDifferenceCents: 50_000, depositTopUpProposalCents: 0, billingReviewRequired: true })
     expect(approveRoomChangeRequest(first.data, first.request.id, approval(false))).toEqual({ ok: false, errors: { general: 'Confirm that the financial and billing effects have been reviewed.' } })
     const approved = approveRoomChangeRequest(first.data, first.request.id, approval(true))
     expect(approved.ok).toBe(true)

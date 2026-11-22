@@ -51,7 +51,7 @@ export function MoveInSection() {
       <div>
         <span className="move-in-eyebrow"><ShieldCheck aria-hidden="true" />Room-level</span>
         <h2 id="move-in-title" ref={headingRef} tabIndex={-1}>Move-in advance &amp; security deposit</h2>
-        <p>One advance and one deposit per room occupancy. The security deposit is {policy.depositDisposition === 'NON_REFUNDABLE' ? 'non-refundable' : 'refundable with manual review'} under the current policy and remains separate from monthly rent.</p>
+        <p>One advance and one deposit per room occupancy. The advance is the first anniversary period’s rent; the security deposit is {policy.depositDisposition === 'NON_REFUNDABLE' ? 'non-refundable' : 'refundable with manual review'} and remains separate.</p>
       </div>
       <div className="move-in-heading-actions">
         <div className="move-in-heading-total"><span>Still to collect</span><strong>{formatMoney(summary.outstandingCents)}</strong><small>{summary.paidObligations} of {summary.obligations} fully settled</small></div>
@@ -68,15 +68,9 @@ export function MoveInSection() {
     <section className="move-in-policy" aria-labelledby="move-in-policy-title">
       <div className="move-in-subheading"><div><h3 id="move-in-policy-title">Policy configuration</h3><p>Changes apply to future obligations. Existing charges and recorded terms stay intact.</p></div><span className="move-in-policy-version">Policy v{policy.version}</span></div>
       <div className="move-in-policy-fields">
-      <div className="move-in-policy-field"><label htmlFor="move-in-advance-policy">Advance application policy</label><p id="move-in-advance-help">Choose when an advance may be applied. Application always needs review.</p>
-      <select id="move-in-advance-policy" aria-describedby="move-in-advance-help" value={policy.advanceApplication} onChange={event => {
-        setNotice('')
-        dispatch({ type: 'moveIn/policyUpdated', advanceApplication: event.target.value as 'FIRST_MONTH' | 'LAST_MONTH' | 'MANUAL' })
-        setNotice('Advance policy updated for future obligations.')
-      }}>
-        <option value="LAST_MONTH">Last month</option>
-        <option value="FIRST_MONTH">First month</option>
-        <option value="MANUAL">Manual review only</option>
+      <div className="move-in-policy-field"><label htmlFor="move-in-advance-policy">Advance application policy</label><p id="move-in-advance-help">The mandatory one-month advance is the first anniversary rental period’s rent.</p>
+      <select id="move-in-advance-policy" aria-describedby="move-in-advance-help" value="FIRST_MONTH" disabled>
+        <option value="FIRST_MONTH">First rental period (mandatory)</option>
       </select></div>
       <div className="move-in-policy-field"><label htmlFor="move-in-deposit-policy">Security deposit terms</label><p id="move-in-deposit-help">Current policy is {policy.depositDisposition === 'NON_REFUNDABLE' ? 'non-refundable' : 'refundable with manual review'}. Existing deposits keep their recorded terms.</p>
       <select id="move-in-deposit-policy" aria-describedby="move-in-deposit-help" value={policy.depositDisposition} onChange={event => {
@@ -96,9 +90,7 @@ export function MoveInSection() {
       <p>A tenant moved between rooms at different rent snapshots. Review any difference manually; nothing has been posted.</p>
       <ul>{proposals.map(({ cycle, room, proposal }) => <li key={cycle.id}>
         Room {room.name}: previous {formatMoney(proposal.previousRentCents)} / current {formatMoney(proposal.currentRentCents)}.
-        {proposal.kind === 'TOP_UP'
-          ? ` Proposed advance top-up ${formatMoney(proposal.advanceTopUpCents)} and deposit top-up ${formatMoney(proposal.depositTopUpCents)}.`
-          : ' Lower rent needs manual settlement review; no automatic adjustment.'}
+        No advance or deposit top-up is collected. The original deposit stays unchanged; any paid-period rent difference requires manual review.
       </li>)}</ul>
     </div>}
     {closedReviews.length > 0 && <div className="move-in-proposals" role="note">

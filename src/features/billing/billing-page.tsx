@@ -10,6 +10,7 @@ import { BillingStatusMatrix } from './billing-status-matrix'
 import { BillingRatesSection } from './billing-rates-section'
 import { PaymentCalculator } from './payment-calculator'
 import { MoveInSection } from './move-in-section'
+import { AnniversaryRentSection } from './anniversary-rent-section'
 import { BillingStatusChart } from './billing-status-chart'
 import { selectBillingRooms } from './billing-room-status'
 import { BillingFiltersMenu } from './billing-filters-menu'
@@ -46,6 +47,7 @@ export default function Billing() {
     <div key={statusFilter ?? 'ALL'} className="billing-table-enter">
       <BillingStatusMatrix data={data} periodId={periodId} asOf={DEMO_DATE} outstandingOnly={false} statusFilter={statusFilter} />
     </div>
+    <div className="mt-8"><AnniversaryRentSection /></div>
     <div className="mt-8"><MoveInSection /></div>
     <BillingRatesSection />
   </>

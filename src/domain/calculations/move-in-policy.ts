@@ -1,13 +1,16 @@
 import type { MoveInPolicy, PrototypeAppState } from '@/domain/types/models'
 
-/** Policy v2 (Policy B): non-refundable deposits, still held without automatic income recognition. */
+/**
+ * Policy v3: the mandatory advance is rent for the first anniversary period. Transfers never post
+ * advance or deposit top-ups; deposits keep their original recorded amount.
+ */
 export const DEFAULT_MOVE_IN_POLICY: MoveInPolicy = {
-  version: 2,
-  advanceApplication: 'LAST_MONTH',
+  version: 3,
+  advanceApplication: 'FIRST_MONTH',
   depositDisposition: 'NON_REFUNDABLE',
   depositIncomeRecognition: 'NOT_RECOGNIZED',
-  transferIncrease: 'PROPOSE_TOP_UP',
-  transferDecrease: 'MANUAL_REVIEW',
+  transferIncrease: 'REVIEW_ONLY',
+  transferDecrease: 'REVIEW_ONLY',
   moveOutSettlement: 'MANUAL_REVIEW',
   shortStayAdvanceRefundDays: 7,
 }

@@ -14,11 +14,14 @@ import { approveRoomChangeRequest, cancelApprovedRoomChangeRequest, cancelRoomCh
 import { createRoom, deleteRoom, updateRoom } from '@/domain/calculations/room-management'
 import { createTenant, deleteTenant, moveOutBlockers, moveOutTenant, updateTenant } from '@/domain/calculations/tenant-management'
 import { prepareShortStayAdvanceRefund } from '@/domain/calculations/advance-refund'
+import { prepareRentPrepayment } from '@/domain/calculations/rent-schedule'
 
 export function prototypeReducer(state: PrototypeData, action: StateAction): PrototypeData {
   switch (action.type) {
     case 'data/loaded':
       return repairNewCycleMoveInObligations(reconcileOccupancy(action.data, action.data, action.occupancyDate, { createMoveInObligations: false }), action.occupancyDate, DEMO_DATE)
+    case 'data/serverSynced':
+      return action.data
     case 'tenant/noteUpdated':
       return {
         ...state,
@@ -32,14 +35,15 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
       return result.ok ? reconcileOccupancy(state, result.data, asOf, { createMoveInObligations: true }) : state
     }
     case 'tenant/updated': {
-      const previousRoom = activeAssignments(state, DEMO_DATE).find(item => item.tenantId === action.tenantId)?.roomId
-      const result = updateTenant(state, action.tenantId, action.draft, DEMO_DATE)
+      const asOf = action.asOf ?? DEMO_DATE
+      const previousRoom = activeAssignments(state, asOf).find(item => item.tenantId === action.tenantId)?.roomId
+      const result = updateTenant(state, action.tenantId, action.draft, asOf)
       if (!result.ok) return state
-      const nextRoom = activeAssignments(result.data, DEMO_DATE).find(item => item.tenantId === action.tenantId)?.roomId
+      const nextRoom = activeAssignments(result.data, asOf).find(item => item.tenantId === action.tenantId)?.roomId
       const withRequests = previousRoom !== nextRoom
-        ? expirePendingRoomChangeRequests(result.data, action.tenantId, DEMO_DATE, 'Tenant assignment changed before the request was reviewed.')
+        ? expirePendingRoomChangeRequests(result.data, action.tenantId, asOf, 'Tenant assignment changed before the request was reviewed.')
         : result.data
-      return reconcileOccupancy(state, withRequests, DEMO_DATE, { createMoveInObligations: false })
+      return reconcileOccupancy(state, withRequests, asOf, { createMoveInObligations: false })
     }
     case 'tenant/movedOut': {
       const asOf = action.asOf ?? DEMO_DATE
@@ -57,21 +61,22 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
       return result.ok ? reconcileOccupancy(working, expirePendingRoomChangeRequests(result.data, action.tenantId, asOf, 'Tenant moved out before the request was reviewed.'), asOf, { createMoveInObligations: false }) : state
     }
     case 'tenant/deleted': {
-      const result = deleteTenant(state, action.tenantId, DEMO_DATE)
-      return result.ok ? reconcileOccupancy(state, expirePendingRoomChangeRequests(result.data, action.tenantId, DEMO_DATE, 'Tenant was deleted before the request was reviewed.'), DEMO_DATE, { createMoveInObligations: false }) : state
+      const asOf = action.asOf ?? DEMO_DATE
+      const result = deleteTenant(state, action.tenantId, asOf)
+      return result.ok ? reconcileOccupancy(state, expirePendingRoomChangeRequests(result.data, action.tenantId, asOf, 'Tenant was deleted before the request was reviewed.'), asOf, { createMoveInObligations: false }) : state
     }
     case 'rates/planned':
       return applyRateChange(state, action.plan)
     case 'room/created': {
-      const result = createRoom(state, action.draft, DEMO_DATE)
+      const result = createRoom(state, action.draft, action.asOf ?? DEMO_DATE)
       return result.ok ? result.data : state
     }
     case 'room/updated': {
-      const result = updateRoom(state, action.roomId, action.draft, DEMO_DATE)
+      const result = updateRoom(state, action.roomId, action.draft, action.asOf ?? DEMO_DATE)
       return result.ok ? result.data : state
     }
     case 'room/deleted': {
-      const result = deleteRoom(state, action.roomId, DEMO_DATE)
+      const result = deleteRoom(state, action.roomId, action.asOf ?? DEMO_DATE)
       return result.ok ? result.data : state
     }
     case 'room/statusToggled': {
@@ -120,7 +125,12 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
       const result = prepareMoveInPayment(state, action)
       return result.ok ? result.data : state
     }
+    case 'rent/prepaymentRecorded': {
+      const result = prepareRentPrepayment(state, action)
+      return result.ok ? result.data : state
+    }
     case 'moveIn/policyUpdated': {
+      const asOf = action.asOf ?? DEMO_DATE
       const current = activeMoveInPolicy(state)
       const next = {
         ...current,
@@ -135,7 +145,7 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
         ...state,
         moveInPolicy: next,
         auditEvents: [...state.auditEvents, {
-          id: `audit-move-in-policy-${next.version}`, actorId: 'demo-admin', occurredOn: DEMO_DATE,
+          id: `audit-move-in-policy-${next.version}`, actorId: 'demo-admin', occurredOn: asOf,
           action: 'MOVE_IN_POLICY_UPDATED' as const, entityType: 'PROTOTYPE' as const, entityId: 'move-in-policy',
           reason: change,
           beforeSnapshot: JSON.stringify(current), afterSnapshot: JSON.stringify(next),

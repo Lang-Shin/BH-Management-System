@@ -1,0 +1,4 @@
+# Optional for non-loopback development only. Never use in production.
+# BHMS_DEV_TOKEN=replace-with-a-long-random-local-token
+# ENVIRONMENT=development
+# ALLOW_IMPORT_APPLY=false

@@ -194,6 +194,7 @@ export function prepareRoomPayment(data: PrototypeAppState, input: RoomPaymentIn
     startedAt: roomAssignmentStarts[0] ?? input.asOf,
     endedAt: activeRoomAssignments.length > 0 ? null : input.asOf,
     status: activeRoomAssignments.length > 0 ? 'ACTIVE' as const : 'CLOSED' as const,
+    rentSchedule: 'LEGACY_CALENDAR' as const, rentAnchorDate: null, rentAnchorDay: null, cycleOrigin: 'LEGACY' as const,
     createdAt: input.asOf, updatedAt: input.asOf,
   }
   const occupancyCycles = data.occupancyCycles.some(item => item.id === cycle.id) ? data.occupancyCycles : [...data.occupancyCycles, cycle]

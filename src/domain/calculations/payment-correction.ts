@@ -1,5 +1,5 @@
 import type {
-  Charge, ChargeCategory, CorrectionSettlementStatus, MeterReading, Payment, PaymentAllocation,
+  AdvanceApplication, Charge, ChargeCategory, CorrectionSettlementStatus, MeterReading, Payment, PaymentAllocation,
   PaymentCorrection, PrototypeAppState, Receipt,
 } from '@/domain/types/models'
 import { chargeRoom } from './room-finance'
@@ -303,7 +303,7 @@ export function preparePaymentCorrection(data: PrototypeAppState, input: Payment
     beforeSnapshot: JSON.stringify({ paymentId: original.id, amountCents: original.amountCents, categories: originalCategories }),
     afterSnapshot: JSON.stringify({ paymentId: correctedPaymentId, amountCents: amountToRecord, categories: quote.selectedCategories, settlement: correction.settlementStatus }),
   }
-  const next: PrototypeAppState = {
+  let next: PrototypeAppState = {
     ...data,
     payments: [...data.payments.map(payment => payment.id === original.id ? { ...payment, state: 'VOIDED' as const } : payment), correctedPayment],
     paymentAllocations: [...reversedAllocations, ...newAllocations],
@@ -324,6 +324,27 @@ export function preparePaymentCorrection(data: PrototypeAppState, input: Payment
         beforeSnapshot: JSON.stringify({ chargeId: electricityOption?.charge.id, amountCents: electricityOption?.charge.amountCents }),
         afterSnapshot: JSON.stringify({ chargeId: extraCharges[0]!.id, amountCents: extraCharges[0]!.amountCents }),
       }] : [])],
+  }
+
+  const voidedAdvanceApplications = data.advanceApplications.filter(application =>
+    application.sourcePaymentId === original.id && application.state === 'ACTIVE'
+    && !quote.selectedCategories.includes('ADVANCE'))
+  if (voidedAdvanceApplications.length > 0) {
+    const reversed: AdvanceApplication[] = voidedAdvanceApplications.map(application => ({
+      ...application, state: 'REVERSED', reversalAuditEventId: `audit-advance-reversal-${application.id}-${revision}`,
+    }))
+    next = {
+      ...next,
+      advanceApplications: data.advanceApplications.map(application =>
+        reversed.find(replacement => replacement.id === application.id) ?? application),
+      auditEvents: [...next.auditEvents, ...reversed.map(application => ({
+        id: application.reversalAuditEventId!, actorId: 'demo-admin', occurredOn: input.correctedAt,
+        action: 'ADVANCE_APPLICATION_REVERSED' as const, entityType: 'ADVANCE_APPLICATION' as const, entityId: application.id,
+        reason: `Advance application reversed by payment correction: ${correction.reason}`,
+        beforeSnapshot: JSON.stringify({ state: 'ACTIVE', rentObligationId: application.rentObligationId }),
+        afterSnapshot: JSON.stringify({ state: 'REVERSED' }),
+      }))],
+    }
   }
   return { ok: true, data: next, correction, payment: correctedPayment, receipt: correctedReceipt }
 }

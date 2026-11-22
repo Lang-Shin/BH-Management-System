@@ -207,12 +207,14 @@ export function createDemoData(): PrototypeAppState {
         .map(assignment => assignment.startDate).sort()[0] ?? '2026-09-01'
       return {
         id: `cycle-${roomId}`, roomId, startedAt, endedAt: null, status: 'ACTIVE' as const,
-        createdAt: startedAt, updatedAt: startedAt,
+        rentSchedule: 'LEGACY_CALENDAR' as const, rentAnchorDate: null, rentAnchorDay: null,
+        cycleOrigin: 'LEGACY' as const, createdAt: startedAt, updatedAt: startedAt,
       }
     })
   return {
     tenants, rooms, roomAssignments, electricityMeters, meterReadings, electricityBillObligations, electricityRates,
     roomRentRates, waterRates, washingRates, billingPeriods, charges, payments, paymentAllocations, tenantCredits, receipts,
     paymentCorrections, auditEvents, occupancyCycles, moveInObligations: [], moveInPolicy: { ...DEFAULT_MOVE_IN_POLICY }, roomChangeRequests: [], advanceRefunds: [],
+    rentalPeriods: [], rentObligations: [], advanceApplications: [], rentPrepayments: [], financialReviewCases: [],
   }
 }

@@ -7,6 +7,7 @@ export const STORAGE_KEY = 'bhms:prototype:v1'
 // Keep the key so old snapshots trigger explicit recovery rather than vanish.
 
 export const localStorageRepository: PrototypeRepository = {
+  mode: 'local',
   async load() {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY)

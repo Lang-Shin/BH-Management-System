@@ -2,8 +2,15 @@ import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
 
-afterEach(() => { cleanup(); localStorage.clear(); sessionStorage.clear(); vi.restoreAllMocks() })
-Object.defineProperty(window, 'scrollTo', { value: vi.fn(), writable: true })
+afterEach(() => {
+  if (typeof window !== 'undefined') {
+    cleanup()
+    localStorage.clear()
+    sessionStorage.clear()
+  }
+  vi.restoreAllMocks()
+})
+if (typeof window !== 'undefined') Object.defineProperty(window, 'scrollTo', { value: vi.fn(), writable: true })
 
 class ResizeObserverMock {
   observe() {}

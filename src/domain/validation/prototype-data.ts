@@ -1,4 +1,4 @@
-import type { AuthorizedCorrection, Charge, PrototypeAppState } from '@/domain/types/models'
+import type { AuthorizedCorrection, Charge, PrototypeAppState, RentObligation } from '@/domain/types/models'
 import { isIsoDate as date } from './date'
 
 type RecordValue = Record<string, unknown>
@@ -77,7 +77,33 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     && (r.originalElectricityReadingMilliKwh === null || money(r.originalElectricityReadingMilliKwh))
     && (r.correctedElectricityReadingMilliKwh === null || money(r.correctedElectricityReadingMilliKwh)) && id(r.auditEventId))) return false
   if (!rows(value, 'occupancyCycles', r => id(r.roomId) && date(r.startedAt) && (r.endedAt === null || date(r.endedAt))
-    && oneOf(r.status, ['ACTIVE', 'CLOSED']) && date(r.createdAt) && date(r.updatedAt))) return false
+    && oneOf(r.status, ['ACTIVE', 'CLOSED']) && date(r.createdAt) && date(r.updatedAt)
+    && oneOf(r.rentSchedule, ['ANNIVERSARY', 'LEGACY_CALENDAR'])
+    && (r.rentSchedule === 'ANNIVERSARY'
+      ? date(r.rentAnchorDate) && Number.isSafeInteger(r.rentAnchorDay) && (r.rentAnchorDay as number) >= 1 && (r.rentAnchorDay as number) <= 31
+      : r.rentAnchorDate === null && r.rentAnchorDay === null)
+    && oneOf(r.cycleOrigin, ['NEW_MOVE_IN', 'TRANSFER', 'LEGACY', 'SAME_DAY_REPLACEMENT']))) return false
+  if (!rows(value, 'rentalPeriods', r => id(r.occupancyCycleId) && id(r.roomId) && positive(r.sequence)
+    && date(r.startDate) && date(r.endDateExclusive) && r.startDate < r.endDateExclusive && date(r.dueDate)
+    && oneOf(r.status, ['OPEN', 'CLOSED']) && oneOf(r.origin, ['ANNIVERSARY', 'LEGACY_CALENDAR']))) return false
+  if (!rows(value, 'rentObligations', r => id(r.occupancyCycleId) && id(r.rentalPeriodId) && id(r.roomId)
+    && positive(r.amountCents) && id(r.rateId) && date(r.rateEffectiveFrom) && positive(r.rateSnapshotCents)
+    && date(r.issuedOn) && date(r.dueDate) && r.dueDate >= r.issuedOn
+    && oneOf(r.source, ['REGULAR', 'MOVE_IN_ADVANCE', 'PREPAYMENT', 'LEGACY_CALENDAR'])
+    && oneOf(r.state, ['ISSUED', 'VOIDED']) && correction(r.correction))) return false
+  if (!rows(value, 'advanceApplications', r => id(r.occupancyCycleId) && id(r.roomId) && id(r.advanceChargeId)
+    && id(r.sourcePaymentId) && id(r.rentObligationId) && positive(r.amountCents) && date(r.appliedOn)
+    && oneOf(r.state, ['ACTIVE', 'REVERSED']) && (r.reversalAuditEventId === null || id(r.reversalAuditEventId)))) return false
+  if (!rows(value, 'rentPrepayments', r => id(r.paymentId) && id(r.occupancyCycleId) && id(r.roomId)
+    && Array.isArray(r.rentalPeriodIds) && r.rentalPeriodIds.length > 0 && r.rentalPeriodIds.every(id)
+    && positive(r.periodCount) && r.periodCount === r.rentalPeriodIds.length
+    && positive(r.totalCents) && positive(r.rateCents) && date(r.rateLockedOn) && date(r.createdAt)
+    && oneOf(r.reviewState, ['NONE', 'TRANSFER_REVIEW']))) return false
+  if (!rows(value, 'financialReviewCases', r => oneOf(r.type, ['TRANSFER_RENT_DIFFERENCE', 'TRANSFER_PREPAID_RENT', 'LEGACY_ADVANCE_UNALLOCATED', 'ADVANCE_APPLICATION_REVIEW'])
+    && id(r.roomId) && (r.occupancyCycleId === null || id(r.occupancyCycleId))
+    && (r.tenantId === null || id(r.tenantId)) && (r.rentalPeriodId === null || id(r.rentalPeriodId))
+    && oneOf(r.status, ['OPEN', 'RESOLVED', 'DISMISSED']) && text(r.note) && r.note.length <= 500
+    && date(r.createdAt) && (r.resolvedAt === null || date(r.resolvedAt)))) return false
   if (!rows(value, 'moveInObligations', r => id(r.occupancyCycleId) && id(r.roomId)
     && positive(r.agreedMonthlyRentCents) && positive(r.advanceRequiredCents) && positive(r.depositRequiredCents)
     && id(r.advanceChargeId) && id(r.depositChargeId) && Number.isSafeInteger(r.policyVersion) && (r.policyVersion as number) > 0
@@ -106,18 +132,19 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     || !oneOf(value.moveInPolicy.advanceApplication, ['FIRST_MONTH', 'LAST_MONTH', 'MANUAL'])
     || !oneOf(value.moveInPolicy.depositDisposition, ['NON_REFUNDABLE', 'MANUAL_REVIEW'])
     || value.moveInPolicy.depositIncomeRecognition !== 'NOT_RECOGNIZED'
-    || value.moveInPolicy.transferIncrease !== 'PROPOSE_TOP_UP'
-    || value.moveInPolicy.transferDecrease !== 'MANUAL_REVIEW'
+    || value.moveInPolicy.transferIncrease !== 'REVIEW_ONLY'
+    || value.moveInPolicy.transferDecrease !== 'REVIEW_ONLY'
     || value.moveInPolicy.moveOutSettlement !== 'MANUAL_REVIEW'
     || !Number.isSafeInteger(value.moveInPolicy.shortStayAdvanceRefundDays) || (value.moveInPolicy.shortStayAdvanceRefundDays as number) < 0) return false
   if (!rows(value, 'auditEvents', r => id(r.actorId) && date(r.occurredOn) && id(r.entityId) && text(r.reason)
-    && oneOf(r.action, ['DEMO_SEEDED', 'READING_CORRECTED', 'CHARGE_CORRECTED', 'PAYMENT_CORRECTED', 'ALLOCATION_REVERSED', 'ELECTRICITY_PAYMENT_RECORDED', 'ROOM_PAYMENT_RECORDED', 'MOVE_IN_PAYMENT_RECORDED', 'MOVE_IN_POLICY_UPDATED', 'METER_INITIALIZED', 'ROOM_CHANGE_REQUESTED', 'ROOM_CHANGE_CANCELLED', 'ROOM_CHANGE_APPROVED', 'ROOM_CHANGE_REJECTED', 'ROOM_CHANGE_EXPIRED', 'ROOM_CHANGE_RESERVATION_CANCELLED', 'ROOM_CHANGE_RESCHEDULED', 'ADVANCE_REFUNDED'])
-    && oneOf(r.entityType, ['PROTOTYPE', 'METER_READING', 'CHARGE', 'PAYMENT', 'PAYMENT_ALLOCATION', 'ROOM_CHANGE_REQUEST'])
+    && oneOf(r.action, ['DEMO_SEEDED', 'READING_CORRECTED', 'CHARGE_CORRECTED', 'PAYMENT_CORRECTED', 'ALLOCATION_REVERSED', 'ELECTRICITY_PAYMENT_RECORDED', 'ROOM_PAYMENT_RECORDED', 'MOVE_IN_PAYMENT_RECORDED', 'MOVE_IN_POLICY_UPDATED', 'METER_INITIALIZED', 'ROOM_CHANGE_REQUESTED', 'ROOM_CHANGE_CANCELLED', 'ROOM_CHANGE_APPROVED', 'ROOM_CHANGE_REJECTED', 'ROOM_CHANGE_EXPIRED', 'ROOM_CHANGE_RESERVATION_CANCELLED', 'ROOM_CHANGE_RESCHEDULED', 'ADVANCE_REFUNDED', 'ADVANCE_APPLIED', 'ADVANCE_APPLICATION_REVERSED', 'RENT_PREPAYMENT_RECORDED', 'FINANCIAL_REVIEW_OPENED'])
+    && oneOf(r.entityType, ['PROTOTYPE', 'METER_READING', 'CHARGE', 'PAYMENT', 'PAYMENT_ALLOCATION', 'ROOM_CHANGE_REQUEST', 'RENT_OBLIGATION', 'ADVANCE_APPLICATION', 'RENT_PREPAYMENT', 'FINANCIAL_REVIEW_CASE'])
     && nullableText(r.beforeSnapshot) && nullableText(r.afterSnapshot))) return false
 
   // Each collection and its discriminated field shapes have been checked above.
   const data = value as unknown as PrototypeAppState
-  const chargeRoomId = (charge: Charge): string | null => {
+  const chargeRoomId = (charge: Charge | RentObligation): string | null => {
+    if (!('category' in charge)) return charge.roomId
     if (charge.category === 'ADVANCE' || charge.category === 'SECURITY_DEPOSIT') {
       return data.moveInObligations.find(obligation => obligation.id === charge.moveInObligationId)?.roomId ?? null
     }
@@ -133,7 +160,8 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
   if ([data.tenants, data.rooms, data.roomAssignments, data.electricityMeters, data.meterReadings,
     data.electricityBillObligations, data.electricityRates, data.roomRentRates, data.waterRates, data.washingRates,
     data.billingPeriods, data.charges, data.payments, data.paymentAllocations, data.tenantCredits, data.receipts,
-    data.paymentCorrections, data.auditEvents, data.occupancyCycles, data.moveInObligations, data.roomChangeRequests, data.advanceRefunds]
+    data.paymentCorrections, data.auditEvents, data.occupancyCycles, data.moveInObligations, data.roomChangeRequests, data.advanceRefunds,
+    data.rentalPeriods, data.rentObligations, data.advanceApplications, data.rentPrepayments, data.financialReviewCases]
     .some(items => new Set(items.map(item => item.id)).size !== items.length)) return false
   if (new Set(data.electricityRates.map(rate => rate.effectiveFrom)).size !== data.electricityRates.length
     || new Set(data.roomRentRates.map(rate => `${rate.categoryId}:${rate.effectiveFrom}`)).size !== data.roomRentRates.length
@@ -176,6 +204,40 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
   if (new Set(data.moveInObligations.map(obligation => obligation.occupancyCycleId)).size !== data.moveInObligations.length) return false
   if (!data.charges.filter(charge => charge.category === 'ADVANCE' || charge.category === 'SECURITY_DEPOSIT')
     .every(charge => 'moveInObligationId' in charge && data.moveInObligations.some(obligation => obligation.id === charge.moveInObligationId))) return false
+  if (new Set(data.rentalPeriods.map(period => `${period.occupancyCycleId}:${period.sequence}`)).size !== data.rentalPeriods.length) return false
+  if (!data.rentalPeriods.every(period => {
+    const cycle = data.occupancyCycles.find(item => item.id === period.occupancyCycleId)
+    return cycle && cycle.roomId === period.roomId
+      && (period.origin !== 'ANNIVERSARY' || cycle.rentSchedule === 'ANNIVERSARY')
+  })) return false
+  if (new Set(data.rentObligations.map(obligation => obligation.rentalPeriodId)).size !== data.rentObligations.length) return false
+  if (!data.rentObligations.every(obligation => {
+    const period = data.rentalPeriods.find(item => item.id === obligation.rentalPeriodId)
+    const cycle = data.occupancyCycles.find(item => item.id === obligation.occupancyCycleId)
+    return period && cycle && period.occupancyCycleId === cycle.id && period.roomId === obligation.roomId
+      && cycle.roomId === obligation.roomId && obligation.rateSnapshotCents === obligation.amountCents
+      && (obligation.state !== 'VOIDED' || obligation.correction !== null)
+  })) return false
+  if (!data.advanceApplications.every(application => {
+    const advance = data.charges.find(charge => charge.id === application.advanceChargeId)
+    const payment = data.payments.find(item => item.id === application.sourcePaymentId)
+    const rent = data.rentObligations.find(item => item.id === application.rentObligationId)
+    const reversal = application.reversalAuditEventId && audit(application.reversalAuditEventId)
+    return advance?.category === 'ADVANCE' && Boolean(payment) && rent
+      && (application.state === 'REVERSED' || payment!.state === 'RECORDED')
+      && rent.occupancyCycleId === application.occupancyCycleId && rent.roomId === application.roomId
+      && application.amountCents <= rent.amountCents
+      && (application.state !== 'ACTIVE' || application.reversalAuditEventId === null)
+      && (application.state !== 'REVERSED' || (reversal && reversal.action === 'ADVANCE_APPLICATION_REVERSED'
+        && reversal.entityType === 'ADVANCE_APPLICATION' && reversal.entityId === application.id))
+  })) return false
+  if (new Set(data.advanceApplications.map(application => application.occupancyCycleId)).size !== data.advanceApplications.length) return false
+  if (!data.financialReviewCases.every(review => data.rooms.some(room => room.id === review.roomId)
+    && (review.occupancyCycleId === null || data.occupancyCycles.some(cycle => cycle.id === review.occupancyCycleId))
+    && (review.tenantId === null || Boolean(tenant(review.tenantId)))
+    && (review.rentalPeriodId === null || data.rentalPeriods.some(period => period.id === review.rentalPeriodId))
+    && (review.status !== 'OPEN' || review.resolvedAt === null)
+    && (review.status === 'OPEN' || review.resolvedAt !== null))) return false
   if (!data.tenants.every(t => {
     const openAssignments = data.roomAssignments.filter(a => a.tenantId === t.id && a.endDate === null).length
     return openAssignments <= 1 && (t.status !== 'MOVED_OUT' || openAssignments === 0)
@@ -261,13 +323,16 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
   if (!data.paymentAllocations.every(a => {
     const payment = data.payments.find(p => p.id === a.paymentId)
     const charge = data.charges.find(c => c.id === a.chargeId)
+    const rent = data.rentObligations.find(c => c.id === a.chargeId)
+    const obligation = charge ?? rent
     const credit = a.creditId && data.tenantCredits.find(c => c.id === a.creditId)
     const reversal = a.reversalAuditEventId && audit(a.reversalAuditEventId)
-    const ownerMatches = payment && charge && (payment.scope === 'ROOM'
-      ? payment.roomId === chargeRoomId(charge)
-      : payment.tenantId === charge.tenantId)
-    return payment && charge && ownerMatches && a.allocatedOn >= payment.paidOn && a.allocatedOn >= charge.issuedOn
-      && (a.state !== 'ACTIVE' || (payment.state === 'RECORDED' && charge.state === 'ISSUED' && a.reversalAuditEventId === null))
+    const ownerMatches = Boolean(payment && obligation) && (payment!.scope === 'ROOM'
+      ? payment!.roomId === chargeRoomId(obligation!)
+      : charge !== undefined && payment!.tenantId === charge.tenantId)
+    return payment && obligation && ownerMatches && a.allocatedOn >= payment.paidOn
+      && a.allocatedOn >= ('issuedOn' in obligation ? obligation.issuedOn : '')
+      && (a.state !== 'ACTIVE' || (payment.state === 'RECORDED' && obligation.state === 'ISSUED' && a.reversalAuditEventId === null))
       && (a.state !== 'REVERSED' || (reversal && reversal.action === 'ALLOCATION_REVERSED' && reversal.entityType === 'PAYMENT_ALLOCATION' && reversal.entityId === a.id))
       && (a.creditId === null || (credit && credit.sourcePaymentId === a.paymentId && credit.createdOn <= a.allocatedOn))
   })) return false
@@ -276,6 +341,19 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     // Rent is all-or-nothing; a sample or user-entered partial rent allocation is invalid.
     return Number.isSafeInteger(applied) && applied <= c.amountCents
       && (c.category !== 'RENT' || applied === 0 || applied === c.amountCents)
+  })) return false
+  if (!data.rentObligations.every(obligation => {
+    const applied = sum(activeAllocations.filter(a => a.chargeId === obligation.id).map(a => a.amountCents))
+    return Number.isSafeInteger(applied) && applied <= obligation.amountCents && (applied === 0 || applied === obligation.amountCents)
+  })) return false
+  if (!data.rentPrepayments.every(prepayment => {
+    const payment = data.payments.find(item => item.id === prepayment.paymentId)
+    const allocations = activeAllocations.filter(allocation => allocation.paymentId === prepayment.paymentId)
+    return payment?.scope === 'ROOM' && payment.roomId === prepayment.roomId && payment.occupancyCycleId === prepayment.occupancyCycleId
+      && allocations.length === prepayment.periodCount
+      && prepayment.rentalPeriodIds.every(id => data.rentalPeriods.some(period => period.id === id && period.roomId === prepayment.roomId))
+      && new Set(prepayment.rentalPeriodIds).size === prepayment.rentalPeriodIds.length
+      && sum(allocations.map(allocation => allocation.amountCents)) === prepayment.totalCents
   })) return false
   if (!data.tenantCredits.every(c => {
     const payment = data.payments.find(p => p.id === c.sourcePaymentId)
@@ -327,5 +405,9 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     || (a.entityType === 'CHARGE' && data.charges.some(c => c.id === a.entityId))
     || (a.entityType === 'PAYMENT' && data.payments.some(p => p.id === a.entityId))
     || (a.entityType === 'PAYMENT_ALLOCATION' && data.paymentAllocations.some(p => p.id === a.entityId))
-    || (a.entityType === 'ROOM_CHANGE_REQUEST' && data.roomChangeRequests.some(r => r.id === a.entityId)))
+    || (a.entityType === 'ROOM_CHANGE_REQUEST' && data.roomChangeRequests.some(r => r.id === a.entityId))
+    || (a.entityType === 'RENT_OBLIGATION' && data.rentObligations.some(r => r.id === a.entityId))
+    || (a.entityType === 'ADVANCE_APPLICATION' && data.advanceApplications.some(r => r.id === a.entityId))
+    || (a.entityType === 'RENT_PREPAYMENT' && data.rentPrepayments.some(r => r.id === a.entityId))
+    || (a.entityType === 'FINANCIAL_REVIEW_CASE' && data.financialReviewCases.some(r => r.id === a.entityId)))
 }

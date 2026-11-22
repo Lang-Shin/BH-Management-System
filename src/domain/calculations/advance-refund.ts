@@ -50,6 +50,9 @@ export function evaluateShortStayAdvanceRefund(data: PrototypeAppState, tenantId
     if (stayDays === null || stayDays < 0) blockers.push('Choose a valid move-out date.')
     else if (stayDays >= windowDays) blockers.push(`The tenant has completed the ${windowDays}-day minimum stay, so the short-stay advance refund does not apply.`)
     if (chargePaid(data, advance.id, moveOutDate) < obligation.advanceRequiredCents) blockers.push('The advance has not been paid in full.')
+    if (data.advanceApplications.some(application => application.advanceChargeId === advance.id && application.state === 'ACTIVE')) {
+      blockers.push('The advance has already settled the first anniversary rent period. Automatic short-stay refund is unavailable; owner reconciliation is required.')
+    }
     if (data.advanceRefunds.some(refund => refund.advanceChargeId === advance.id)) blockers.push('This advance has already been refunded.')
     const otherOccupants = activeAssignments(data, moveOutDate)
       .filter(item => item.roomId === room.id && item.tenantId !== tenantId)
