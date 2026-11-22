@@ -4,11 +4,11 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useAnimatedDialogClose } from '@/components/ui/use-animated-dialog-close'
 import { usePrototype } from '@/hooks/use-prototype'
+import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { parseMeterReadingMilliKwh } from '@/domain/calculations/electricity-calculation'
 import { latestPaymentReceipt, buildPaymentCorrectionQuote, preparePaymentCorrection, correctionSettlementText } from '@/domain/calculations/payment-correction'
 import { paymentRooms } from '@/domain/calculations/room-finance'
 import type { ChargeCategory, CorrectionSettlementStatus } from '@/domain/types/models'
-import { DEMO_DATE } from '@/data/fixtures/demo'
 import { formatDate, formatMoney } from '@/lib/format'
 import { CATEGORY_LABELS } from '@/lib/labels'
 
@@ -22,6 +22,7 @@ export function EditPaymentDialog({ paymentId, onClose, onReturnFocus, onSaved }
   onSaved: (message: string) => void
 }) {
   const { data, dispatch, persistSnapshot } = usePrototype()
+  const occupancyDate = useOccupancyDate()
   const payment = data.payments.find(item => item.id === paymentId)
   const receipt = payment ? latestPaymentReceipt(data, payment.id) : null
   const originalCategories = payment ? [...new Set(data.paymentAllocations
@@ -71,12 +72,12 @@ export function EditPaymentDialog({ paymentId, onClose, onReturnFocus, onSaved }
   const quote = buildPaymentCorrectionQuote(data, {
     paymentId, selectedCategories: selected,
     correctedElectricityReadingMilliKwh: selectedElectricity ? (readingError ? null : parsedReading) : null,
-    reason, settlementStatus: settlement, correctedAt: DEMO_DATE,
+    reason, settlementStatus: settlement, correctedAt: occupancyDate,
   })
   if ('quoteError' in quote) return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="payment-calculator" onAnimationEnd={onAnimationEnd} onCloseAutoFocus={event => { event.preventDefault(); onReturnFocus() }}>
       <div className="payment-calculator-heading"><DialogTitle>Edit Payment</DialogTitle><DialogDescription className="mt-2">This transaction cannot be edited safely.</DialogDescription></div>
-      <div className="payment-calculator-body"><p role="alert" className="text-sm text-destructive">{quote.quoteError === 'LATER_DEPENDENT_READING' ? 'A later settled electricity transaction depends on this reading. A reviewed historical adjustment is required.' : 'This transaction is no longer editable. Review the latest transaction or correction history.'}</p><Button className="mt-5" variant="outline" onClick={requestClose}>Close</Button></div>
+      <div className="payment-calculator-body"><p role="alert" className="text-sm text-destructive">{quote.quoteError === 'INVALID_DATE' ? 'The correction date cannot be earlier than the original payment date.' : quote.quoteError === 'REFUND_EXISTS' ? 'This payment has an advance refund. Review the refund record instead of editing the original transaction.' : quote.quoteError === 'LATER_DEPENDENT_READING' ? 'A later settled electricity transaction depends on this reading. A reviewed historical adjustment is required.' : 'This transaction is no longer editable. Review the latest transaction or correction history.'}</p><Button className="mt-5" variant="outline" onClick={requestClose}>Close</Button></div>
     </DialogContent>
   </Dialog>
   const difference = quote.differenceCents
@@ -86,7 +87,7 @@ export function EditPaymentDialog({ paymentId, onClose, onReturnFocus, onSaved }
     : difference > 0
       ? settlement === 'ADDITIONAL_RECEIVED' && settlementConfirmed
       : settlement === 'CORRECTED' || (settlement === 'REFUNDED' && settlementConfirmed)
-  const rooms = paymentRooms(data, payment, DEMO_DATE)
+  const rooms = paymentRooms(data, payment, occupancyDate)
   const periods = [...new Set(originalCategories.flatMap(category => data.paymentAllocations
     .filter(allocation => allocation.paymentId === payment.id && allocation.state === 'ACTIVE')
     .flatMap(allocation => {
@@ -113,7 +114,7 @@ export function EditPaymentDialog({ paymentId, onClose, onReturnFocus, onSaved }
     if (!settlementReady || saving) return
     const result = preparePaymentCorrection(data, {
       paymentId, selectedCategories: selected, correctedElectricityReadingMilliKwh: selectedElectricity ? parsedReading : null,
-      reason, settlementStatus: settlement, moneyExchangeConfirmed: settlementConfirmed, correctedAt: DEMO_DATE,
+      reason, settlementStatus: settlement, moneyExchangeConfirmed: settlementConfirmed, correctedAt: occupancyDate,
     })
     if (!result.ok) {
       setSubmitError('The correction could not be saved because the transaction changed or is no longer safe to correct.')
@@ -130,7 +131,7 @@ export function EditPaymentDialog({ paymentId, onClose, onReturnFocus, onSaved }
     dispatch({
       type: 'payment/corrected', paymentId, selectedCategories: selected,
       correctedElectricityReadingMilliKwh: selectedElectricity ? parsedReading : null,
-      reason, settlementStatus: settlement, moneyExchangeConfirmed: settlementConfirmed, correctedAt: DEMO_DATE,
+      reason, settlementStatus: settlement, moneyExchangeConfirmed: settlementConfirmed, correctedAt: occupancyDate,
     })
     setSaved({
       receiptNumber: result.receipt.receiptNumber, amountCents: result.receipt.amountCents,
@@ -156,6 +157,7 @@ export function EditPaymentDialog({ paymentId, onClose, onReturnFocus, onSaved }
             <div><dt>Billing period</dt><dd>{periods.join(' / ')}</dd></div>
             <div><dt>Original recorded amount</dt><dd>{formatMoney(payment.amountCents)}</dd></div>
           </dl>
+          {originalCategories.includes('ADVANCE') && <p role="note" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">For a genuine short-stay move-out refund, use the tenant’s <strong>Move Out / Archive</strong> workflow. Editing this payment is only for correcting what was originally recorded.</p>}
           <fieldset className="room-payment-options">
             <legend className="sr-only">Categories in this transaction</legend>
             {quote.categories.map(option => {

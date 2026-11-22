@@ -8,6 +8,7 @@ import { formatMoney } from '@/lib/format'
 
 function CategoryValue({ status, remainingCents }: { status: MoveInSettlementStatus; remainingCents: number }) {
   if (status === 'PAID') return <span className="move-in-status" data-status="PAID">PAID</span>
+  if (status === 'REFUNDED') return <span className="move-in-status" data-status="REFUNDED">REFUNDED</span>
   return <span className="move-in-category-amount">{formatMoney(remainingCents)}</span>
 }
 

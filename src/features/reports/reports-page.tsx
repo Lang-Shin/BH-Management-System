@@ -35,6 +35,7 @@ const changeLabels: Record<AuditEvent['action'], string> = {
   ROOM_CHANGE_EXPIRED: 'Room change request expired',
   ROOM_CHANGE_RESERVATION_CANCELLED: 'Approved room reservation cancelled',
   ROOM_CHANGE_RESCHEDULED: 'Approved room reservation rescheduled',
+  ADVANCE_REFUNDED: 'Short-stay advance refunded',
 }
 
 export default function Reports() {

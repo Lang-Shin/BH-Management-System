@@ -1746,3 +1746,5 @@ li:nth-child(n + 5) > .notification-item { animation-delay: 120ms; }
 .dark .billing-filter-status-icon[data-status="reserved"] { color: #e8bd6a; }
 .billing-filter-status-icon[data-status="available"] { border-color: color-mix(in srgb, #527346 28%, var(--border)); background: color-mix(in srgb, #527346 10%, var(--card)); color: #527346; }
 .billing-filter-status-icon[data-status="repair"] { border-color: color-mix(in srgb, var(--red) 28%, var(--border)); background: color-mix(in srgb, var(--red) 13%, var(--card)); color: var(--red-text); }
+.move-in-status[data-status="REFUNDED"] { border-color: color-mix(in srgb, #527346 26%, var(--border)); background: color-mix(in srgb, #527346 8%, var(--card)); color: #527346; }
+.dark .move-in-status[data-status="REFUNDED"] { color: #a7cf9b; }

@@ -9,10 +9,10 @@ import { useTablePagination } from '@/components/shared/use-table-pagination'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { TransactionDialog } from '@/components/shared/transaction-dialog'
 import { usePrototype } from '@/hooks/use-prototype'
+import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { currentCorrectionStatuses, isLegacyCorrectionStatus, isLegacyPendingCorrection, latestPaymentReceipt, legacyCorrectionStatuses } from '@/domain/calculations/payment-correction'
 import { paymentRooms } from '@/domain/calculations/room-finance'
 import type { CorrectionSettlementStatus, Payment, PaymentCorrection } from '@/domain/types/models'
-import { DEMO_DATE } from '@/data/fixtures/demo'
 import { formatDate, formatMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { EditPaymentDialog } from '@/features/billing/edit-payment-dialog'
@@ -48,6 +48,7 @@ function transactionReceipt(data: ReturnType<typeof usePrototype>['data'], payme
 
 export function PaymentsTransactionWorkspace() {
   const { data } = usePrototype()
+  const occupancyDate = useOccupancyDate()
   const [tab, setTab] = useState<WorkspaceTab>('transactions')
   const [search, setSearch] = useState('')
   const [month, setMonth] = useState('ALL')
@@ -63,14 +64,14 @@ export function PaymentsTransactionWorkspace() {
   const period = data.billingPeriods.find(item => item.id === month)
   const normalizedSearch = search.trim().toLowerCase()
   const inSelectedMonth = (date: string) => month === 'ALL' || Boolean(period && date >= period.startDate && date <= period.endDate)
-  const recordedPayments = data.payments.filter(payment => payment.state === 'RECORDED' && payment.paidOn <= DEMO_DATE)
+  const recordedPayments = data.payments.filter(payment => payment.state === 'RECORDED' && payment.paidOn <= occupancyDate)
   const legacyPendingCorrections = data.paymentCorrections.filter(correction => isLegacyPendingCorrection(correction.settlementStatus))
   const availableCorrectionStatuses = correctionStatusOrder.filter(status => !isLegacyCorrectionStatus(status)
     || data.paymentCorrections.some(correction => correction.settlementStatus === status))
 
   const transactionRows = recordedPayments.filter(payment => {
     const receiptNumber = transactionReceipt(data, payment)
-    const roomLabel = paymentRooms(data, payment, DEMO_DATE).label
+    const roomLabel = paymentRooms(data, payment, occupancyDate).label
     const effectiveStatus = payment.correction ? 'CORRECTED' : 'RECORDED'
     const matchesSearch = !normalizedSearch || `${receiptNumber} ${roomLabel}`.toLowerCase().includes(normalizedSearch)
     const matchesMonth = month === 'ALL' || inSelectedMonth(payment.paidOn)
@@ -84,7 +85,7 @@ export function PaymentsTransactionWorkspace() {
     const correctedPayment = data.payments.find(payment => payment.id === correction.correctedPaymentId)
     const correctedReceipt = data.receipts.find(receipt => receipt.id === correction.correctedReceiptId)
     const originalReceipt = data.receipts.find(receipt => receipt.id === correction.originalReceiptId)
-    const roomLabel = correctedPayment ? paymentRooms(data, correctedPayment, DEMO_DATE).label : 'Room needs review'
+    const roomLabel = correctedPayment ? paymentRooms(data, correctedPayment, occupancyDate).label : 'Room needs review'
     const matchesSearch = !normalizedSearch || `${correctedReceipt?.receiptNumber ?? ''} ${originalReceipt?.receiptNumber ?? ''} ${roomLabel}`.toLowerCase().includes(normalizedSearch)
     const matchesMonth = inSelectedMonth(correction.correctedAt)
     const matchesStatus = status === 'ALL' || status === correction.settlementStatus
@@ -124,18 +125,18 @@ export function PaymentsTransactionWorkspace() {
 
   const transactionColumns: Column<Payment>[] = [
     { key: 'receipt', label: 'Receipt Number', render: payment => <span className="break-all font-semibold text-[var(--tint)]">{transactionReceipt(data, payment)}</span> },
-    { key: 'room', label: 'Room', render: payment => <span className="font-semibold">{paymentRooms(data, payment, DEMO_DATE).label}</span> },
+    { key: 'room', label: 'Room', render: payment => <span className="font-semibold">{paymentRooms(data, payment, occupancyDate).label}</span> },
     { key: 'date', label: 'Date Paid', render: payment => formatDate(payment.paidOn) },
     { key: 'amount', label: 'Amount Paid', align: 'right', render: payment => <span className="font-semibold tabular-nums">{formatMoney(payment.amountCents)}</span> },
     { key: 'status', label: 'Status', render: payment => <StatusBadge status={payment.correction ? 'Corrected' : 'Recorded'} /> },
-    { key: 'transaction', label: 'Transaction', render: payment => <Button variant="outline" size="sm" aria-label={`See Transaction for ${paymentRooms(data, payment, DEMO_DATE).label}, ${formatDate(payment.paidOn)}, ${formatMoney(payment.amountCents)}`} onClick={event => openTransaction(payment, event.currentTarget)}>See Transaction</Button> },
+    { key: 'transaction', label: 'Transaction', render: payment => <Button variant="outline" size="sm" aria-label={`See Transaction for ${paymentRooms(data, payment, occupancyDate).label}, ${formatDate(payment.paidOn)}, ${formatMoney(payment.amountCents)}`} onClick={event => openTransaction(payment, event.currentTarget)}>See Transaction</Button> },
   ]
 
   const correctionColumns: Column<PaymentCorrection>[] = [
     { key: 'receipt', label: 'Receipt Number', render: correction => <span className="break-all font-semibold text-[var(--tint)]">{data.receipts.find(receipt => receipt.id === correction.correctedReceiptId)?.receiptNumber ?? 'No receipt'}</span> },
     { key: 'room', label: 'Room', render: correction => {
       const payment = data.payments.find(item => item.id === correction.correctedPaymentId)
-      return <span className="font-semibold">{payment ? paymentRooms(data, payment, DEMO_DATE).label : 'Room needs review'}</span>
+      return <span className="font-semibold">{payment ? paymentRooms(data, payment, occupancyDate).label : 'Room needs review'}</span>
     } },
     { key: 'date', label: 'Correction Date', render: correction => formatDate(correction.correctedAt) },
     { key: 'original', label: 'Original Amount', align: 'right', render: correction => <span className="tabular-nums">{formatMoney(correction.originalAmountCents)}</span> },
@@ -184,7 +185,7 @@ export function PaymentsTransactionWorkspace() {
 
     {activeRows.length > 0 && <TablePagination page={pagination.page} totalRecords={pagination.totalRecords} pageSize={pagination.pageSize} onPageChange={pagination.setPage} onPageSizeChange={pagination.setPageSize} recordLabel={tab === 'transactions' ? 'transactions' : 'corrections'} />}
 
-    {selectedPayment && <TransactionDialog key={`${selectedPayment.id}:${selectedDialog?.title}`} data={data} payment={selectedPayment} asOf={DEMO_DATE} title={selectedDialog?.title} description={selectedDialog?.description} onClose={() => setSelectedDialog(null)} onReturnFocus={() => transactionTrigger.current?.focus()} onEditPayment={selectedDialog?.title === 'Transaction Details' ? payment => { setSelectedDialog(null); setEditingPaymentId(payment.id) } : undefined} />}
+    {selectedPayment && <TransactionDialog key={`${selectedPayment.id}:${selectedDialog?.title}`} data={data} payment={selectedPayment} asOf={occupancyDate} title={selectedDialog?.title} description={selectedDialog?.description} onClose={() => setSelectedDialog(null)} onReturnFocus={() => transactionTrigger.current?.focus()} onEditPayment={selectedDialog?.title === 'Transaction Details' ? payment => { setSelectedDialog(null); setEditingPaymentId(payment.id) } : undefined} />}
     {editingPaymentId && <EditPaymentDialog paymentId={editingPaymentId} onClose={() => setEditingPaymentId(null)} onReturnFocus={() => { if (transactionTrigger.current?.isConnected) transactionTrigger.current.focus(); else transactionsTab.current?.focus() }} onSaved={setNotice} />}
   </section>
 }

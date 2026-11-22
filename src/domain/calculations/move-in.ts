@@ -5,7 +5,7 @@ import { activeAssignments, chargePaid } from './summary'
 import { activeMoveInPolicy } from './move-in-policy'
 import { nextReceiptNumbers } from './receipt-numbering'
 
-export type MoveInSettlementStatus = 'NOT PAID' | 'PARTLY PAID' | 'PAID'
+export type MoveInSettlementStatus = 'NOT PAID' | 'PARTLY PAID' | 'PAID' | 'REFUNDED'
 export type MoveInCategory = 'ADVANCE' | 'SECURITY_DEPOSIT'
 
 export function activeCycleForRoom(data: PrototypeAppState, roomId: string): OccupancyCycle | null {
@@ -144,6 +144,8 @@ export interface MoveInObligationView {
   room: Room
   payerName: string
   advancePaidCents: number
+  advanceRefundedCents: number
+  advanceNetCents: number
   depositPaidCents: number
   advanceRemainingCents: number
   depositRemainingCents: number
@@ -169,19 +171,20 @@ export function selectMoveInObligations(data: PrototypeAppState, asOf: string, r
     const depositCharge = data.charges.find(item => item.id === obligation.depositChargeId)
     if (!cycle || !room || !advanceCharge || !depositCharge) continue
     const advancePaidCents = chargePaid(data, advanceCharge.id, asOf)
+    const advanceRefundedCents = data.advanceRefunds.filter(refund => refund.advanceChargeId === advanceCharge.id).reduce((sum, refund) => sum + refund.amountCents, 0)
     const depositPaidCents = chargePaid(data, depositCharge.id, asOf)
-    const advanceRemainingCents = Math.max(0, obligation.advanceRequiredCents - advancePaidCents)
+    const advanceRemainingCents = advanceRefundedCents >= obligation.advanceRequiredCents ? 0 : Math.max(0, obligation.advanceRequiredCents - advancePaidCents)
     const depositRemainingCents = Math.max(0, obligation.depositRequiredCents - depositPaidCents)
     const totalRequiredCents = obligation.advanceRequiredCents + obligation.depositRequiredCents
     const totalPaidCents = advancePaidCents + depositPaidCents
     const totalRemainingCents = advanceRemainingCents + depositRemainingCents
     result.push({
       obligation, cycle, room, payerName: data.tenants.find(tenant => tenant.id === advanceCharge.tenantId)?.name ?? 'Unknown tenant',
-      advancePaidCents, depositPaidCents, advanceRemainingCents, depositRemainingCents,
+      advancePaidCents, advanceRefundedCents, advanceNetCents: Math.max(0, advancePaidCents - advanceRefundedCents), depositPaidCents, advanceRemainingCents, depositRemainingCents,
       totalRequiredCents, totalPaidCents, totalRemainingCents,
-      advanceStatus: settlementStatus(obligation.advanceRequiredCents, advancePaidCents),
+      advanceStatus: advanceRefundedCents >= obligation.advanceRequiredCents ? 'REFUNDED' : settlementStatus(obligation.advanceRequiredCents, advancePaidCents),
       depositStatus: settlementStatus(obligation.depositRequiredCents, depositPaidCents),
-      status: settlementStatus(totalRequiredCents, totalPaidCents),
+      status: totalRemainingCents === 0 ? 'PAID' : settlementStatus(totalRequiredCents, totalPaidCents),
     })
   }
   return result.sort((a, b) => a.room.name.localeCompare(b.room.name, 'en', { numeric: true }) || a.obligation.id.localeCompare(b.obligation.id))
@@ -191,7 +194,7 @@ export function moveInSummary(data: PrototypeAppState, asOf: string) {
   const views = selectMoveInObligations(data, asOf)
   return {
     obligations: views.length,
-    advanceCollectedCents: views.reduce((sum, view) => sum + view.advancePaidCents, 0),
+    advanceCollectedCents: views.reduce((sum, view) => sum + view.advanceNetCents, 0),
     depositCollectedCents: views.reduce((sum, view) => sum + view.depositPaidCents, 0),
     outstandingCents: views.reduce((sum, view) => sum + view.totalRemainingCents, 0),
     paidObligations: views.filter(view => view.status === 'PAID').length,

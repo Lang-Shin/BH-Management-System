@@ -227,7 +227,7 @@ export function moveOutBlockers(data: PrototypeAppState, tenantId: string, asOf:
     blockers.push('This tenant has electricity awaiting a meter reading. Complete that Billing workflow before moving out.')
   }
   const assignment = activeAssignments(data, asOf).find(item => item.tenantId === tenantId)
-  if (assignment && assignment.startDate >= asOf) blockers.push('The move-out date must be after the tenant’s move-in date.')
+  if (assignment && assignment.startDate > asOf) blockers.push('The move-out date cannot be before the tenant’s move-in date.')
   return blockers
 }
 
@@ -241,7 +241,7 @@ export function moveOutTenant(data: PrototypeAppState, tenantId: string, asOf: s
       ...data,
       tenants: data.tenants.map(tenant => tenant.id === tenantId ? { ...tenant, status: 'MOVED_OUT' as const } : tenant),
       roomAssignments: assignment
-        ? data.roomAssignments.map(item => item.id === assignment.id ? { ...item, endDate: previousDate(asOf) } : item)
+        ? data.roomAssignments.map(item => item.id === assignment.id ? { ...item, endDate: assignment.startDate === asOf ? asOf : previousDate(asOf) } : item)
         : data.roomAssignments,
     },
   }

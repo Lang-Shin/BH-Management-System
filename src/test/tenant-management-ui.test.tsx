@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { AppRouter } from '@/app/router/app-router'
 import { PrototypeProvider } from '@/app/providers/prototype-provider'
 import { localStorageRepository, STORAGE_KEY } from '@/data/repositories/local-storage-repository'
-import { createDemoData, DEMO_DATE } from '@/data/fixtures/demo'
+import { createDemoData, DEMO_DATE, OCCUPANCY_DATE } from '@/data/fixtures/demo'
 
 function renderApp(route = '/') {
   return render(<PrototypeProvider repository={localStorageRepository}><MemoryRouter initialEntries={[route]}><AppRouter /></MemoryRouter></PrototypeProvider>)
@@ -131,15 +131,15 @@ describe('tenant management UI', { timeout: 15000 }, () => {
     await user.click(within(screen.getByRole('dialog', { name: 'Alex Rivera' })).getByRole('button', { name: 'Edit Tenant' }))
     const dialog = screen.getByRole('dialog', { name: 'Edit Tenant Alex Rivera' })
     await user.selectOptions(within(dialog).getByLabelText('Room assignment'), 'room-7')
-    expect(within(dialog).getByLabelText('Move-in date')).toHaveValue(DEMO_DATE)
+    expect(within(dialog).getByLabelText('Move-in date')).toHaveValue(OCCUPANCY_DATE)
     await user.click(within(dialog).getByRole('button', { name: 'Save Tenant' }))
     await screen.findByRole('dialog', { name: 'Alex Rivera' })
     await waitFor(() => {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null').data
       const oldAssignment = saved.roomAssignments.find((assignment: { id: string }) => assignment.id === 'assignment-1')
       const newAssignment = saved.roomAssignments.find((assignment: { tenantId: string; roomId: string }) => assignment.tenantId === 'tenant-1' && assignment.roomId === 'room-7')
-      expect(oldAssignment.endDate).toBe('2026-11-12')
-      expect(newAssignment).toMatchObject({ startDate: DEMO_DATE, endDate: null })
+      expect(oldAssignment.endDate).toBe('2026-11-21')
+      expect(newAssignment).toMatchObject({ startDate: OCCUPANCY_DATE, endDate: null })
       expect(saved.charges).toEqual(original.charges)
       expect(saved.payments).toEqual(original.payments)
       expect(saved.receipts).toEqual(original.receipts)
@@ -199,7 +199,7 @@ describe('tenant management UI', { timeout: 15000 }, () => {
     await waitFor(() => {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null').data
       expect(saved.tenants.find((tenant: { id: string }) => tenant.id === 'tenant-1').status).toBe('MOVED_OUT')
-      expect(saved.roomAssignments.find((assignment: { id: string }) => assignment.id === 'assignment-1').endDate).toBe('2026-11-12')
+      expect(saved.roomAssignments.find((assignment: { id: string }) => assignment.id === 'assignment-1').endDate).toBe(new Date(Date.parse(`${OCCUPANCY_DATE}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10))
       expect(saved.payments).toEqual(original.payments)
       expect(saved.receipts).toEqual(original.receipts)
     })

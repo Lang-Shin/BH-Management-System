@@ -12,7 +12,8 @@ import { prepareMoveInPayment, reconcileOccupancy, repairNewCycleMoveInObligatio
 import { activeMoveInPolicy } from '@/domain/calculations/move-in-policy'
 import { approveRoomChangeRequest, cancelApprovedRoomChangeRequest, cancelRoomChangeRequest, expirePendingRoomChangeRequests, rejectRoomChangeRequest, rescheduleApprovedRoomChangeRequest, submitRoomChangeRequest } from '@/domain/calculations/room-change-requests'
 import { createRoom, deleteRoom, updateRoom } from '@/domain/calculations/room-management'
-import { createTenant, deleteTenant, moveOutTenant, updateTenant } from '@/domain/calculations/tenant-management'
+import { createTenant, deleteTenant, moveOutBlockers, moveOutTenant, updateTenant } from '@/domain/calculations/tenant-management'
+import { prepareShortStayAdvanceRefund } from '@/domain/calculations/advance-refund'
 
 export function prototypeReducer(state: PrototypeData, action: StateAction): PrototypeData {
   switch (action.type) {
@@ -41,8 +42,19 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
       return reconcileOccupancy(state, withRequests, DEMO_DATE, { createMoveInObligations: false })
     }
     case 'tenant/movedOut': {
-      const result = moveOutTenant(state, action.tenantId, DEMO_DATE)
-      return result.ok ? reconcileOccupancy(state, expirePendingRoomChangeRequests(result.data, action.tenantId, DEMO_DATE, 'Tenant moved out before the request was reviewed.'), DEMO_DATE, { createMoveInObligations: false }) : state
+      const asOf = action.asOf ?? DEMO_DATE
+      if (moveOutBlockers(state, action.tenantId, asOf).length > 0) return state
+      let working = state
+      if (action.refundAdvance) {
+        const refund = prepareShortStayAdvanceRefund(state, {
+          tenantId: action.tenantId, moveOutDate: asOf,
+          refundedOn: action.refundAdvance.refundedOn, reason: action.refundAdvance.reason,
+        })
+        if (!refund.ok) return state
+        working = refund.data
+      }
+      const result = moveOutTenant(working, action.tenantId, asOf)
+      return result.ok ? reconcileOccupancy(working, expirePendingRoomChangeRequests(result.data, action.tenantId, asOf, 'Tenant moved out before the request was reviewed.'), asOf, { createMoveInObligations: false }) : state
     }
     case 'tenant/deleted': {
       const result = deleteTenant(state, action.tenantId, DEMO_DATE)

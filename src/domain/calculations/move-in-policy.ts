@@ -9,6 +9,7 @@ export const DEFAULT_MOVE_IN_POLICY: MoveInPolicy = {
   transferIncrease: 'PROPOSE_TOP_UP',
   transferDecrease: 'MANUAL_REVIEW',
   moveOutSettlement: 'MANUAL_REVIEW',
+  shortStayAdvanceRefundDays: 7,
 }
 
 export function activeMoveInPolicy(data: PrototypeAppState): MoveInPolicy {

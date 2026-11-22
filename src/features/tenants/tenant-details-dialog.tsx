@@ -6,12 +6,13 @@ import { useAnimatedDialogClose } from '@/components/ui/use-animated-dialog-clos
 import { AnimatedNumber } from '@/components/shared/animated-number'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { usePrototype } from '@/hooks/use-prototype'
+import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { activeAssignments, tenantAccount } from '@/domain/calculations/summary'
+import { evaluateShortStayAdvanceRefund } from '@/domain/calculations/advance-refund'
 import {
   moveOutBlockers, tenantDeletionBlockers, validateTenantDraft,
   type TenantDraft, type TenantDraftErrors,
 } from '@/domain/calculations/tenant-management'
-import { DEMO_DATE } from '@/data/fixtures/demo'
 import { formatDate, formatMoney } from '@/lib/format'
 import { ACCOUNT_STATUS_LABELS, TENANT_STATUS_LABELS } from '@/lib/labels'
 import type { Tenant } from '@/domain/types/models'
@@ -24,29 +25,34 @@ export function TenantDetailsDialog({ tenant, onClose, onReturnFocus, onNotice }
   onNotice: (message: string) => void
 }) {
   const { data, dispatch } = usePrototype()
+  const occupancyDate = useOccupancyDate()
   const [notes, setNotes] = useState(tenant.notes)
   const [mode, setMode] = useState<'details' | 'edit' | 'moveOut' | 'delete'>('details')
   const [values, setValues] = useState<TenantDraft>({
     name: tenant.name, email: tenant.email, phone: tenant.phone, address: tenant.address,
-    roomId: null, moveInDate: DEMO_DATE, notes: tenant.notes,
+    roomId: null, moveInDate: occupancyDate, notes: tenant.notes,
   })
   const [errors, setErrors] = useState<TenantDraftErrors>({})
   const submitting = useRef(false)
   const [movingOut, setMovingOut] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [refundAdvance, setRefundAdvance] = useState(false)
+  const [refundReason, setRefundReason] = useState('')
+  const [refundError, setRefundError] = useState('')
   const { open, requestClose, onOpenChange, onAnimationEnd } = useAnimatedDialogClose(onClose)
-  const account = tenantAccount(data, tenant.id, DEMO_DATE)
+  const account = tenantAccount(data, tenant.id, occupancyDate)
   const assignments = data.roomAssignments.filter(assignment => assignment.tenantId === tenant.id)
-  const activeAssignment = activeAssignments(data, DEMO_DATE).find(assignment => assignment.tenantId === tenant.id)
+  const activeAssignment = activeAssignments(data, occupancyDate).find(assignment => assignment.tenantId === tenant.id)
   const activeRoom = activeAssignment ? data.rooms.find(room => room.id === activeAssignment.roomId) : undefined
-  const deletionBlockers = tenantDeletionBlockers(data, tenant.id, DEMO_DATE)
-  const moveOutIssues = moveOutBlockers(data, tenant.id, DEMO_DATE)
+  const deletionBlockers = tenantDeletionBlockers(data, tenant.id, occupancyDate)
+  const moveOutIssues = moveOutBlockers(data, tenant.id, occupancyDate)
+  const refundEligibility = evaluateShortStayAdvanceRefund(data, tenant.id, occupancyDate)
 
   function startEdit() {
     submitting.current = false
     setValues({
       name: tenant.name, email: tenant.email, phone: tenant.phone, address: tenant.address,
-      roomId: activeAssignment?.roomId ?? null, moveInDate: activeAssignment?.startDate ?? DEMO_DATE, notes: tenant.notes,
+      roomId: activeAssignment?.roomId ?? null, moveInDate: activeAssignment?.startDate ?? occupancyDate, notes: tenant.notes,
     })
     setErrors({})
     setMode('edit')
@@ -56,7 +62,7 @@ export function TenantDetailsDialog({ tenant, onClose, onReturnFocus, onNotice }
     setValues(current => {
       const next = { ...current, [field]: value }
       if (field === 'roomId' && activeAssignment && value && value !== activeAssignment.roomId && next.moveInDate <= activeAssignment.startDate) {
-        next.moveInDate = DEMO_DATE
+        next.moveInDate = occupancyDate
       }
       return next
     })
@@ -66,7 +72,7 @@ export function TenantDetailsDialog({ tenant, onClose, onReturnFocus, onNotice }
   function saveTenant(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (submitting.current) return
-    const nextErrors = validateTenantDraft(data, values, { tenantId: tenant.id, asOf: DEMO_DATE })
+    const nextErrors = validateTenantDraft(data, values, { tenantId: tenant.id, asOf: occupancyDate })
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
     submitting.current = true
@@ -77,16 +83,29 @@ export function TenantDetailsDialog({ tenant, onClose, onReturnFocus, onNotice }
   }
 
   function confirmMoveOut() {
-    if (movingOut || submitting.current || moveOutBlockers(data, tenant.id, DEMO_DATE).length > 0) return
+    if (movingOut || submitting.current || moveOutBlockers(data, tenant.id, occupancyDate).length > 0) return
+    if (refundAdvance && !refundEligibility.eligible) {
+      setRefundError(refundEligibility.blockers[0] ?? 'The short-stay advance refund is not available.')
+      return
+    }
+    if (refundAdvance && refundReason.trim().length < 3) {
+      setRefundError('Enter a reason for the advance refund.')
+      return
+    }
     submitting.current = true
     setMovingOut(true)
-    dispatch({ type: 'tenant/movedOut', tenantId: tenant.id })
-    onNotice(`Tenant ${tenant.name} was moved out. Historical bills and receipts remain available.`)
+    dispatch({
+      type: 'tenant/movedOut', tenantId: tenant.id, asOf: occupancyDate,
+      refundAdvance: refundAdvance ? { refundedOn: occupancyDate, reason: refundReason.trim() } : undefined,
+    })
+    onNotice(refundAdvance
+      ? `Tenant ${tenant.name} was moved out. The unused advance was recorded as refunded; the non-refundable deposit remains held.`
+      : `Tenant ${tenant.name} was moved out. Historical bills and receipts remain available.`)
     requestClose()
   }
 
   function confirmDelete() {
-    if (deleting || submitting.current || tenantDeletionBlockers(data, tenant.id, DEMO_DATE).length > 0) return
+    if (deleting || submitting.current || tenantDeletionBlockers(data, tenant.id, occupancyDate).length > 0) return
     submitting.current = true
     setDeleting(true)
     dispatch({ type: 'tenant/deleted', tenantId: tenant.id })
@@ -137,6 +156,25 @@ export function TenantDetailsDialog({ tenant, onClose, onReturnFocus, onNotice }
             ? <div role="alert" className="mt-4"><p className="font-semibold text-destructive">Move-out cannot be completed yet.</p><ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-muted-foreground">{moveOutIssues.map(issue => <li key={issue}>{issue}</li>)}</ul></div>
             : <p className="mt-4 text-sm text-muted-foreground">The tenant will leave current room occupancy and no longer appear as an active tenant. Historical bills, receipts, and reports remain identifiable.</p>}
         </section>
+        {refundEligibility.stayDays !== null && refundEligibility.stayDays < refundEligibility.windowDays && (
+          <section className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-950" aria-labelledby="short-stay-refund-title">
+            <h2 id="short-stay-refund-title" className="font-semibold">Short-stay advance refund</h2>
+            {refundEligibility.eligible
+              ? <>
+                  <p className="mt-1 text-sm">The tenant stayed {refundEligibility.stayDays} of {refundEligibility.windowDays} days. The unused advance of {formatMoney(refundEligibility.refundableCents)} may be refunded; the security deposit remains non-refundable.</p>
+                  <label className="mt-3 flex items-start gap-2 text-sm font-medium">
+                    <input type="checkbox" checked={refundAdvance} onChange={event => { setRefundAdvance(event.target.checked); setRefundError('') }} className="mt-0.5 size-4 shrink-0" />
+                    <span>Record that the unused advance was returned to the tenant.</span>
+                  </label>
+                  {refundAdvance && <label className="mt-3 grid gap-2 text-sm font-semibold">Refund reason
+                    <textarea rows={2} maxLength={500} value={refundReason} onChange={event => { setRefundReason(event.target.value); setRefundError('') }} className="w-full rounded-xl border border-amber-300 bg-card p-3 text-foreground" placeholder="For example: tenant moved out within the seven-day window." />
+                  </label>}
+                </>
+              : <><p className="mt-1 text-sm">This short stay requires manual review before refunding the advance:</p><ul className="mt-2 list-disc space-y-1 pl-5 text-sm">{refundEligibility.blockers.map(blocker => <li key={blocker}>{blocker}</li>)}</ul></>}
+            {refundError && <p role="alert" className="mt-2 text-sm font-semibold text-destructive">{refundError}</p>}
+            <p className="mt-2 text-xs">No refund is posted automatically. Confirm only after the money has actually been returned. The original payment and receipt remain in history.</p>
+          </section>
+        )}
         <DialogFooter><Button type="button" variant="outline" onClick={() => setMode('details')}>Cancel</Button><Button type="button" onClick={confirmMoveOut} disabled={moveOutIssues.length > 0 || movingOut} aria-busy={movingOut}>{movingOut ? 'Moving out…' : 'Move Out / Archive'}</Button></DialogFooter>
       </>}
 

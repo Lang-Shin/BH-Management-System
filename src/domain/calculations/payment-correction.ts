@@ -3,6 +3,7 @@ import type {
   PaymentCorrection, PrototypeAppState, Receipt,
 } from '@/domain/types/models'
 import { chargeRoom } from './room-finance'
+import { isIsoDate } from '@/domain/validation/date'
 import { formatMoney } from '@/lib/format'
 
 const categoryOrder: ChargeCategory[] = ['RENT', 'ELECTRICITY', 'WATER', 'WASHING_MACHINE', 'ADVANCE', 'SECURITY_DEPOSIT']
@@ -88,7 +89,7 @@ export type PaymentCorrectionError =
   | 'PAYMENT_NOT_FOUND' | 'RECEIPT_NOT_FOUND' | 'NO_CATEGORIES' | 'INVALID_CATEGORY'
   | 'REASON_REQUIRED' | 'REASON_TOO_LONG' | 'DUPLICATE_CORRECTION' | 'UNALLOCATED_PAYMENT'
   | 'LATER_DEPENDENT_READING' | 'INVALID_READING' | 'INVALID_SETTLEMENT'
-  | 'INVALID_TOTAL' | 'DUPLICATE_PAYMENT'
+  | 'INVALID_TOTAL' | 'DUPLICATE_PAYMENT' | 'INVALID_DATE' | 'REFUND_EXISTS'
 
 export type PaymentCorrectionResult =
   | { ok: true; data: PrototypeAppState; correction: PaymentCorrection; payment: Payment; receipt: Receipt }
@@ -118,6 +119,8 @@ export function buildPaymentCorrectionQuote(data: PrototypeAppState, input: Paym
   if (!payment) return { quoteError: 'PAYMENT_NOT_FOUND' }
   const receipt = latestPaymentReceipt(data, payment.id)
   if (!receipt || receipt.state !== 'ISSUED') return { quoteError: 'RECEIPT_NOT_FOUND' }
+  if (!isIsoDate(input.correctedAt) || input.correctedAt < payment.paidOn) return { quoteError: 'INVALID_DATE' }
+  if (data.advanceRefunds.some(refund => refund.sourcePaymentId === payment.id)) return { quoteError: 'REFUND_EXISTS' }
   if (data.paymentCorrections.some(correction => correction.originalPaymentId === payment.id)) return { quoteError: 'DUPLICATE_CORRECTION' }
   const allocations = activeAllocations(data, payment.id)
   if (allocations.reduce((sum, allocation) => sum + allocation.amountCents, 0) !== payment.amountCents) return { quoteError: 'UNALLOCATED_PAYMENT' }

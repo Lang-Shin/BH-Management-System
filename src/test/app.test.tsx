@@ -156,7 +156,7 @@ describe('admin workspace integration', () => {
     await user.click(screen.getByRole('button', { name: 'Restore sample records' }))
     await user.click(within(screen.getByRole('dialog', { name: 'Restore the sample records?' })).getByRole('button', { name: 'Yes, restore records' }))
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 15)
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 16)
   })
 
   it('shows a log-out button that opens a centered clarification dialog without signing out', async () => {
@@ -655,8 +655,9 @@ describe('admin workspace integration', () => {
       expect(saved?.data.receipts.some((receipt: { receiptNumber: string }) => receipt.receiptNumber === 'DEMO-RCT-007-R2')).toBe(true)
       expect(selectSummary(saved.data, DEMO_DATE, DEMO_PERIOD).received).toBe(selectSummary(createDemoData(), DEMO_DATE, DEMO_PERIOD).received - 6_500)
     })
-    const expectedReceived = selectSummary(createDemoData(), DEMO_DATE, DEMO_PERIOD).received - 6_500
-    const expectedApplied = selectSummary(createDemoData(), DEMO_DATE, DEMO_PERIOD).applied - 6_500
+    const savedAfterCorrection = JSON.parse(localStorage.getItem(STORAGE_KEY)!).data
+    const expectedReceived = selectSummary(savedAfterCorrection, DEMO_DATE, DEMO_PERIOD).received
+    const expectedApplied = selectSummary(savedAfterCorrection, DEMO_DATE, DEMO_PERIOD).applied
     const nav = screen.getByRole('navigation', { name: 'Main navigation' })
     await user.click(within(nav).getByRole('link', { name: 'Dashboard' }))
     const overview = await screen.findByRole('region', { name: 'Money overview' })

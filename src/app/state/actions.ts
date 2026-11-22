@@ -9,7 +9,7 @@ export type PrototypeAction =
   | { type: 'tenant/noteUpdated'; tenantId: string; notes: string }
   | { type: 'tenant/created'; draft: TenantDraft; asOf?: string }
   | { type: 'tenant/updated'; tenantId: string; draft: TenantDraft }
-  | { type: 'tenant/movedOut'; tenantId: string }
+  | { type: 'tenant/movedOut'; tenantId: string; asOf?: string; refundAdvance?: { refundedOn: string; reason: string } }
   | { type: 'tenant/deleted'; tenantId: string }
   | { type: 'rates/planned'; plan: RatePlan }
   | { type: 'room/created'; draft: RoomDraft }

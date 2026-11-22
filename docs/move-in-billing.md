@@ -38,3 +38,9 @@ The localStorage key stays `bhms:prototype:v1`. Version 13 reads valid version 7
 ## Verification
 
 Domain tests cover obligation creation, non-refundable snapshots, roommate sharing, partial and full payments, overpayment rejection, payer validation, cycle closure, repeat occupancy, move-out preservation without refunds or income, transfer proposals without duplicate deposits, policy versioning, and v9/v10 migration. UI tests cover shared room obligations, full-category collection, payer/method-free room payments, both tenants seeing the same paid state and receipts, historical transfer access, monthly category status, corrections, persistence, and versioned policy changes.
+
+## Short-stay advance refunds
+
+A tenant who moves out before completing seven calendar days may receive the unused advance back. The security deposit remains non-refundable. The refund is never automatic: the landlord must use the explicit move-out workflow and confirm that the money was actually returned.
+
+Eligibility requires a fully paid advance, no outstanding tenant bills or electricity awaiting a reading, and no remaining occupant in the same shared room. A roommate leaving a still-occupied shared room requires manual review. Refunds are recorded separately from the original payment and receipt, preserve the original allocations, retain the deposit, and are limited to one refund per occupancy-cycle advance. Schema v16 stores these refunds and the seven-day policy window.

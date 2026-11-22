@@ -179,6 +179,21 @@ export interface MoveInObligation {
   status: 'OPEN'
 }
 
+export interface AdvanceRefund {
+  id: string
+  occupancyCycleId: string
+  roomId: string
+  tenantId: string
+  advanceChargeId: string
+  sourcePaymentId: string
+  amountCents: number
+  refundedOn: string
+  reason: string
+  policyVersion: number
+  refundWindowDays: number
+  auditEventId: string
+}
+
 export type DepositDisposition = 'NON_REFUNDABLE' | 'MANUAL_REVIEW'
 /** Non-refundable terms do not authorize automatic income recognition in this prototype. */
 export type DepositIncomeRecognition = 'NOT_RECOGNIZED'
@@ -191,6 +206,7 @@ export interface MoveInPolicy {
   transferIncrease: 'PROPOSE_TOP_UP'
   transferDecrease: 'MANUAL_REVIEW'
   moveOutSettlement: 'MANUAL_REVIEW'
+  shortStayAdvanceRefundDays: number
 }
 
 export type RoomChangeRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'EXPIRED'
@@ -302,7 +318,7 @@ export interface AuditEvent {
   id: string
   actorId: string
   occurredOn: string
-  action: 'DEMO_SEEDED' | 'READING_CORRECTED' | 'CHARGE_CORRECTED' | 'PAYMENT_CORRECTED' | 'ALLOCATION_REVERSED' | 'ELECTRICITY_PAYMENT_RECORDED' | 'ROOM_PAYMENT_RECORDED' | 'MOVE_IN_PAYMENT_RECORDED' | 'MOVE_IN_POLICY_UPDATED' | 'METER_INITIALIZED' | 'ROOM_CHANGE_REQUESTED' | 'ROOM_CHANGE_CANCELLED' | 'ROOM_CHANGE_APPROVED' | 'ROOM_CHANGE_REJECTED' | 'ROOM_CHANGE_EXPIRED' | 'ROOM_CHANGE_RESERVATION_CANCELLED' | 'ROOM_CHANGE_RESCHEDULED'
+  action: 'DEMO_SEEDED' | 'READING_CORRECTED' | 'CHARGE_CORRECTED' | 'PAYMENT_CORRECTED' | 'ALLOCATION_REVERSED' | 'ELECTRICITY_PAYMENT_RECORDED' | 'ROOM_PAYMENT_RECORDED' | 'MOVE_IN_PAYMENT_RECORDED' | 'MOVE_IN_POLICY_UPDATED' | 'METER_INITIALIZED' | 'ROOM_CHANGE_REQUESTED' | 'ROOM_CHANGE_CANCELLED' | 'ROOM_CHANGE_APPROVED' | 'ROOM_CHANGE_REJECTED' | 'ROOM_CHANGE_EXPIRED' | 'ROOM_CHANGE_RESERVATION_CANCELLED' | 'ROOM_CHANGE_RESCHEDULED' | 'ADVANCE_REFUNDED'
   entityType: 'PROTOTYPE' | 'METER_READING' | 'CHARGE' | 'PAYMENT' | 'PAYMENT_ALLOCATION' | 'ROOM_CHANGE_REQUEST'
   entityId: string
   reason: string
@@ -334,6 +350,7 @@ export interface PrototypeAppState {
   moveInObligations: MoveInObligation[]
   moveInPolicy: MoveInPolicy
   roomChangeRequests: RoomChangeRequest[]
+  advanceRefunds: AdvanceRefund[]
 }
 
 /** Existing prototype reducer/repository payload name; identical to the app state. */

@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest'
 import { AppRouter } from '@/app/router/app-router'
 import { PrototypeProvider } from '@/app/providers/prototype-provider'
 import { localStorageRepository, STORAGE_KEY } from '@/data/repositories/local-storage-repository'
+import { OCCUPANCY_DATE } from '@/data/fixtures/demo'
+import { formatDate } from '@/lib/format'
 
 function renderApp(route = '/payments') {
   return render(<PrototypeProvider repository={localStorageRepository}><MemoryRouter initialEntries={[route]}><AppRouter /></MemoryRouter></PrototypeProvider>)
@@ -61,7 +63,7 @@ describe('tenant receipt corrections', () => {
     expect(within(revised).queryByText('Water')).not.toBeInTheDocument()
     expect(within(revised).getByText('Washing machine')).toBeInTheDocument()
     expect(within(revised).queryByText('Electricity')).not.toBeInTheDocument()
-    expect(within(revised).getByText('Corrected Nov 13, 2026.')).toBeInTheDocument()
+    expect(within(revised).getByText(`Corrected ${formatDate(OCCUPANCY_DATE)}.`)).toBeInTheDocument()
     expect(within(revised).getByText(/Recorded amount corrected; no refund was required/)).toBeInTheDocument()
     expect(screen.getAllByRole('article', { name: 'Receipt DEMO-RCT-006-R2' })).toHaveLength(1)
 

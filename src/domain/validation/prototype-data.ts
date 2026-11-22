@@ -96,6 +96,11 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
       : r.status === 'APPROVED'
         ? r.decidedAt !== null && r.approvedStartDate !== null && r.resultingAssignmentId !== null
         : r.decidedAt !== null && r.decidedBy !== null && r.decisionReason !== null && r.resultingAssignmentId === null))) return false
+  if (!rows(value, 'advanceRefunds', r => id(r.occupancyCycleId) && id(r.roomId) && id(r.tenantId)
+    && id(r.advanceChargeId) && id(r.sourcePaymentId) && positive(r.amountCents) && date(r.refundedOn)
+    && text(r.reason) && r.reason.length >= 3 && r.reason.length <= 500
+    && Number.isSafeInteger(r.policyVersion) && (r.policyVersion as number) > 0
+    && Number.isSafeInteger(r.refundWindowDays) && (r.refundWindowDays as number) >= 0 && id(r.auditEventId))) return false
   if (!isRecord(value.moveInPolicy)
     || !Number.isSafeInteger(value.moveInPolicy.version) || (value.moveInPolicy.version as number) < 1
     || !oneOf(value.moveInPolicy.advanceApplication, ['FIRST_MONTH', 'LAST_MONTH', 'MANUAL'])
@@ -103,9 +108,10 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     || value.moveInPolicy.depositIncomeRecognition !== 'NOT_RECOGNIZED'
     || value.moveInPolicy.transferIncrease !== 'PROPOSE_TOP_UP'
     || value.moveInPolicy.transferDecrease !== 'MANUAL_REVIEW'
-    || value.moveInPolicy.moveOutSettlement !== 'MANUAL_REVIEW') return false
+    || value.moveInPolicy.moveOutSettlement !== 'MANUAL_REVIEW'
+    || !Number.isSafeInteger(value.moveInPolicy.shortStayAdvanceRefundDays) || (value.moveInPolicy.shortStayAdvanceRefundDays as number) < 0) return false
   if (!rows(value, 'auditEvents', r => id(r.actorId) && date(r.occurredOn) && id(r.entityId) && text(r.reason)
-    && oneOf(r.action, ['DEMO_SEEDED', 'READING_CORRECTED', 'CHARGE_CORRECTED', 'PAYMENT_CORRECTED', 'ALLOCATION_REVERSED', 'ELECTRICITY_PAYMENT_RECORDED', 'ROOM_PAYMENT_RECORDED', 'MOVE_IN_PAYMENT_RECORDED', 'MOVE_IN_POLICY_UPDATED', 'METER_INITIALIZED', 'ROOM_CHANGE_REQUESTED', 'ROOM_CHANGE_CANCELLED', 'ROOM_CHANGE_APPROVED', 'ROOM_CHANGE_REJECTED', 'ROOM_CHANGE_EXPIRED', 'ROOM_CHANGE_RESERVATION_CANCELLED', 'ROOM_CHANGE_RESCHEDULED'])
+    && oneOf(r.action, ['DEMO_SEEDED', 'READING_CORRECTED', 'CHARGE_CORRECTED', 'PAYMENT_CORRECTED', 'ALLOCATION_REVERSED', 'ELECTRICITY_PAYMENT_RECORDED', 'ROOM_PAYMENT_RECORDED', 'MOVE_IN_PAYMENT_RECORDED', 'MOVE_IN_POLICY_UPDATED', 'METER_INITIALIZED', 'ROOM_CHANGE_REQUESTED', 'ROOM_CHANGE_CANCELLED', 'ROOM_CHANGE_APPROVED', 'ROOM_CHANGE_REJECTED', 'ROOM_CHANGE_EXPIRED', 'ROOM_CHANGE_RESERVATION_CANCELLED', 'ROOM_CHANGE_RESCHEDULED', 'ADVANCE_REFUNDED'])
     && oneOf(r.entityType, ['PROTOTYPE', 'METER_READING', 'CHARGE', 'PAYMENT', 'PAYMENT_ALLOCATION', 'ROOM_CHANGE_REQUEST'])
     && nullableText(r.beforeSnapshot) && nullableText(r.afterSnapshot))) return false
 
@@ -127,7 +133,7 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
   if ([data.tenants, data.rooms, data.roomAssignments, data.electricityMeters, data.meterReadings,
     data.electricityBillObligations, data.electricityRates, data.roomRentRates, data.waterRates, data.washingRates,
     data.billingPeriods, data.charges, data.payments, data.paymentAllocations, data.tenantCredits, data.receipts,
-    data.paymentCorrections, data.auditEvents, data.occupancyCycles, data.moveInObligations, data.roomChangeRequests]
+    data.paymentCorrections, data.auditEvents, data.occupancyCycles, data.moveInObligations, data.roomChangeRequests, data.advanceRefunds]
     .some(items => new Set(items.map(item => item.id)).size !== items.length)) return false
   if (new Set(data.electricityRates.map(rate => rate.effectiveFrom)).size !== data.electricityRates.length
     || new Set(data.roomRentRates.map(rate => `${rate.categoryId}:${rate.effectiveFrom}`)).size !== data.roomRentRates.length

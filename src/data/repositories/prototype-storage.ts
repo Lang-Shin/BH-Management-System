@@ -3,7 +3,7 @@ import { initialRoomRentRates, initialWashingRates, initialWaterRates } from '@/
 import { DEFAULT_MOVE_IN_POLICY } from '@/domain/calculations/move-in-policy'
 import { isPrototypeData, isRecord } from '@/domain/validation/prototype-data'
 
-export const STORAGE_SCHEMA_VERSION = 15
+export const STORAGE_SCHEMA_VERSION = 16
 
 type ParseResult =
   | { ok: true; data: PrototypeAppState }
@@ -37,6 +37,14 @@ function withPaymentScope(value: unknown): unknown {
       : payment)
     : value.payments
   return { ...value, payments }
+}
+
+function withAdvanceRefundState(value: unknown): unknown {
+  if (!isRecord(value)) return value
+  const policy = isRecord(value.moveInPolicy)
+    ? { ...value.moveInPolicy, shortStayAdvanceRefundDays: Number.isSafeInteger(value.moveInPolicy.shortStayAdvanceRefundDays) ? value.moveInPolicy.shortStayAdvanceRefundDays : 7 }
+    : value.moveInPolicy
+  return { ...value, advanceRefunds: Array.isArray(value.advanceRefunds) ? value.advanceRefunds : [], moveInPolicy: policy }
 }
 
 function withRoomChangeRequests(value: unknown): unknown {
@@ -111,26 +119,30 @@ export function parsePrototypeSnapshot(raw: string): ParseResult {
     return { ok: false, reason: 'MALFORMED_JSON' }
   }
   if (!isRecord(parsed)) return { ok: false, reason: 'INVALID_DATA' }
-  // Version 14 adds tenant room-change requests. Older versions receive an empty request queue.
+  // Version 16 adds explicit short-stay advance refunds.
+  if (parsed.version === 15) {
+    const migrated = withAdvanceRefundState(parsed.data)
+    return isPrototypeData(migrated) ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }
+  }
   if (parsed.version === 14 || parsed.version === 13 || parsed.version === 12) {
-    const migrated = withRoomChangeRequests(parsed.data)
+    const migrated = withAdvanceRefundState(withRoomChangeRequests(parsed.data))
     return isPrototypeData(migrated) ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }
   }
   if (parsed.version === 11) {
-    const migrated = withRoomChangeRequests(withPaymentScope(parsed.data))
+    const migrated = withAdvanceRefundState(withRoomChangeRequests(withPaymentScope(parsed.data)))
     return isPrototypeData(migrated) ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }
   }
   if (parsed.version === 10) {
-    const migrated = withMoveInState(parsed.data, 10)
-    return migrated ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }
+    const migrated = withAdvanceRefundState(withMoveInState(parsed.data, 10))
+    return migrated && isPrototypeData(migrated) ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }
   }
   if (parsed.version === 9 || parsed.version === 8) {
-    const migrated = withMoveInState(parsed.data, parsed.version)
-    return migrated ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }
+    const migrated = withAdvanceRefundState(withMoveInState(parsed.data, parsed.version))
+    return migrated && isPrototypeData(migrated) ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }
   }
   if (parsed.version === 7) {
-    const migrated = withMoveInState(migrateVersion7(parsed.data), 7)
-    return migrated ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }
+    const migrated = withAdvanceRefundState(withMoveInState(migrateVersion7(parsed.data), 7))
+    return migrated && isPrototypeData(migrated) ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }
   }
   if (parsed.version !== STORAGE_SCHEMA_VERSION) return { ok: false, reason: 'UNSUPPORTED_SCHEMA' }
   if (!isPrototypeData(parsed.data)) return { ok: false, reason: 'INVALID_DATA' }
