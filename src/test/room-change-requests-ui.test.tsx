@@ -36,6 +36,26 @@ describe('tenant room change request UI', () => {
     expect(saved.receipts).toEqual(base.receipts)
   })
 
+  it('keeps validation errors visible and cancels without saving', async () => {
+    const user = userEvent.setup()
+    renderApp('/tenant/room')
+    await screen.findByRole('heading', { level: 1, name: 'My Room' })
+    await user.click(await screen.findByRole('button', { name: 'Request a room change' }))
+    const dialog = screen.getByRole('dialog', { name: 'Request a room change' })
+    expect(dialog).toHaveClass('room-change-dialog')
+    expect(dialog.querySelector('[data-slot="dialog-footer"]')).toHaveClass('room-change-dialog-footer')
+
+    await user.click(within(dialog).getByRole('button', { name: 'Submit request' }))
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Choose the room you want to move to.')
+    await user.selectOptions(within(dialog).getByLabelText('Room you want'), 'room-13')
+    await user.click(within(dialog).getByRole('button', { name: 'Submit request' }))
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Explain briefly why you want to move.')
+
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Request a room change' })).not.toBeInTheDocument())
+    expect(stored().roomChangeRequests).toHaveLength(0)
+  })
+
   it('cancels a pending request without assignment changes', async () => {
     const user = userEvent.setup()
     const first = submitRoomChangeRequest(createDemoData(), { tenantId: 'tenant-1', requestedRoomId: 'room-13', requestedStartDate: DEMO_DATE, reason: 'Need more space' }, DEMO_DATE)

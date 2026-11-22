@@ -55,7 +55,7 @@ export function RoomChangeRequestDialog({ tenantId, room, onClose, onSaved }: {
   }
 
   return <Dialog open onOpenChange={next => { if (!next) onClose() }}>
-    <DialogContent className="max-h-[88dvh] overflow-y-auto">
+    <DialogContent className="room-change-dialog">
       <form onSubmit={submit} noValidate className="grid gap-5">
         <DialogHeader><DialogTitle>Request a room change</DialogTitle><DialogDescription>Your request does not reserve a room or change your current tenancy. The landlord must approve it first.</DialogDescription></DialogHeader>
         <div className="room-change-current"><DoorOpen aria-hidden="true" /><div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Current room</p><p className="mt-1 font-semibold">Room {room.name} · {formatMoney(assignment?.agreedRentCents ?? 0)}/month</p></div></div>
@@ -81,7 +81,7 @@ export function RoomChangeRequestDialog({ tenantId, room, onClose, onSaved }: {
         </div>
         {warnings && <div className="room-change-warnings" role="note"><p className="font-semibold">Before you submit</p><dl><div><dt>Target rent</dt><dd>{formatMoney(warnings.targetRentCents)}/month</dd></div><div><dt>Rent difference</dt><dd>{warnings.rentDifferenceCents === 0 ? 'No change' : `${warnings.rentDifferenceCents > 0 ? '+' : '−'}${formatMoney(Math.abs(warnings.rentDifferenceCents))}`}</dd></div>{warnings.outstandingCents > 0 && <div><dt>Outstanding balance</dt><dd>{formatMoney(warnings.outstandingCents)}</dd></div>}{warnings.creditCents > 0 && <div><dt>Held advance</dt><dd>{formatMoney(warnings.creditCents)}</dd></div>}</dl><ul>{warnings.notes.map(note => <li key={note}>{note}</li>)}</ul></div>}
         {errors.general && <p role="alert" className="text-sm text-destructive">{errors.general}</p>}
-        <DialogFooter><Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button type="submit" disabled={saving} aria-busy={saving}>{saving ? 'Submitting…' : <><ArrowRight aria-hidden="true" />Submit request</>}</Button></DialogFooter>
+        <DialogFooter className="room-change-dialog-footer"><Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button type="submit" disabled={saving} aria-busy={saving}>{saving ? 'Submitting…' : <><ArrowRight aria-hidden="true" />Submit request</>}</Button></DialogFooter>
       </form>
     </DialogContent>
   </Dialog>

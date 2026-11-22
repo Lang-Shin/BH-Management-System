@@ -25,11 +25,6 @@ function ReceiptCard({ view, historical = false }: { view: TenantReceiptView; hi
   const ambiguousRoom = rooms.label === 'Multiple rooms / contexts' || rooms.label === 'Room needs review'
   const revised = receipt.revision > 1
   const corrected = view.correction?.correctedReceiptId === receipt.id ? view.correction : null
-  const payerLabel = payment.scope === 'ROOM'
-    ? 'Room-level payment · no tenant payer recorded'
-    : view.viewerIsPayer && view.tenant
-      ? null
-      : 'Shared room payment'
 
   return <article aria-label={`Receipt ${receipt.receiptNumber}`}>
     <Card className={historical ? 'h-full border-dashed' : 'h-full'}>
@@ -55,10 +50,8 @@ function ReceiptCard({ view, historical = false }: { view: TenantReceiptView; hi
             <div className="transaction-amount-section"><dt className="text-muted-foreground">Amount paid</dt><dd className="transaction-dialog-amount">{formatMoney(receipt.amountCents)}</dd></div>
           </dl>
         </section>
-        {payerLabel ? <p className="mt-4 text-sm text-muted-foreground">{payerLabel}</p>
-          : <p className="mt-4 text-sm"><span className="text-muted-foreground">Paid by:</span> <strong className="font-semibold">{view.tenant!.name}</strong></p>}
-        {ambiguousRoom && <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{rooms.note}</p>}
-        <p className="mt-2 text-xs text-muted-foreground">
+        {ambiguousRoom && <p className="mt-4 text-xs leading-relaxed text-muted-foreground">{rooms.note}</p>}
+        <p className="mt-3 text-xs text-muted-foreground">
           Revision {receipt.revision}
           {view.supersedesReceipt ? ` · Supersedes ${view.supersedesReceipt.receiptNumber} (revision ${view.supersedesReceipt.revision})` : ''}
         </p>

@@ -1677,3 +1677,60 @@ li:nth-child(n + 5) > .notification-item { animation-delay: 120ms; }
 .room-change-billing-review { margin-bottom: 24px; padding: 14px 16px; border: 1px solid color-mix(in srgb, #9a6400 24%, var(--border)); border-radius: 14px; background: color-mix(in srgb, #9a6400 5%, var(--card)); font-size: 13px; line-height: 1.55; }
 .room-change-billing-review > p { margin-top: 4px; color: var(--muted-foreground); }
 .room-change-billing-review ul { display: grid; gap: 4px; margin-top: 8px; padding-left: 18px; }
+
+/* Room change dialog: constrain the scroll container and every form row to the viewport. */
+.room-change-dialog[data-slot="dialog-content"] {
+  box-sizing: border-box;
+  width: calc(100vw - 2rem);
+  max-width: min(36rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 1rem);
+  padding: clamp(1rem, 4vw, 1.5rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.room-change-dialog form,
+.room-change-dialog form > *,
+.room-change-dialog [data-slot="dialog-header"],
+.room-change-dialog .room-change-current,
+.room-change-dialog .room-change-current > div,
+.room-change-dialog .room-change-warnings {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+.room-change-dialog form {
+  display: grid;
+  width: 100%;
+  gap: clamp(1rem, 3vw, 1.25rem);
+}
+.room-change-dialog [data-slot="dialog-header"] { padding-right: 2.75rem; text-align: left; }
+.room-change-dialog .room-change-current p,
+.room-change-dialog .room-change-warnings dd,
+.room-change-dialog .room-change-warnings li,
+.room-change-dialog [data-slot="dialog-description"] { overflow-wrap: anywhere; }
+.room-change-dialog select,
+.room-change-dialog input,
+.room-change-dialog textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.room-change-dialog [data-slot="dialog-footer"] {
+  flex-direction: column-reverse;
+  align-items: stretch;
+  gap: 10px;
+  padding-top: 4px;
+}
+.room-change-dialog [data-slot="dialog-footer"] > button {
+  flex: none;
+  width: 100%;
+}
+@media (min-width: 30rem) {
+  .room-change-dialog [data-slot="dialog-footer"] { flex-direction: row; justify-content: flex-end; }
+  .room-change-dialog [data-slot="dialog-footer"] > button { width: auto; min-width: 8rem; }
+}
+@media (max-height: 34rem) {
+  .room-change-dialog[data-slot="dialog-content"] { max-height: calc(100dvh - 0.5rem); padding-block: 1rem; }
+}

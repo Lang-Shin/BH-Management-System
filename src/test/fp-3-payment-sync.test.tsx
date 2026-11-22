@@ -59,7 +59,7 @@ describe('recorded payment synchronization', () => {
     await user.selectOptions(screen.getByLabelText('Demo tenant'), 'tenant-8')
     const sharedReceipt = await screen.findByRole('article', { name: 'Receipt DEMO-RCT-015' })
     expect(sharedReceipt).toHaveTextContent('Room 4')
-    expect(sharedReceipt).toHaveTextContent(/Room-level payment .* no tenant payer recorded/)
+    expect(sharedReceipt).not.toHaveTextContent(/Paid by|payer|Shared room payment/)
   }, 20000)
 
   it('does not report payment success when persistence fails', async () => {
