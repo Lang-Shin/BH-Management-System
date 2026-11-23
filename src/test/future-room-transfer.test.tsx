@@ -12,6 +12,7 @@ import { localStorageRepository, STORAGE_KEY } from '@/data/repositories/local-s
 import { approveRoomChangeRequest, cancelApprovedRoomChangeRequest, eligibleRoomChangeTargets, rescheduleApprovedRoomChangeRequest, submitRoomChangeRequest } from '@/domain/calculations/room-change-requests'
 import { futureRoomReservations, roomCapacityConflict } from '@/domain/calculations/room-capacity'
 import { createTenant, validateTenantDraft, type TenantDraft } from '@/domain/calculations/tenant-management'
+import { prepareMoveInPayment } from '@/domain/calculations/move-in'
 import { roomOccupancy, roomOccupants } from '@/domain/calculations/summary'
 
 const BEFORE_EFFECTIVE = '2026-11-22'
@@ -34,6 +35,12 @@ function createScenario() {
     type: 'tenant/created',
     draft: { name: 'Charise', email: 'charise@example.com', phone: '+63 900 555 0402', address: 'Test', roomId: 'room-13', moveInDate: '2026-11-01', notes: '' },
   })
+  const moveIn = data.moveInObligations.find(item => item.roomId === 'room-13')
+  if (moveIn) {
+    const paid = prepareMoveInPayment(data, { obligationId: moveIn.id, categories: ['ADVANCE', 'SECURITY_DEPOSIT'], paidOn: '2026-11-01' })
+    if (!paid.ok) throw new Error(paid.reason)
+    data = paid.data
+  }
   const room06 = data.rooms.find(room => room.name === '06')!
   const room02 = data.rooms.find(room => room.name === '02')!
   const charles = roomOccupants(data, room06.id, BEFORE_EFFECTIVE).find(tenant => tenant.name === 'Charles')!

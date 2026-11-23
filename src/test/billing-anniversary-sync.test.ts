@@ -23,10 +23,10 @@ function createTenant(data: PrototypeAppState, overrides: Partial<TenantDraft> =
   return { data: next, tenant }
 }
 
-function payMoveIn(data: PrototypeAppState, roomId: string, categories: ('ADVANCE' | 'SECURITY_DEPOSIT')[]) {
+function payMoveIn(data: PrototypeAppState, roomId: string, categories: ('ADVANCE' | 'SECURITY_DEPOSIT')[], paidOn = DEMO_DATE) {
   const views = selectMoveInObligations(data, DEMO_DATE, roomId)
   const view = views.find(item => item.cycle.status === 'ACTIVE') ?? views[0]!
-  const paid = prepareMoveInPayment(data, { obligationId: view.obligation.id, categories, paidOn: DEMO_DATE })
+  const paid = prepareMoveInPayment(data, { obligationId: view.obligation.id, categories, paidOn })
   if (!paid.ok) throw new Error(paid.reason)
   return paid.data
 }
@@ -146,12 +146,12 @@ describe('Bills anniversary rent synchronization', () => {
     const first = createTenant(createDemoData(), {
       name: 'First Bills Cycle', email: 'first-bills-cycle@example.com', moveInDate: '2026-11-01',
     })
-    let data = payMoveIn(first.data, 'room-14', ['ADVANCE'])
+    let data = payMoveIn(first.data, 'room-14', ['ADVANCE'], '2026-11-01')
     data = prototypeReducer(data, { type: 'tenant/movedOut', tenantId: first.tenant.id, asOf: '2026-11-03' })
     const second = createTenant(data, {
       name: 'Second Bills Cycle', email: 'second-bills-cycle@example.com', moveInDate: '2026-11-04',
     })
-    data = payMoveIn(second.data, 'room-14', ['ADVANCE'])
+    data = payMoveIn(second.data, 'room-14', ['ADVANCE'], '2026-11-04')
     const november = data.billingPeriods.find(period => period.id === DEMO_PERIOD)!
     const rent = selectBillingRent(data, 'room-14', november, DEMO_DATE)
     expect(rent.source).toBe('ANNIVERSARY')

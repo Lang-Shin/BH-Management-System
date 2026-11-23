@@ -133,6 +133,8 @@ export interface ElectricityBillObligation {
 
 interface ChargeRecord {
   id: string
+  /** Persisted historical room context for utilities; prevents transfers from reassigning old bills. */
+  roomId?: string
   tenantId: string
   billingPeriodId: string
   description: string

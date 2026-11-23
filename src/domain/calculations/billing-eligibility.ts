@@ -47,7 +47,7 @@ export function proposedRoomCharges(data: PrototypeAppState, room: Room, period:
   if (assignments.length === 0) return []
   const existing = issuedCharges(data, asOf, period.id).filter(charge => chargeRoom(data, charge).roomId === room.id)
   const { issuedOn, dueDate } = chargeDates(period, asOf)
-  const base = { billingPeriodId: period.id, issuedOn, dueDate, state: 'ISSUED' as const, correction: null }
+  const base = { roomId: room.id, billingPeriodId: period.id, issuedOn, dueDate, state: 'ISSUED' as const, correction: null }
   const proposed: Charge[] = []
   const roomPayer = assignments[0]!
 

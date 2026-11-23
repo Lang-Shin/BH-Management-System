@@ -1,7 +1,8 @@
 import type { PrototypeAppState, RoomAssignment, Tenant } from '@/domain/types/models'
 import { isIsoDate } from '@/domain/validation/date'
 import { roomMonthlyRentCents } from './billing-rates'
-import { activeAssignments, tenantAccount, unresolvedElectricity } from './summary'
+import { activeAssignments, tenantAccount } from './summary'
+import { occupancyFinancialMessage, roomFinancialEligibility } from './occupancy-financial-eligibility'
 import { roomCapacityConflict } from './room-capacity'
 import { randomSuffix } from './random-id'
 
@@ -90,6 +91,8 @@ export function validateTenantDraft(data: PrototypeAppState, draft: TenantDraft,
       }
     }
     if (currentAssignment && draft.roomId && draft.roomId !== currentAssignment.roomId) {
+      const sourceEligibility = roomFinancialEligibility(data, currentAssignment.roomId, options.asOf)
+      if (!sourceEligibility.eligible && !errors.general) errors.general = occupancyFinancialMessage(sourceEligibility, 'Transfer') ?? undefined
       if (draft.moveInDate <= currentAssignment.startDate) {
         errors.moveInDate = 'The transfer date must be after the current room assignment started.'
       }
@@ -221,12 +224,13 @@ export function moveOutBlockers(data: PrototypeAppState, tenantId: string, asOf:
   }
   const account = tenantAccount(data, tenantId, asOf)
   const blockers: string[] = []
-  if (account.balance > 0) blockers.push('This tenant still has an outstanding balance. Settle it through the existing Billing or Payments workflow before moving out.')
-  if (account.credit > 0) blockers.push('This tenant still has an advance credit. Resolve or apply it through the existing workflow before moving out.')
-  if (unresolvedElectricity(data, asOf).some(obligation => obligation.tenantId === tenantId)) {
-    blockers.push('This tenant has electricity awaiting a meter reading. Complete that Billing workflow before moving out.')
-  }
   const assignment = activeAssignments(data, asOf).find(item => item.tenantId === tenantId)
+  if (assignment) {
+    const eligibility = roomFinancialEligibility(data, assignment.roomId, asOf)
+    const financialMessage = occupancyFinancialMessage(eligibility, 'Move-out')
+    if (financialMessage) blockers.push(financialMessage)
+  }
+  if (account.credit > 0) blockers.push('This tenant still has an advance credit. Resolve or apply it through the existing workflow before moving out.')
   if (assignment && assignment.startDate > asOf) blockers.push('The move-out date cannot be before the tenant’s move-in date.')
   return blockers
 }

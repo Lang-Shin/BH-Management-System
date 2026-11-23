@@ -76,7 +76,7 @@ export function TenantDetailsDialog({ tenant, onClose, onReturnFocus, onNotice }
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
     submitting.current = true
-    dispatch({ type: 'tenant/updated', tenantId: tenant.id, draft: values })
+    dispatch({ type: 'tenant/updated', tenantId: tenant.id, asOf: occupancyDate, draft: values })
     onNotice(`Tenant ${values.name.trim()} was updated.`)
     setNotes(values.notes.trim().slice(0, 500))
     setMode('details')

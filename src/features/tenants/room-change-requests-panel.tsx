@@ -12,6 +12,7 @@ import {
   approveRoomChangeRequest, cancelApprovedRoomChangeRequest, pendingRoomChangeRequests, rejectRoomChangeRequest,
   rescheduleApprovedRoomChangeRequest, roomChangeFinancialWarnings,
 } from '@/domain/calculations/room-change-requests'
+import { occupancyFinancialMessage, roomFinancialEligibility } from '@/domain/calculations/occupancy-financial-eligibility'
 
 const statusLabels: Record<RoomChangeRequest['status'], string> = {
   PENDING: 'PENDING', APPROVED: 'APPROVED', REJECTED: 'REJECTED', CANCELLED: 'CANCELLED', EXPIRED: 'EXPIRED',
@@ -33,6 +34,8 @@ function RoomChangeReviewDialog({ request, onClose, onNotice }: {
   const tenant = data.tenants.find(item => item.id === request.tenantId)
   const fromRoom = data.rooms.find(item => item.id === request.currentRoomId)
   const toRoom = data.rooms.find(item => item.id === request.requestedRoomId)
+  const sourceEligibility = fromRoom ? roomFinancialEligibility(data, fromRoom.id, occupancyDate) : null
+  const sourceFinancialMessage = sourceEligibility ? occupancyFinancialMessage(sourceEligibility, 'Transfer') : null
   const warnings = toRoom ? roomChangeFinancialWarnings(data, request.tenantId, toRoom.id, effectiveDate) : null
   const requiresAcknowledgment = Boolean(warnings?.billingReviewRequired)
   const targetOccupants = toRoom
@@ -94,6 +97,7 @@ function RoomChangeReviewDialog({ request, onClose, onNotice }: {
         {toRoom && <div><span>Target availability on effective date</span><strong>Room {toRoom.name} · {targetOccupants}/{toRoom.capacity} occupied</strong></div>}
         <div><span>Reason</span><strong>{request.reason}</strong></div>
       </section>
+      {sourceFinancialMessage && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{sourceFinancialMessage} Settle the source-room obligations before approving this transfer.</p>}
       {warnings && <div className="room-change-warnings" role="note">
         <p className="font-semibold">Financial review</p>
         <dl>
@@ -123,7 +127,7 @@ function RoomChangeReviewDialog({ request, onClose, onNotice }: {
         {errors.startDate && <p role="alert" className="text-sm text-destructive">{errors.startDate}</p>}
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button type="button" onClick={approve} disabled={(requiresAcknowledgment && !acknowledged) || saving} aria-busy={saving}><Check aria-hidden="true" />{saving ? 'Saving…' : 'Approve transfer'}</Button>
+          <Button type="button" onClick={approve} disabled={Boolean(sourceFinancialMessage) || (requiresAcknowledgment && !acknowledged) || saving} aria-busy={saving}><Check aria-hidden="true" />{saving ? 'Saving…' : 'Approve transfer'}</Button>
         </DialogFooter>
       </div>}
       {mode === 'reject' && <div className="grid gap-4">

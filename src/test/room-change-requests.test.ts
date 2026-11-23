@@ -10,10 +10,51 @@ import { localStorageRepository, STORAGE_KEY } from '@/data/repositories/local-s
 import { parsePrototypeSnapshot, STORAGE_SCHEMA_VERSION } from '@/data/repositories/prototype-storage'
 import { isPrototypeData } from '@/domain/validation/prototype-data'
 import { roomOccupancy, roomOccupants } from '@/domain/calculations/summary'
-import { reconcileOccupancy } from '@/domain/calculations/move-in'
+import { prepareMoveInPayment, reconcileOccupancy, selectMoveInObligations } from '@/domain/calculations/move-in'
+import { collectionCatalog, prepareCollection } from '@/domain/calculations/payment-collection'
+import { electricityBaseline } from '@/domain/calculations/meter-baseline'
+import { roomFinancialEligibility } from '@/domain/calculations/occupancy-financial-eligibility'
+import type { PrototypeAppState } from '@/domain/types/models'
 
 const draft = { tenantId: 'tenant-1', requestedRoomId: 'room-13', requestedStartDate: DEMO_DATE, reason: 'Need more space' }
 const approval = (ack = true) => ({ effectiveDate: DEMO_DATE, note: 'Approved after review', billingReviewAcknowledged: ack, decidedAt: DEMO_DATE })
+
+function settleRoom(data: PrototypeAppState, roomId: string, asOf = DEMO_DATE) {
+  let next = data
+  const moveIn = selectMoveInObligations(next, asOf, roomId).find(item => item.cycle.status === 'ACTIVE')
+  if (moveIn) {
+    const categories: ('ADVANCE' | 'SECURITY_DEPOSIT')[] = []
+    if (moveIn.advanceRemainingCents > 0) categories.push('ADVANCE')
+    if (moveIn.depositRemainingCents > 0) categories.push('SECURITY_DEPOSIT')
+    if (categories.length > 0) {
+      const paid = prepareMoveInPayment(next, { obligationId: moveIn.obligation.id, categories, paidOn: asOf })
+      if (!paid.ok) throw new Error(paid.reason)
+      next = paid.data
+    }
+  }
+  const meter = next.electricityMeters.find(item => item.roomId === roomId)
+  const baseline = meter ? electricityBaseline(next, meter.id) : null
+  const readings = meter && baseline ? { [`reading:${meter.id}:cumulative`]: baseline.readingMilliKwh + 100_000 } : {}
+  const items = collectionCatalog(next, roomId, asOf, readings).filter(item => item.selectable && item.amountCents > 0)
+  if (items.length > 0) {
+    const paid = prepareCollection(next, {
+      transactionId: `settle-${roomId}-${asOf}`, roomId, readings, collectedOn: asOf,
+      selections: items.map(({ id, amountCents, periodId, dueDate, basis }) => ({ id, amountCents, periodId, dueDate, basis })),
+    })
+    if (!paid.ok) throw new Error(paid.reason)
+    next = paid.data
+  }
+  if (roomFinancialEligibility(next, roomId, asOf).blockers.some(blocker => blocker.kind === 'ELECTRICITY_SETTLEMENT')) {
+    const meterIds = new Set(next.electricityMeters.filter(meter => meter.roomId === roomId).map(meter => meter.id))
+    next = {
+      ...next,
+      electricityMeters: next.electricityMeters.filter(meter => meter.roomId !== roomId),
+      meterReadings: next.meterReadings.filter(reading => !meterIds.has(reading.meterId)),
+      electricityBillObligations: next.electricityBillObligations.filter(item => item.roomId !== roomId),
+    }
+  }
+  return next
+}
 const addDays = (date: string, days: number) => {
   const value = new Date(`${date}T00:00:00Z`)
   value.setUTCDate(value.getUTCDate() + days)
@@ -200,7 +241,7 @@ describe('tenant room change requests', () => {
   })
 
   it('moves a tenant into an occupied shared room without replacing either room cycle or creating obligations', () => {
-    const base = createDemoData()
+    const base = settleRoom(createDemoData(), 'room-2')
     const request = submitRoomChangeRequest(base, { ...draft, tenantId: 'tenant-2', requestedRoomId: 'room-1' }, DEMO_DATE)
     if (!request.ok) throw new Error(JSON.stringify(request.errors))
     const approved = approveRoomChangeRequest(request.data, request.request.id, approval())
@@ -217,6 +258,7 @@ describe('tenant room change requests', () => {
   it('does not duplicate move-in obligations when joining an occupied room with an existing cycle', () => {
     let data = prototypeReducer(createDemoData(), { type: 'tenant/created', draft: { name: 'Target Occupant', email: 'target@example.com', phone: '+63 900 555 0001', address: 'Test', roomId: 'room-10', moveInDate: '2026-11-01', notes: '' } })
     data = prototypeReducer(data, { type: 'tenant/created', draft: { name: 'Moving Tenant', email: 'moving@example.com', phone: '+63 900 555 0002', address: 'Test', roomId: 'room-9', moveInDate: '2026-11-01', notes: '' } })
+    data = settleRoom(data, 'room-9')
     const mover = data.tenants.find(tenant => tenant.email === 'moving@example.com')!
     const targetCycle = data.occupancyCycles.find(cycle => cycle.roomId === 'room-10' && cycle.status === 'ACTIVE')!
     const request = submitRoomChangeRequest(data, { ...draft, tenantId: mover.id, requestedRoomId: 'room-10' }, DEMO_DATE)
@@ -234,6 +276,7 @@ describe('tenant room change requests', () => {
   it('makes Room 02 occupied immediately when a Room 06 occupant transfers effective today', () => {
     let data = prototypeReducer(createDemoData(), { type: 'tenant/created', draft: { name: 'Room 06 First', email: 'r06first@example.com', phone: '+63 900 555 0101', address: 'Test', roomId: 'room-13', moveInDate: '2026-11-01', notes: '' } })
     data = prototypeReducer(data, { type: 'tenant/created', draft: { name: 'Room 06 Second', email: 'r06second@example.com', phone: '+63 900 555 0102', address: 'Test', roomId: 'room-13', moveInDate: '2026-11-01', notes: '' } })
+    data = settleRoom(data, 'room-13')
     const room06 = data.rooms.find(room => room.name === '06')!
     const room02 = data.rooms.find(room => room.name === '02')!
     const occupants = roomOccupants(data, room06.id, DEMO_DATE)
@@ -253,6 +296,7 @@ describe('tenant room change requests', () => {
   it('keeps a future-dated Room 02 transfer inactive until its effective date', () => {
     let data = prototypeReducer(createDemoData(), { type: 'tenant/created', draft: { name: 'Future Mover', email: 'future.mover@example.com', phone: '+63 900 555 0103', address: 'Test', roomId: 'room-13', moveInDate: '2026-11-01', notes: '' } })
     data = prototypeReducer(data, { type: 'tenant/created', draft: { name: 'Future Remaining', email: 'future.remaining@example.com', phone: '+63 900 555 0104', address: 'Test', roomId: 'room-13', moveInDate: '2026-11-01', notes: '' } })
+    data = settleRoom(data, 'room-13')
     const room06 = data.rooms.find(room => room.name === '06')!
     const room02 = data.rooms.find(room => room.name === '02')!
     const mover = roomOccupants(data, room06.id, DEMO_DATE).find(tenant => tenant.name === 'Future Mover')!

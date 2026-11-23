@@ -45,7 +45,8 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
   if (!rows(value, 'billingPeriods', r => id(r.label) && date(r.startDate) && date(r.endDate) && oneOf(r.status, ['OPEN', 'CLOSED']))) return false
   if (!rows(value, 'charges', r => {
     if (!(id(r.tenantId) && id(r.billingPeriodId) && text(r.description) && positive(r.amountCents)
-      && date(r.issuedOn) && date(r.dueDate) && oneOf(r.state, ['ISSUED', 'VOIDED']) && correction(r.correction))) return false
+      && date(r.issuedOn) && date(r.dueDate) && oneOf(r.state, ['ISSUED', 'VOIDED']) && correction(r.correction)
+      && (r.roomId === undefined || id(r.roomId)))) return false
     if (r.category === 'RENT') return id(r.roomAssignmentId) && positive(r.agreedRentCents)
     if (r.category === 'WATER' || r.category === 'WASHING_MACHINE') return r.entryMethod === 'MANUAL'
     if (r.category === 'ADVANCE' || r.category === 'SECURITY_DEPOSIT') return id(r.moveInObligationId)
@@ -151,6 +152,11 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     if (charge.category === 'RENT') {
       return data.roomAssignments.find(assignment => assignment.id === charge.roomAssignmentId)?.roomId ?? null
     }
+    if (charge.roomId) return data.rooms.some(room => room.id === charge.roomId) ? charge.roomId : null
+    const allocation = data.paymentAllocations.find(item => item.chargeId === charge.id && item.state === 'ACTIVE')
+    const roomPayment = allocation ? data.payments.find(item => item.id === allocation.paymentId && item.state === 'RECORDED'
+      && item.scope === 'ROOM' && item.roomId) : undefined
+    if (roomPayment?.roomId) return roomPayment.roomId
     const period = data.billingPeriods.find(item => item.id === charge.billingPeriodId)
     if (!period) return null
     const roomIds = [...new Set(data.roomAssignments.filter(assignment => assignment.tenantId === charge.tenantId
@@ -286,6 +292,7 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     const period = data.billingPeriods.find(p => p.id === c.billingPeriodId)
     const original = c.correction && data.charges.find(o => o.id === c.correction?.supersedesId)
     if (!tenant(c.tenantId) || !period || c.dueDate < c.issuedOn || !validCorrection(c.correction, c.id, 'CHARGE')
+      || (c.roomId !== undefined && !data.rooms.some(room => room.id === c.roomId))
       || (c.correction && (!original || original.state !== 'VOIDED' || original.tenantId !== c.tenantId || original.category !== c.category))) return false
     if (c.category === 'RENT') return c.amountCents === c.agreedRentCents
       && data.roomAssignments.some(a => a.id === c.roomAssignmentId && a.tenantId === c.tenantId

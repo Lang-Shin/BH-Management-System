@@ -24,10 +24,15 @@ export function chargeRoom(data: PrototypeAppState, charge: Charge): FinancialRo
     const obligation = data.moveInObligations.find(item => item.id === charge.moveInObligationId)
     return obligation ? roomContext(data, obligation.roomId, 'rent-assignment', 'Move-in obligation room') ?? unresolved : unresolved
   }
+  if (charge.roomId) return roomContext(data, charge.roomId, 'period-assignment', 'Recorded historical room context') ?? unresolved
   if (charge.category === 'RENT') {
     const assignment = data.roomAssignments.find(item => item.id === charge.roomAssignmentId && item.tenantId === charge.tenantId)
     return assignment ? roomContext(data, assignment.roomId, 'rent-assignment', 'Recorded rent assignment') ?? unresolved : unresolved
   }
+  const allocation = data.paymentAllocations.find(item => item.chargeId === charge.id && item.state === 'ACTIVE')
+  const roomPayment = allocation ? data.payments.find(item => item.id === allocation.paymentId && item.state === 'RECORDED'
+    && item.scope === 'ROOM' && item.roomId) : undefined
+  if (roomPayment?.roomId) return roomContext(data, roomPayment.roomId, 'period-assignment', 'Recorded by the room-level payment') ?? unresolved
   const period = data.billingPeriods.find(item => item.id === charge.billingPeriodId)
   if (!period) return unresolved
   const roomIds = [...new Set(data.roomAssignments.filter(item => item.tenantId === charge.tenantId

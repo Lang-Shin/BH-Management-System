@@ -13,6 +13,7 @@ import type { CollectibleItem, CollectionInput } from '@/domain/calculations/pay
 import { rentObligationPaidCents } from '@/domain/calculations/rental-periods'
 import { selectRoomFinance } from '@/domain/calculations/room-finance'
 import { pendingPaymentPeriods } from '@/features/dashboard/pending-payment-groups'
+import { isPrototypeData } from '@/domain/validation/prototype-data'
 
 const root = process.cwd()
 const src = path.join(root, 'src')
@@ -663,5 +664,140 @@ describe('Worker and D1 integration', () => {
     const after = await bootstrap()
     expect(after.revision).toBe(cleared.revision)
     expect(after.data.rooms.some(room => room.name === 'TEST-ROOM')).toBe(true)
+  }, 30_000)
+
+  it('persists a fully paid boundary transfer and rejects both shared-room move-outs', async () => {
+    const initial = await bootstrap()
+    const chariseResponse = await jsonRequest('/api/v1/commands', 'POST', { action: { type: 'tenant/created', draft: {
+      name: 'Charise Server', email: 'charise.server@example.com', phone: '', address: '', notes: '',
+      roomId: 'room-15', moveInDate: '2026-10-01',
+    } } }, { 'idempotency-key': 'server-charise-create-0001' })
+    expect(chariseResponse.status).toBe(200)
+    let state = await bootstrap()
+    const charise = state.data.tenants.find(tenant => tenant.name === 'Charise Server')!
+    const chariseMoveIn = state.data.moveInObligations.find(item => item.roomId === 'room-15')!
+    expect((await jsonRequest('/api/v1/commands', 'POST', { action: {
+      type: 'moveIn/paymentRecorded', obligationId: chariseMoveIn.id, categories: ['ADVANCE', 'SECURITY_DEPOSIT'], paidOn: '2026-10-01',
+    } }, { 'idempotency-key': 'server-charise-move-in-0001' })).status).toBe(200)
+    state = await bootstrap()
+    const quote = await jsonRequest('/api/v1/payments/quote', 'POST', { roomId: 'room-15', readings: {} })
+    const quoteBody = await quote.json() as { items: CollectibleItem[]; serverDate: string }
+    expect(quoteBody.items.some(item => item.category === 'RENT')).toBe(true)
+    expect(quoteBody.items.some(item => item.category === 'WATER')).toBe(true)
+    const initialPaymentCount = state.data.payments.length
+    const initialAdvanceCount = state.data.charges.filter(charge => charge.category === 'ADVANCE' || charge.category === 'SECURITY_DEPOSIT').length
+    const initialRoom2 = JSON.stringify(state.data.roomAssignments.filter(assignment => assignment.roomId === 'room-2'))
+    const paid = await jsonRequest('/api/v1/commands', 'POST', { action: { type: 'payment/collected', input: {
+      transactionId: 'server-charise-bills', roomId: 'room-15', readings: {}, collectedOn: quoteBody.serverDate,
+      selections: quoteBody.items.filter(item => item.selectable && item.amountCents > 0).map(({ id, amountCents, periodId, dueDate, basis }) => ({ id, amountCents, periodId, dueDate, basis })),
+    } } }, { 'idempotency-key': 'server-charise-bills-0001' })
+    if (paid.status !== 200) throw new Error(await paid.clone().text())
+    expect(paid.status).toBe(200)
+    const transfer = await jsonRequest('/api/v1/commands', 'POST', { action: { type: 'tenant/updated', tenantId: charise.id, draft: {
+      name: charise.name, email: charise.email, phone: charise.phone, address: charise.address, notes: charise.notes,
+      roomId: 'room-1', moveInDate: '2026-11-01',
+    } } }, { 'idempotency-key': 'server-charise-transfer-0001' })
+    if (transfer.status !== 200) throw new Error(await transfer.clone().text())
+    const transferred = await transfer.json() as { data: ReturnType<typeof createDemoData>; revision: number }
+    expect(isPrototypeData(transferred.data)).toBe(true)
+    expect(transferred.data.roomAssignments.find(assignment => assignment.tenantId === charise.id && assignment.endDate === null)?.roomId).toBe('room-1')
+    expect(transferred.data.roomAssignments.find(assignment => assignment.tenantId === charise.id && assignment.roomId === 'room-15')?.endDate).toBe('2026-10-31')
+    expect(transferred.data.payments).toHaveLength(initialPaymentCount + 1)
+    expect(transferred.data.charges.filter(charge => charge.category === 'ADVANCE' || charge.category === 'SECURITY_DEPOSIT')).toHaveLength(initialAdvanceCount)
+    expect(transferred.data.charges.filter(charge => charge.roomId === 'room-15').every(charge => charge.category === 'WATER'))
+      .toBe(true)
+    expect(JSON.stringify(transferred.data.roomAssignments.filter(assignment => assignment.roomId === 'room-2'))).toBe(initialRoom2)
+    const refreshed = await bootstrap()
+    expect(refreshed.data.roomAssignments.find(assignment => assignment.tenantId === charise.id && assignment.endDate === null)?.roomId).toBe('room-1')
+
+    const eduardResponse = await jsonRequest('/api/v1/commands', 'POST', { action: { type: 'tenant/created', draft: {
+      name: 'Eduard Server', email: 'eduard.server@example.com', phone: '', address: '', notes: '',
+      roomId: 'room-8', moveInDate: '2026-10-01',
+    } } }, { 'idempotency-key': 'server-eduard-create-0001' })
+    expect(eduardResponse.status).toBe(200)
+    state = await bootstrap()
+    const eduard = state.data.tenants.find(tenant => tenant.name === 'Eduard Server')!
+    const eduardMoveIn = state.data.moveInObligations.find(item => item.roomId === 'room-8')!
+    expect((await jsonRequest('/api/v1/commands', 'POST', { action: {
+      type: 'moveIn/paymentRecorded', obligationId: eduardMoveIn.id, categories: ['ADVANCE', 'SECURITY_DEPOSIT'], paidOn: '2026-10-01',
+    } }, { 'idempotency-key': 'server-eduard-move-in-0001' })).status).toBe(200)
+    const renzoResponse = await jsonRequest('/api/v1/commands', 'POST', { action: { type: 'tenant/created', draft: {
+      name: 'Renzo Server', email: 'renzo.server@example.com', phone: '', address: '', notes: '',
+      roomId: 'room-8', moveInDate: '2026-10-10',
+    } } }, { 'idempotency-key': 'server-renzo-create-0001' })
+    expect(renzoResponse.status).toBe(200)
+    state = await bootstrap()
+    const renzo = state.data.tenants.find(tenant => tenant.name === 'Renzo Server')!
+    const revisionBefore = state.revision
+    for (const [tenantId, key] of [[eduard.id, 'server-eduard-move-out-0001'], [renzo.id, 'server-renzo-move-out-0001']] as const) {
+      const blocked = await jsonRequest('/api/v1/commands', 'POST', { action: { type: 'tenant/movedOut', tenantId, asOf: state.serverDate } }, { 'idempotency-key': key })
+      expect(blocked.status).toBe(422)
+      const body = await blocked.json() as { error: { code: string; message: string } }
+      expect(body.error.code).toBe('ROOM_FINANCIAL_BLOCKED')
+      expect(body.error.message).toMatch(/Move-out blocked: Room 8 has unpaid rent/)
+    }
+    const afterMoveOuts = await bootstrap()
+    expect(afterMoveOuts.revision).toBe(revisionBefore)
+    expect(afterMoveOuts.data.tenants.filter(tenant => [eduard.id, renzo.id].includes(tenant.id)).every(tenant => tenant.status === 'ACTIVE')).toBe(true)
+    expect(initial.revision).toBeLessThan(afterMoveOuts.revision)
+
+    const blockedCreate = await jsonRequest('/api/v1/commands', 'POST', { action: { type: 'tenant/created', draft: {
+      name: 'Blocked Transfer Server', email: 'blocked.transfer@example.com', phone: '', address: '', notes: '',
+      roomId: 'room-4', moveInDate: '2026-10-01',
+    } } }, { 'idempotency-key': 'server-blocked-transfer-create-0001' })
+    expect(blockedCreate.status).toBe(200)
+    state = await bootstrap()
+    const blockedTenant = state.data.tenants.find(tenant => tenant.name === 'Blocked Transfer Server')!
+    const blockedMoveIn = state.data.moveInObligations.find(item => item.roomId === 'room-4')!
+    expect((await jsonRequest('/api/v1/commands', 'POST', { action: {
+      type: 'moveIn/paymentRecorded', obligationId: blockedMoveIn.id, categories: ['ADVANCE', 'SECURITY_DEPOSIT'], paidOn: '2026-10-01',
+    } }, { 'idempotency-key': 'server-blocked-transfer-move-in-0001' })).status).toBe(200)
+    state = await bootstrap()
+    const blockedRevision = state.revision
+    const blockedTransfer = await jsonRequest('/api/v1/commands', 'POST', { action: { type: 'tenant/updated', tenantId: blockedTenant.id, draft: {
+      name: blockedTenant.name, email: blockedTenant.email, phone: blockedTenant.phone, address: blockedTenant.address, notes: blockedTenant.notes,
+      roomId: 'room-1', moveInDate: state.serverDate,
+    } } }, { 'idempotency-key': 'server-blocked-transfer-0001' })
+    expect(blockedTransfer.status).toBe(422)
+    const blockedBody = await blockedTransfer.json() as { error: { code: string; message: string } }
+    expect(blockedBody.error.code).toBe('ROOM_FINANCIAL_BLOCKED')
+    expect(blockedBody.error.message).toContain('Transfer blocked: Room 4 has unpaid rent')
+    expect(blockedBody.error.message).toContain('3,500.00 outstanding')
+    const afterBlockedTransfer = await bootstrap()
+    expect(afterBlockedTransfer.revision).toBe(blockedRevision)
+    expect(afterBlockedTransfer.data.roomAssignments.find(assignment => assignment.tenantId === blockedTenant.id && assignment.endDate === null)?.roomId).toBe('room-4')
+
+    const racers: { tenantId: string; roomId: string }[] = []
+    for (const [name, email, roomId, key] of [
+      ['Concurrent Transfer A', 'concurrent.a@example.com', 'room-5', 'a'],
+      ['Concurrent Transfer B', 'concurrent.b@example.com', 'room-7', 'b'],
+    ] as const) {
+      const created = await jsonRequest('/api/v1/commands', 'POST', { action: { type: 'tenant/created', draft: {
+        name, email, phone: '', address: '', notes: '', roomId, moveInDate: '2026-11-01',
+      } } }, { 'idempotency-key': `server-concurrent-${key}-create-0001` })
+      expect(created.status).toBe(200)
+      state = await bootstrap()
+      const tenant = state.data.tenants.find(item => item.name === name)!
+      const moveIn = state.data.moveInObligations.find(item => item.roomId === roomId)!
+      expect((await jsonRequest('/api/v1/commands', 'POST', { action: {
+        type: 'moveIn/paymentRecorded', obligationId: moveIn.id, categories: ['ADVANCE', 'SECURITY_DEPOSIT'], paidOn: '2026-11-01',
+      } }, { 'idempotency-key': `server-concurrent-${key}-move-in-0001` })).status).toBe(200)
+      racers.push({ tenantId: tenant.id, roomId })
+    }
+    state = await bootstrap()
+    const raceRevision = state.revision
+    const race = await Promise.all(racers.map((racer, index) => jsonRequest('/api/v1/commands', 'POST', { action: { type: 'tenant/updated', tenantId: racer.tenantId, draft: {
+      name: `Concurrent Transfer ${index === 0 ? 'A' : 'B'}`,
+      email: index === 0 ? 'concurrent.a@example.com' : 'concurrent.b@example.com',
+      phone: '', address: '', notes: '', roomId: 'room-1', moveInDate: state.serverDate,
+    } } }, { 'idempotency-key': `server-concurrent-transfer-${index}-0001` })))
+    expect(race.filter(response => response.status === 200)).toHaveLength(1)
+    expect(race.filter(response => response.status === 409 || response.status === 422)).toHaveLength(1)
+    const afterRace = await bootstrap()
+    expect(afterRace.revision).toBe(raceRevision + 1)
+    const winners = racers.filter(racer => afterRace.data.roomAssignments.find(assignment => assignment.tenantId === racer.tenantId && assignment.endDate === null)?.roomId === 'room-1')
+    expect(winners).toHaveLength(1)
+    const roomOneOccupants = new Set(afterRace.data.roomAssignments.filter(assignment => assignment.roomId === 'room-1' && assignment.endDate === null).map(assignment => assignment.tenantId))
+    expect(roomOneOccupants.size).toBe(2)
   }, 30_000)
 })

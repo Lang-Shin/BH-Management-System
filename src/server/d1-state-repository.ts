@@ -12,6 +12,8 @@ import { ensureBillingPeriodsThrough } from '@/domain/calculations/billing-perio
 import { repairMissingAdvanceApplications } from '@/domain/calculations/advance-reconciliation'
 import { ensureInitialRateBaseline } from '@/domain/calculations/rate-baseline'
 import { prepareCollection, prepareRentPrepaymentCollection } from '@/domain/calculations/payment-collection'
+import { moveOutBlockers, validateTenantDraft } from '@/domain/calculations/tenant-management'
+import { approveRoomChangeRequest } from '@/domain/calculations/room-change-requests'
 import type { CollectionInput, CollectionResult } from '@/domain/calculations/payment-collection'
 
 export interface CommandOutcome {
@@ -135,6 +137,24 @@ export class D1StateRepository {
     }
 
     const current = await this.load()
+    if (action.type === 'tenant/updated') {
+      const errors = validateTenantDraft(current.data, action.draft, { tenantId: action.tenantId, asOf: action.asOf ?? serverDate })
+      const message = errors.general ?? errors.roomId ?? errors.moveInDate ?? errors.name ?? errors.email ?? errors.phone ?? errors.address ?? errors.notes
+      if (message) {
+        const currentRoomId = current.data.roomAssignments.find(assignment => assignment.tenantId === action.tenantId && assignment.endDate === null)?.roomId
+        const transferring = Boolean(currentRoomId && action.draft.roomId && action.draft.roomId !== currentRoomId)
+        throw new ApiError(422, message.startsWith('Transfer blocked:') ? 'ROOM_FINANCIAL_BLOCKED' : transferring ? 'TRANSFER_BLOCKED' : 'TENANT_UPDATE_REJECTED', message)
+      }
+    } else if (action.type === 'tenant/movedOut') {
+      const blockers = moveOutBlockers(current.data, action.tenantId, action.asOf ?? serverDate)
+      if (blockers.length > 0) throw new ApiError(422, blockers[0]!.startsWith('Move-out blocked:') ? 'ROOM_FINANCIAL_BLOCKED' : 'MOVE_OUT_BLOCKED', blockers[0]!)
+    } else if (action.type === 'roomChange/approved') {
+      const approval = approveRoomChangeRequest(current.data, action.requestId, action)
+      if (!approval.ok) {
+        const message = approval.errors.general ?? approval.errors.roomId ?? approval.errors.startDate ?? approval.errors.reason ?? 'The room transfer could not be saved. Refresh and review the current records.'
+        throw new ApiError(422, message.startsWith('Transfer blocked:') ? 'ROOM_FINANCIAL_BLOCKED' : 'TRANSFER_BLOCKED', message)
+      }
+    }
     let collection: { input: CollectionInput; result: Extract<CollectionResult, { ok: true }> } | null = null
     if (action.type === 'payment/collected') {
       const prepared = prepareCollection(current.data, action.input)

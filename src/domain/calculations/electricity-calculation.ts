@@ -67,6 +67,7 @@ export function calculateElectricityChargeForObligation(
   }
   const charge: ElectricityCharge = {
     id: `electricity-${obligation.billingPeriodId}-${obligation.roomId}`,
+    roomId: obligation.roomId,
     tenantId: obligation.tenantId,
     billingPeriodId: obligation.billingPeriodId,
     description: 'Cumulative electricity — settled meter interval',

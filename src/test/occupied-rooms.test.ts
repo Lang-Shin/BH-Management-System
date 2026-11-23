@@ -4,6 +4,7 @@ import { createEmptyData } from '@/data/fixtures/empty'
 import { prototypeReducer } from '@/app/state/prototype-reducer'
 import { occupiedRoomSelection } from '@/domain/calculations/occupied-rooms'
 import { activeAssignments } from '@/domain/calculations/summary'
+import { prepareMoveInPayment, selectMoveInObligations } from '@/domain/calculations/move-in'
 
 const ids = (data: Parameters<typeof occupiedRoomSelection>[0]) => occupiedRoomSelection(data, '2026-11-23').rooms.map(room => room.id)
 
@@ -23,6 +24,10 @@ describe('occupied Calculate Payment rooms', () => {
     expect(ids(data)).toEqual(['room-13'])
     expect(ids(data)).not.toContain('room-6')
     const tenantId = data.tenants[0]!.id
+    const moveIn = selectMoveInObligations(data, '2026-11-23', 'room-13').find(item => item.cycle.status === 'ACTIVE')!
+    const paid = prepareMoveInPayment(data, { obligationId: moveIn.obligation.id, categories: ['ADVANCE', 'SECURITY_DEPOSIT'], paidOn: '2026-11-01' })
+    if (!paid.ok) throw new Error(paid.reason)
+    data = paid.data
 
     data = prototypeReducer(data, { type: 'tenant/updated', tenantId, asOf: '2026-11-23', draft: {
       name: 'Room 06 Tenant', email: '', phone: '', address: '', notes: '', roomId: 'room-15', moveInDate: '2026-11-02',

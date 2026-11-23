@@ -79,7 +79,7 @@ describe('anniversary rent periods', () => {
     const second = createTenant(first.data, {
       name: 'Remaining Occupant', email: 'remaining@example.com', moveInDate: '2026-11-20',
     }, '2026-11-20')
-    const firstOut = prototypeReducer(second.data, {
+    const firstOut = prototypeReducer(paidThroughFirstPeriod(second.data).data, {
       type: 'tenant/movedOut', tenantId: first.tenant.id, asOf: '2026-11-21',
     })
     const active = firstOut.occupancyCycles.find(item => item.roomId === 'room-14' && item.status === 'ACTIVE')!
@@ -172,7 +172,10 @@ describe('anniversary rent periods', () => {
     const destinationCycle = second.data.occupancyCycles.find(item => item.roomId === 'room-14' && item.status === 'ACTIVE')!
     expect(destinationCycle.id).toBe(first.cycle.id)
 
-    const transferred = prototypeReducer(second.data, {
+    const secondMoveIn = selectMoveInObligations(second.data, '2026-11-14', 'room-15').find(item => item.cycle.status === 'ACTIVE')!
+    const secondPaid = prepareMoveInPayment(second.data, { obligationId: secondMoveIn.obligation.id, categories: ['ADVANCE', 'SECURITY_DEPOSIT'], paidOn: '2026-11-14' })
+    if (!secondPaid.ok) throw new Error(secondPaid.reason)
+    const transferred = prototypeReducer(secondPaid.data, {
       type: 'tenant/updated', tenantId: second.tenant.id, asOf: '2026-11-16',
       draft: draft({
         name: second.tenant.name, email: second.tenant.email, phone: second.tenant.phone, address: second.tenant.address,

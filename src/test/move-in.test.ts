@@ -27,7 +27,14 @@ function createInRoom(data: PrototypeAppState, overrides: Partial<TenantDraft> =
   return { data: next, tenant }
 }
 
-function viewFor(data: PrototypeAppState, tenant: Tenant) {
+
+function settleRoomMoveIn(data: PrototypeAppState, roomId: string) {
+  const obligation = data.moveInObligations.find(item => item.roomId === roomId)
+  if (!obligation) return data
+  const paid = prepareMoveInPayment(data, { obligationId: obligation.id, categories: ['ADVANCE', 'SECURITY_DEPOSIT'], paidOn: DEMO_DATE })
+  if (!paid.ok) throw new Error(paid.reason)
+  return paid.data
+}function viewFor(data: PrototypeAppState, tenant: Tenant) {
   const assignment = data.roomAssignments.find(item => item.tenantId === tenant.id && item.endDate === null)
   if (!assignment) throw new Error('Tenant assignment missing')
   return selectMoveInObligations(data, DEMO_DATE, assignment.roomId)[0]
@@ -183,7 +190,8 @@ describe('room-level move-in advance and security deposit', () => {
   it('closes the room cycle when everyone leaves and creates a fresh obligation for the next occupancy', () => {
     const first = createInRoom(createDemoData())
     const second = createInRoom(first.data, { name: 'Roommate', email: 'roommate@example.com', moveInDate: '2026-11-05' })
-    const firstOut = prototypeReducer(second.data, { type: 'tenant/movedOut', tenantId: first.tenant.id })
+    const paidRoom = settleRoomMoveIn(second.data, 'room-9')
+    const firstOut = prototypeReducer(paidRoom, { type: 'tenant/movedOut', tenantId: first.tenant.id })
     expect(firstOut.occupancyCycles.find(cycle => cycle.roomId === 'room-9' && cycle.status === 'ACTIVE')).toBeDefined()
     const allOut = prototypeReducer(firstOut, { type: 'tenant/movedOut', tenantId: second.tenant.id })
     const closed = allOut.occupancyCycles.find(cycle => cycle.roomId === 'room-9' && cycle.endedAt !== null)
@@ -218,7 +226,7 @@ describe('room-level move-in advance and security deposit', () => {
   it('preserves an obligation during a transfer and requires review without posting top-ups', () => {
     const created = createInRoom(createDemoData())
     const tenant = created.tenant
-    const transfer = prototypeReducer(created.data, {
+    const transfer = prototypeReducer(settleRoomMoveIn(created.data, 'room-9'), {
       type: 'tenant/updated',
       tenantId: tenant.id,
       draft: draft({ name: tenant.name, email: tenant.email, phone: tenant.phone, address: tenant.address, roomId: 'room-15', moveInDate: DEMO_DATE }),
@@ -239,7 +247,8 @@ describe('room-level move-in advance and security deposit', () => {
 
   it('requires review but no deposit top-up when a tenant transfers into an occupied, more expensive room', () => {
     const first = createInRoom(createDemoData(), { roomId: 'room-7', name: 'First Transfer', email: 'first-transfer@example.com' })
-    const second = createInRoom(first.data, { roomId: 'room-10', name: 'Second Transfer', email: 'second-transfer@example.com' })
+    const firstPaid = settleRoomMoveIn(first.data, 'room-7')
+    const second = createInRoom(firstPaid, { roomId: 'room-10', name: 'Second Transfer', email: 'second-transfer@example.com' })
     const tenant = first.tenant
     const transferred = prototypeReducer(second.data, {
       type: 'tenant/updated', tenantId: tenant.id,

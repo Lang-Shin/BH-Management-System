@@ -9,13 +9,22 @@ import { TENANT_DEMO_STORAGE_KEY } from '@/app/providers/tenant-demo'
 import { createDemoData, DEMO_DATE, OCCUPANCY_DATE } from '@/data/fixtures/demo'
 import { localStorageRepository, STORAGE_KEY } from '@/data/repositories/local-storage-repository'
 import { approveRoomChangeRequest, submitRoomChangeRequest } from '@/domain/calculations/room-change-requests'
+import { prepareMoveInPayment } from '@/domain/calculations/move-in'
 import { prototypeReducer } from '@/app/state/prototype-reducer'
 import { roomOccupants } from '@/domain/calculations/summary'
+import type { PrototypeAppState } from '@/domain/types/models'
 
 function renderApp(route: string) {
   return render(<StrictMode><PrototypeProvider repository={localStorageRepository}><MemoryRouter initialEntries={[route]}><AppRouter /></MemoryRouter></PrototypeProvider></StrictMode>)
 }
 const stored = () => JSON.parse(localStorage.getItem(STORAGE_KEY)!).data
+function payRoomMoveIn(data: PrototypeAppState, roomId: string) {
+  const obligation = data.moveInObligations.find(item => item.roomId === roomId)
+  if (!obligation) return data
+  const paid = prepareMoveInPayment(data, { obligationId: obligation.id, categories: ['ADVANCE', 'SECURITY_DEPOSIT'], paidOn: '2026-11-01' })
+  if (!paid.ok) throw new Error(paid.reason)
+  return paid.data
+}
 const addDays = (date: string, days: number) => {
   const value = new Date(`${date}T00:00:00Z`)
   value.setUTCDate(value.getUTCDate() + days)
@@ -141,6 +150,7 @@ describe('landlord room change review UI', () => {
     const user = userEvent.setup()
     let data = prototypeReducer(createDemoData(), { type: 'tenant/created', draft: { name: 'Room 06 Mover', email: 'r06.mover@example.com', phone: '+63 900 555 0201', address: 'Test', roomId: 'room-13', moveInDate: '2026-11-01', notes: '' } })
     data = prototypeReducer(data, { type: 'tenant/created', draft: { name: 'Room 06 Remaining', email: 'r06.remaining@example.com', phone: '+63 900 555 0202', address: 'Test', roomId: 'room-13', moveInDate: '2026-11-01', notes: '' } })
+    data = payRoomMoveIn(data, 'room-13')
     const mover = roomOccupants(data, 'room-13', DEMO_DATE).find(tenant => tenant.name === 'Room 06 Mover')!
     const remaining = roomOccupants(data, 'room-13', DEMO_DATE).find(tenant => tenant.name === 'Room 06 Remaining')!
     const first = submitRoomChangeRequest(data, { tenantId: mover.id, requestedRoomId: 'room-15', requestedStartDate: DEMO_DATE, reason: 'Move to Room 02' }, DEMO_DATE)
@@ -179,6 +189,7 @@ describe('landlord room change review UI', () => {
     const futureDate = addDays(OCCUPANCY_DATE, 5)
     let data = prototypeReducer(createDemoData(), { type: 'tenant/created', draft: { name: 'Future Room 06 Mover', email: 'future.r06.mover@example.com', phone: '+63 900 555 0301', address: 'Test', roomId: 'room-13', moveInDate: '2026-11-01', notes: '' } })
     data = prototypeReducer(data, { type: 'tenant/created', draft: { name: 'Future Room 06 Remaining', email: 'future.r06.remaining@example.com', phone: '+63 900 555 0302', address: 'Test', roomId: 'room-13', moveInDate: '2026-11-01', notes: '' } })
+    data = payRoomMoveIn(data, 'room-13')
     const mover = roomOccupants(data, 'room-13', OCCUPANCY_DATE).find(tenant => tenant.name === 'Future Room 06 Mover')!
     const request = submitRoomChangeRequest(data, { tenantId: mover.id, requestedRoomId: 'room-15', requestedStartDate: futureDate, reason: 'Future move to Room 02' }, OCCUPANCY_DATE)
     if (!request.ok) throw new Error(JSON.stringify(request.errors))

@@ -6,6 +6,7 @@ import { transferTenantRoom } from './tenant-management'
 import { reconcileOccupancy } from './move-in'
 import { roomCapacityConflict } from './room-capacity'
 import { transferRentReviewNeeded } from './rent-schedule'
+import { occupancyFinancialMessage, roomFinancialEligibility } from './occupancy-financial-eligibility'
 import { randomSuffix } from './random-id'
 
 export interface RoomChangeRequestDraft {
@@ -213,8 +214,13 @@ export function approveRoomChangeRequest(data: PrototypeAppState, requestIdToApp
     tenantId: request.tenantId, requestedRoomId: request.requestedRoomId,
     requestedStartDate: input.effectiveDate, reason: request.reason,
   }, { asOf: input.decidedAt, currentAssignmentId: request.currentAssignmentId, ignoreRequestId: request.id })
-  if (request.currentRoomId !== data.roomAssignments.find(item => item.id === request.currentAssignmentId)?.roomId) {
+  const sourceRoomId = data.roomAssignments.find(item => item.id === request.currentAssignmentId)?.roomId
+  if (request.currentRoomId !== sourceRoomId) {
     errors.general = 'The current assignment no longer matches this request. Reject it and ask the tenant to submit again.'
+  }
+  if (sourceRoomId) {
+    const sourceEligibility = roomFinancialEligibility(data, sourceRoomId, input.decidedAt)
+    if (!sourceEligibility.eligible) errors.general = occupancyFinancialMessage(sourceEligibility, 'Transfer') ?? errors.general
   }
   if (Object.keys(errors).length > 0) return { ok: false, errors }
   const warnings = roomChangeFinancialWarnings(data, request.tenantId, request.requestedRoomId, input.effectiveDate)
