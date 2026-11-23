@@ -1,6 +1,7 @@
 import type { BillingPeriod, ChargeCategory, DepositDisposition, Payment, PaymentCorrection, PrototypeAppState, Receipt, Tenant } from '@/domain/types/models'
 import { paymentRooms, chargeRoom, type PaymentRoomPresentation } from '@/domain/calculations/room-finance'
 import { tenantHasCycleAccess, tenantOccupiedRoomAt } from '@/domain/calculations/tenant-access'
+import { rentLedgerCharges } from '@/domain/calculations/rent-ledger-charges'
 
 export const RECEIPT_CATEGORIES: { category: ChargeCategory; label: string }[] = [
   { category: 'RENT', label: 'Rent' },
@@ -45,7 +46,7 @@ export interface TenantReceiptView {
 export function selectTenantReceipts(data: PrototypeAppState, tenantId: string): { receipts: TenantReceiptView[]; unmatched: number } {
   const tenantsById = new Map(data.tenants.map(item => [item.id, item]))
   const paymentsById = new Map(data.payments.map(item => [item.id, item]))
-  const chargesById = new Map(data.charges.map(item => [item.id, item]))
+  const chargesById = new Map([...data.charges, ...rentLedgerCharges(data)].map(item => [item.id, item]))
   const periodsById = new Map(data.billingPeriods.map(item => [item.id, item]))
   const cyclesById = new Map(data.occupancyCycles.map(item => [item.id, item]))
   let unmatched = 0

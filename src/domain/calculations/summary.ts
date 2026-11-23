@@ -39,6 +39,7 @@ export function selectRoomSummary(data: PrototypeAppState, asOf: string) {
 }
 
 export function chargePaid(data: PrototypeAppState, chargeId: string, asOf: string): number {
+  if (data.rentObligations.some(obligation => obligation.id === chargeId)) return rentObligationPaidCents(data, chargeId, asOf)
   return data.paymentAllocations.filter(a => a.chargeId === chargeId && a.state === 'ACTIVE' && a.allocatedOn <= asOf
     && data.payments.some(p => p.id === a.paymentId && p.state === 'RECORDED' && p.paidOn <= asOf))
     .reduce((sum, a) => sum + a.amountCents, 0)

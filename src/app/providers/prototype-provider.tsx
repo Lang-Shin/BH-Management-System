@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type Rea
 import { civilDateInTimeZone } from '@/lib/business-date'
 import { createEmptyData } from '@/data/fixtures/empty'
 import type { PrototypeRepository } from '@/data/repositories/prototype-repository'
+import { fetchCollectionCatalog } from '@/data/repositories/api-repository'
 import { ErrorState, LoadingState } from '@/components/shared/states'
 import { PrototypeContext } from '@/app/state/prototype-context'
 import { prototypeReducer } from '@/app/state/prototype-reducer'
@@ -135,12 +136,12 @@ export function PrototypeProvider({ children, repository, now }: { children: Rea
     runServerCommand(action, key, syncGeneration.current)
   }, [runServerCommand])
 
-  const commitAction = useCallback((action: PrototypeAction): Promise<boolean> => {
+  const commitAction = useCallback((action: PrototypeAction, idempotencyKey?: string): Promise<boolean> => {
     if (!serverRepository?.command) {
       reduce(action)
       return Promise.resolve(true)
     }
-    const key = crypto.randomUUID()
+    const key = idempotencyKey ?? crypto.randomUUID()
     pendingActions.current = [...pendingActions.current, { action, key }]
     setPendingCommands(pendingActions.current.length)
     failedCommand.current = null
@@ -250,7 +251,7 @@ export function PrototypeProvider({ children, repository, now }: { children: Rea
   if (loadFailed) return <div className="p-6"><ErrorState title="Your records could not be opened" onRetry={() => window.location.reload()} /></div>
   if (!ready) return <div className="p-6"><LoadingState /></div>
   return <PrototypeContext.Provider value={{
-    data, dispatch, commitAction, persistSnapshot, clearAllRecords, canClearRecords, storageWarning,
+    data, dispatch, commitAction, loadCollectionCatalog: fetchCollectionCatalog, persistSnapshot, clearAllRecords, canClearRecords, storageWarning,
     pendingCommands, commandError, retryCommand, refreshFromServer,
     repositoryMode: serverRepository ? 'server' : 'local',
   }}>

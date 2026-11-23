@@ -11,6 +11,7 @@ import { ensureRegularRentPeriodsThrough } from '@/domain/calculations/rent-sche
 import { ensureBillingPeriodsThrough } from '@/domain/calculations/billing-periods'
 import { repairMissingAdvanceApplications } from '@/domain/calculations/advance-reconciliation'
 import { ensureInitialRateBaseline } from '@/domain/calculations/rate-baseline'
+import { prepareCollection } from '@/domain/calculations/payment-collection'
 
 export interface CommandOutcome {
   data: PrototypeAppState
@@ -90,7 +91,10 @@ export class D1StateRepository {
           }],
         }
       }
+      const operationId = `maintain-${revision}-${crypto.randomUUID()}`
       const statements = [
+        this.db.prepare("INSERT INTO workspace_operations (id, workspace_id, operation, status, expected_revision, request_id, started_at) VALUES (?, ?, 'MAINTENANCE', 'RUNNING', ?, ?, ?)")
+          .bind(operationId, this.workspaceId, current.revision, `maintain-${revision}`, now),
         this.db.prepare('UPDATE workspace_state SET revision = ?, data_json = ?, updated_at = ?, updated_by = ? WHERE workspace_id = ? AND revision = ?')
           .bind(revision, JSON.stringify(next), now, 'system-maintenance', this.workspaceId, current.revision),
         ...this.projectionStatements(next),
@@ -104,8 +108,9 @@ export class D1StateRepository {
             serverDate, `maintenance-${revision}`, JSON.stringify({ revision: current.revision }),
             JSON.stringify({ revision, repaired: repaired.repaired }), now))
       }
+      statements.push(this.db.prepare("UPDATE workspace_operations SET status = 'COMPLETED', completed_at = ? WHERE id = ?").bind(now, operationId))
       const results = await this.db.batch(statements)
-      if (results[0]?.meta.changes === 1) return { data: next, revision }
+      if (results[1]?.meta.changes === 1) return { data: next, revision }
     }
     return this.load()
   }
@@ -115,7 +120,7 @@ export class D1StateRepository {
       throw new ApiError(400, 'IDEMPOTENCY_KEY_REQUIRED', 'Provide an Idempotency-Key header with 8 to 200 characters.')
     }
     const action = withServerDate(rawAction, serverDate)
-    const hash = await sha256(JSON.stringify(action))
+    const hash = await sha256(JSON.stringify(rawAction))
     const existing = await this.idempotency(idempotencyKey)
     if (existing) {
       if (existing.request_hash !== hash) throw new ApiError(409, 'IDEMPOTENCY_CONFLICT', 'This idempotency key was already used for another command.')
@@ -124,8 +129,19 @@ export class D1StateRepository {
       return { ...response, replayed: true }
     }
 
+    if (rawAction.type === 'payment/collected' && rawAction.input.collectedOn !== serverDate) {
+      throw new ApiError(409, 'COLLECTION_DATE_CHANGED', 'The Manila business date changed. Refresh the catalog and review the actual collection date again.')
+    }
+
     const current = await this.load()
+    if (action.type === 'payment/collected') {
+      const prepared = prepareCollection(current.data, action.input)
+      if (!prepared.ok) throw new ApiError(422, prepared.reason, 'The selected obligations changed or cannot be collected. Refresh the payment catalog and review again.')
+    }
     const next = prototypeReducer(current.data, action)
+    if (action.type === 'payment/collected' && next !== current.data) {
+      next.auditEvents = next.auditEvents.map(event => event.id === `audit-payment-collection-${action.input.transactionId}` ? { ...event, actorId: actor.id } : event)
+    }
     if (next === current.data) {
       if (action.type === 'occupancy/dateChanged') {
         return { data: current.data, revision: current.revision, replayed: false }
@@ -138,6 +154,8 @@ export class D1StateRepository {
     const now = new Date().toISOString()
     const auditId = `server-audit-${requestId}`
     const statements = [
+      this.db.prepare("INSERT INTO workspace_operations (id, workspace_id, operation, status, expected_revision, request_id, started_at) VALUES (?, ?, 'COMMAND', 'RUNNING', ?, ?, ?)")
+        .bind(`command-${requestId}`, this.workspaceId, current.revision, requestId, now),
       this.db.prepare('UPDATE workspace_state SET revision = ?, data_json = ?, updated_at = ?, updated_by = ? WHERE workspace_id = ? AND revision = ?')
         .bind(revision, JSON.stringify(next), now, actor.id, this.workspaceId, current.revision),
       this.db.prepare(`INSERT INTO idempotency_keys
@@ -151,11 +169,31 @@ export class D1StateRepository {
           `Server command ${action.type}`, serverDate, requestId, idempotencyKey,
           JSON.stringify({ revision: current.revision }), JSON.stringify({ revision }), now),
       ...this.projectionStatements(next),
+      this.db.prepare("UPDATE workspace_operations SET status = 'COMPLETED', completed_at = ? WHERE id = ?")
+        .bind(now, `command-${requestId}`),
     ]
+    if (action.type === 'payment/collected') {
+      const prepared = prepareCollection(current.data, action.input)
+      if (!prepared.ok) throw new ApiError(422, prepared.reason, 'The selected payment obligations changed.')
+      const receipt = next.receipts.find(item => item.id === prepared.receiptId)!
+      statements.push(this.db.prepare(`INSERT INTO cash_collections
+        (id, workspace_id, payment_id, receipt_id, receipt_number, room_id, collected_on, amount_cents, idempotency_key, actor_id, items_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(action.input.transactionId, this.workspaceId, prepared.paymentId, receipt.id, receipt.receiptNumber,
+          action.input.roomId, action.input.collectedOn, prepared.totalCents, idempotencyKey, actor.id,
+          JSON.stringify(prepared.items.map(item => ({ id: item.charge?.id ?? item.id, category: item.category, periodId: item.periodId, periodLabel: item.periodLabel, dueDate: item.dueDate, amountCents: item.amountCents })))))
+      for (const item of prepared.items) {
+        statements.push(this.db.prepare(`INSERT INTO cash_collection_allocations
+          (id, collection_id, workspace_id, target_id, category, original_period_id, original_period_label, original_due_date, amount_cents)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          .bind(`collection-allocation-${action.input.transactionId}-${item.id}`, action.input.transactionId, this.workspaceId,
+            item.charge?.id ?? item.id, item.category, item.periodId, item.periodLabel, item.dueDate, item.amountCents))
+      }
+    }
 
     try {
       const results = await this.db.batch(statements)
-      const stateResult = results[0]
+      const stateResult = results[1]
       if (!stateResult || stateResult.meta.changes !== 1) {
         throw new ApiError(409, 'STATE_CONFLICT', 'The workspace changed while this command was being saved. Refresh and retry.')
       }
@@ -210,6 +248,8 @@ export class D1StateRepository {
         .bind(operationId, this.workspaceId, expectedRevision, requestId, now),
       this.db.prepare('UPDATE workspace_state SET revision = ?, data_json = ?, updated_at = ?, updated_by = ? WHERE workspace_id = ? AND revision = ?')
         .bind(revision, JSON.stringify(empty), now, actor.id, this.workspaceId, current.revision),
+      this.db.prepare('DELETE FROM cash_collection_allocations WHERE workspace_id = ?').bind(this.workspaceId),
+      this.db.prepare('DELETE FROM cash_collections WHERE workspace_id = ?').bind(this.workspaceId),
       this.db.prepare(`INSERT INTO idempotency_keys
         (workspace_id, idempotency_key, request_hash, operation, response_json, created_at, request_id)
         VALUES (?, ?, ?, 'CLEAR_RECORDS', ?, ?, ?)`)

@@ -344,7 +344,9 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
   })) return false
   if (!data.rentObligations.every(obligation => {
     const applied = sum(activeAllocations.filter(a => a.chargeId === obligation.id).map(a => a.amountCents))
-    return Number.isSafeInteger(applied) && applied <= obligation.amountCents && (applied === 0 || applied === obligation.amountCents)
+    const advance = sum(data.advanceApplications.filter(application => application.rentObligationId === obligation.id && application.state === 'ACTIVE').map(application => application.amountCents))
+    const total = applied + advance
+    return Number.isSafeInteger(total) && total <= obligation.amountCents && (applied === 0 || total === obligation.amountCents)
   })) return false
   if (!data.rentPrepayments.every(prepayment => {
     const payment = data.payments.find(item => item.id === prepayment.paymentId)

@@ -78,6 +78,7 @@ function categoryArray(value: unknown): ChargeCategory[] {
 }
 
 const actionTypes = new Set<PrototypeAction['type']>([
+  'payment/collected',
   'tenant/noteUpdated', 'tenant/created', 'tenant/updated', 'tenant/movedOut', 'tenant/deleted',
   'rates/planned', 'room/created', 'room/updated', 'room/deleted', 'room/statusToggled',
   'room/washingMachineUpdated', 'electricity/paymentConfirmed', 'electricity/meterInitialized',
@@ -92,6 +93,17 @@ export function parseAction(value: unknown): PrototypeAction {
   if (!isRecord(value) || !oneOf(value.type, [...actionTypes])) invalid('Unknown command type.')
   const action = value
   switch (action.type) {
+    case 'payment/collected': {
+      const input = action.input
+      if (!isRecord(input) || !isId(input.transactionId) || !isId(input.roomId) || !isIsoDate(input.collectedOn)
+        || !Array.isArray(input.selections) || input.selections.length === 0 || input.selections.length > 200
+        || !input.selections.every(item => isRecord(item) && isId(item.id) && isId(item.basis) && isMoney(item.amountCents)
+          && isId(item.periodId) && (item.dueDate === null || isIsoDate(item.dueDate)))
+        || !isRecord(input.readings) || Object.values(input.readings).some(reading => !Number.isSafeInteger(reading) || (reading as number) < 0)) {
+        invalid('Select valid obligations and verified meter readings.')
+      }
+      return { type: 'payment/collected', input: input as unknown as Extract<PrototypeAction, { type: 'payment/collected' }>['input'] }
+    }
     case 'tenant/noteUpdated':
       if (!isId(action.tenantId) || !isText(action.notes, 500)) invalid('The tenant note is invalid.')
       return { type: action.type, tenantId: action.tenantId, notes: action.notes }
@@ -199,6 +211,7 @@ export function parseAction(value: unknown): PrototypeAction {
 /** Server-owned civil dates override client clocks for system-time mutations. */
 export function withServerDate(action: PrototypeAction, serverDate: string): PrototypeAction {
   switch (action.type) {
+    case 'payment/collected': return { ...action, input: { ...action.input, collectedOn: serverDate } }
     case 'tenant/created': return { ...action, asOf: serverDate }
     case 'tenant/updated': return { ...action, asOf: serverDate }
     case 'tenant/movedOut': return { ...action, asOf: serverDate }

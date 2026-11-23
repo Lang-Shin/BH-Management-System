@@ -75,7 +75,9 @@ export function proposedRoomCharges(data: PrototypeAppState, room: Room, period:
     }
   }
 
-  if (room.washingMachineEnabled && !existing.some(charge => charge.category === 'WASHING_MACHINE')) {
+  // A current subscription is not evidence that washing was availed in a past month.
+  if (room.washingMachineEnabled && period.startDate.slice(0, 7) === asOf.slice(0, 7)
+    && !existing.some(charge => charge.category === 'WASHING_MACHINE')) {
     const washingRate = activeWashingRate(data, period.startDate)?.rateCents
     const id = `washing-${period.id}-${room.id}`
     if (washingRate && !data.charges.some(charge => charge.id === id)) {

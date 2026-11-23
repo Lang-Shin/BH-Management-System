@@ -1,197 +1,157 @@
-import { useState } from 'react'
-import { ArrowLeft, ArrowUpRight, Calculator, Check, Droplets, House, ShieldCheck, Wallet, WashingMachine, Zap } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { ArrowLeft, ArrowUpRight, Calculator, Check } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { usePrototype } from '@/hooks/use-prototype'
 import { useOccupancyDate } from '@/hooks/use-occupancy-date'
-import type { ChargeCategory } from '@/domain/types/models'
-import { selectBillingEligibleRooms } from '@/domain/calculations/billing-eligibility'
-import { buildRoomPaymentQuote, prepareRoomPayment, roomPaymentCategories, type RoomPaymentResult } from '@/domain/calculations/room-payment'
+import { collectionCatalog, prepareCollection, type CollectibleItem, type CollectionInput } from '@/domain/calculations/payment-collection'
+import { buildRoomPaymentQuote } from '@/domain/calculations/room-payment'
 import { parseMeterReadingMilliKwh } from '@/domain/calculations/electricity-calculation'
 import { formatDate, formatMoney } from '@/lib/format'
 import { CATEGORY_LABELS } from '@/lib/labels'
 
-const icons = { RENT: House, ELECTRICITY: Zap, WATER: Droplets, WASHING_MACHINE: WashingMachine, ADVANCE: Wallet, SECURITY_DEPOSIT: ShieldCheck }
-const emptySelection: ChargeCategory[] = []
-
-function electricityError(code: string | undefined) {
-  switch (code) {
-    case 'READING_BELOW_PREVIOUS': return 'Current reading cannot be lower than the last settled reading.'
-    case 'READING_NOT_ADVANCED': return 'Current reading must be higher than the last settled reading.'
-    case 'READING_DATE_INVALID': return 'The payment date must be after the last settled reading date.'
-    case 'RATE_NOT_FOUND': return 'No electricity rate applies to this payment date.'
-    case 'DUPLICATE_INTERVAL': return 'This meter interval was already billed.'
-    case 'INVALID_AMOUNT': return 'This reading produces an amount the prototype cannot represent safely.'
-    default: return 'Enter a valid current reading to calculate electricity.'
-  }
-}
-
 export function PaymentCalculator({ periodId, periodLabel }: { periodId: string; periodLabel: string }) {
-  const { data, dispatch, persistSnapshot } = usePrototype()
+  const { data, commitAction, loadCollectionCatalog, persistSnapshot, repositoryMode, commandError } = usePrototype()
   const occupancyDate = useOccupancyDate()
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState<'calculator' | 'confirm' | 'success'>('calculator')
   const [roomId, setRoomId] = useState('')
-  const [selected, setSelected] = useState<ChargeCategory[]>(emptySelection)
-  const [reading, setReading] = useState('')
-  const [preview, setPreview] = useState<Extract<RoomPaymentResult, { ok: true }> | null>(null)
-  const [submitError, setSubmitError] = useState('')
+  const [selected, setSelected] = useState<string[]>([])
+  const [readingText, setReadingText] = useState<Record<string, string>>({})
+  const [serverItems, setServerItems] = useState<CollectibleItem[]>([])
+  const [serverDate, setServerDate] = useState(occupancyDate)
+  const [quotedKey, setQuotedKey] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [catalogError, setCatalogError] = useState('')
+  const [retry, setRetry] = useState(0)
+  const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
-  const rooms = selectBillingEligibleRooms(data, periodId, occupancyDate)
-  const parsedReading = reading === '' ? null : parseMeterReadingMilliKwh(reading)
-  const readingError = reading !== '' && parsedReading === null ? 'Enter a non-negative reading with up to three decimal places.' : null
-  const quote = roomId ? buildRoomPaymentQuote(data, { roomId, periodId, selected, electricityReadingMilliKwh: parsedReading, asOf: occupancyDate }) : null
-  const electricityOption = quote?.options.find(option => option.category === 'ELECTRICITY')
-  const electricityErrorText = electricityOption?.state === 'INVALID_READING'
-    ? electricityError(quote?.electricity?.error) : null
-  const canReview = Boolean(quote?.canConfirm && !readingError)
+  const [input, setInput] = useState<CollectionInput | null>(null)
+  const [reviewItems, setReviewItems] = useState<CollectibleItem[]>([])
+  const readings = useMemo(() => Object.fromEntries(Object.entries(readingText)
+    .flatMap(([id, value]) => { const parsed = parseMeterReadingMilliKwh(value); return parsed === null ? [] : [[id, parsed]] })), [readingText]) as Record<string, number>
+  const requestedKey = JSON.stringify({ roomId, readings })
 
-  function reset() {
-    setStep('calculator')
-    setRoomId('')
-    setSelected(emptySelection)
-    setReading('')
-    setPreview(null)
-    setSubmitError('')
-    setSaving(false)
-  }
+  useEffect(() => {
+    if (!open || !roomId || repositoryMode !== 'server' || step !== 'calculator') return
+    let cancelled = false
+    const timer = setTimeout(() => {
+      setLoading(true)
+      setCatalogError('')
+      loadCollectionCatalog(roomId, readings).then(result => {
+        if (cancelled) return
+        setServerItems(result.items)
+        setServerDate(result.serverDate)
+        setQuotedKey(JSON.stringify({ roomId, readings }))
+      }).catch(cause => { if (!cancelled) setCatalogError(cause instanceof Error ? cause.message : 'The payment catalog could not be opened.') })
+        .finally(() => { if (!cancelled) setLoading(false) })
+    }, 150)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [open, roomId, repositoryMode, readings, retry, step, loadCollectionCatalog])
+
+  const asOf = repositoryMode === 'server' ? serverDate : occupancyDate
+  const items = repositoryMode === 'server' ? serverItems : roomId ? collectionCatalog(data, roomId, asOf, readings) : []
+  const rentItems = items.filter(item => item.category === 'RENT')
+  const utilityItems = items.filter(item => item.category !== 'RENT')
+  const months = [...new Set(utilityItems.map(item => item.periodId))]
+  const chosen = items.filter(item => selected.includes(item.id))
+  const total = chosen.reduce((sum, item) => sum + item.amountCents, 0)
+  const canReview = !loading && !catalogError && (repositoryMode !== 'server' || quotedKey === requestedKey)
+    && !Object.values(readingText).some(value => value !== '' && parseMeterReadingMilliKwh(value) === null)
+    && chosen.length > 0 && chosen.length === selected.length
+    && chosen.every(item => item.selectable && item.amountCents > 0)
+  const currentQuote = roomId ? buildRoomPaymentQuote(data, { roomId, periodId, selected: [], electricityReadingMilliKwh: null, asOf }) : null
+  const payment = input ? data.payments.find(item => item.id === `payment-collection-${input.transactionId}`) : undefined
+  const receipt = payment ? data.receipts.find(item => item.paymentId === payment.id) : undefined
 
   function changeOpen(next: boolean) {
-    if (next) reset()
+    if (saving) return
     setOpen(next)
+    if (next) { setStep('calculator'); chooseRoom(''); setInput(null); setReviewItems([]) }
   }
 
-  function chooseRoom(nextRoomId: string) {
-    setRoomId(nextRoomId)
-    setSelected(emptySelection)
-    setReading('')
-    setPreview(null)
-    setSubmitError('')
+  function chooseRoom(id: string) {
+    setRoomId(id); setSelected([]); setReadingText({}); setServerItems([]); setQuotedKey(''); setError(''); setCatalogError('')
+    setLoading(repositoryMode === 'server' && Boolean(id))
+    setInput(null)
   }
 
-  function toggle(category: ChargeCategory) {
-    setSelected(current => current.includes(category) ? current.filter(item => item !== category) : [...current, category])
-    setPreview(null)
-    setSubmitError('')
+  function toggle(ids: string[]) {
+    setSelected(current => ids.every(id => current.includes(id)) ? current.filter(id => !ids.includes(id)) : [...new Set([...current, ...ids])])
+    setError(''); setInput(null)
   }
 
   function review() {
-    if (!quote || !roomId) return
-    const result = prepareRoomPayment(data, { roomId, periodId, selected, electricityReadingMilliKwh: parsedReading, asOf: occupancyDate })
-    if (!result.ok) {
-      setSubmitError(result.reason === 'ELECTRICITY_READING_REQUIRED' ? 'Enter a valid current electricity reading before continuing.' : 'These bills changed. Close and reopen the calculator.')
-      return
+    if (!canReview) return
+    const nextInput: CollectionInput = {
+      transactionId: crypto.randomUUID(), roomId, readings, collectedOn: asOf,
+      selections: chosen.map(({ id, amountCents, periodId: originalPeriod, dueDate, basis }) => ({ id, amountCents, periodId: originalPeriod, dueDate, basis })),
     }
-    setPreview(result)
-    setStep('confirm')
+    setInput(nextInput); setReviewItems(chosen); setError(''); setStep('confirm')
   }
 
   async function confirm() {
-    if (!roomId || saving) return
-    const result = prepareRoomPayment(data, { roomId, periodId, selected, electricityReadingMilliKwh: parsedReading, asOf: occupancyDate })
-    if (!result.ok) {
-      setSubmitError('This payment could not be recorded because the underlying bills changed. Cancelling has not advanced the meter.')
-      return
+    if (!input || saving) return
+    setSaving(true); setError('')
+    if (repositoryMode === 'local') {
+      const result = prepareCollection(data, input)
+      if (!result.ok) { setError(`These obligations changed: ${result.reason}. Return and refresh the selections.`); setSaving(false); return }
+      const warning = await persistSnapshot(result.data)
+      if (warning) { setError(`Payment was not saved. ${warning}`); setSaving(false); return }
     }
-    setSaving(true)
-    setSubmitError('')
-    const warning = await persistSnapshot(result.data)
+    const confirmed = await commitAction({ type: 'payment/collected', input }, input.transactionId)
     setSaving(false)
-    if (warning) {
-      setSubmitError(`Payment was not saved. ${warning}`)
-      return
-    }
-    dispatch({ type: 'room/paymentConfirmed', roomId, periodId, selected, electricityReadingMilliKwh: parsedReading, asOf: occupancyDate })
-    setPreview(result)
+    if (!confirmed) { setError('Payment was not confirmed. Retry the same transaction or go back and refresh the catalog.'); return }
     setStep('success')
   }
 
   return <Dialog open={open} onOpenChange={changeOpen}>
-    <DialogTrigger asChild>
-      <button type="button" className="payment-launcher">
-        <span className="payment-launcher-icon"><Calculator aria-hidden="true" /></span>
-        <span className="text-left"><span className="block font-bold">Calculate payment</span><span className="block text-xs opacity-85">Room-based, calculated for you</span></span>
-        <ArrowUpRight className="ml-2 size-5 shrink-0" aria-hidden="true" />
-      </button>
-    </DialogTrigger>
+    <DialogTrigger asChild><button type="button" className="payment-launcher"><span className="payment-launcher-icon"><Calculator aria-hidden="true" /></span><span className="text-left"><span className="block font-bold">Calculate payment</span><span className="block text-xs opacity-85">Room-based, calculated for you</span></span><ArrowUpRight className="ml-2 size-5 shrink-0" aria-hidden="true" /></button></DialogTrigger>
     <DialogContent className="payment-calculator" aria-describedby="payment-calculator-description">
-      {step === 'calculator' && <form onSubmit={event => { event.preventDefault(); if (canReview) review() }}>
-        <div className="payment-calculator-heading">
-          <span className="payment-eyebrow">PAYMENT STUDIO · PHP</span>
-          <DialogTitle className="mt-2 text-2xl">Choose a room and its bills.</DialogTitle>
-          <DialogDescription id="payment-calculator-description" className="mt-2">Select the bills this room is paying. Amounts are calculated from the workspace billing rules.</DialogDescription>
-          <p className="mt-2 text-xs text-muted-foreground">{periodLabel} · Only this billing period is included; older pending periods remain in Pending Payments.</p>
-        </div>
+      {step === 'calculator' && <form onSubmit={event => { event.preventDefault(); review() }}>
+        <div className="payment-calculator-heading"><span className="payment-eyebrow">PAYMENT STUDIO · PHP</span><DialogTitle className="mt-2 text-2xl">Choose a room and its bills.</DialogTitle><DialogDescription id="payment-calculator-description" className="mt-2">Select specific unpaid rent periods and calendar-month utilities. Nothing is selected automatically.</DialogDescription><p className="mt-2 text-xs text-muted-foreground">Viewing Billing: {periodLabel}. Collection includes earlier outstanding obligations. Collection date: {formatDate(asOf)}.</p></div>
         <div className="payment-calculator-body">
           <label htmlFor="payment-room" className="mb-2 block text-sm font-semibold">Choose room</label>
-          <select id="payment-room" value={roomId} onChange={event => chooseRoom(event.target.value)} className="payment-tenant-select">
-            <option value="">Choose a room</option>
-            {rooms.map(room => <option key={room.id} value={room.id}>Room {room.name}</option>)}
-          </select>
-
-          {roomId && quote && <fieldset className="room-payment-options">
-            <legend className="sr-only">Bills to pay</legend>
-            {roomPaymentCategories.map(category => {
-              const option = quote.options.find(item => item.category === category)!
-              const Icon = icons[category]
-              const selectable = ['SELECTABLE', 'AWAITING_READING', 'INVALID_READING'].includes(option.state)
-              const checked = selected.includes(category)
-              return <div key={category} className="room-payment-option" data-state={option.state}>
-                <label className="room-payment-option-label">
-                  <input type="checkbox" checked={checked} disabled={!selectable} onChange={() => toggle(category)} aria-label={CATEGORY_LABELS[category]} />
-                  <span className="payment-category-icon"><Icon className="size-[18px]" aria-hidden="true" /></span>
-                  <span className="min-w-0 flex-1"><span className="block font-semibold">{CATEGORY_LABELS[category]}{category === 'WASHING_MACHINE' && <span className="ml-2 text-xs font-medium text-muted-foreground">Optional</span>}</span><span className="mt-0.5 block text-xs text-muted-foreground">{option.detail}{category === 'ELECTRICITY' && quote.electricity ? ` · Last settled ${quote.electricity.previousReadingMilliKwh / 1000} kWh on ${formatDate(quote.electricity.previousReadOn)}` : ''}</span></span>
-                  <span className="shrink-0 text-right font-semibold tabular-nums">{option.state === 'PAID' ? 'Paid' : option.state === 'UNAVAILABLE' ? option.detail : option.amountCents == null ? 'Amount pending calculation' : formatMoney(option.amountCents)}</span>
-                </label>
-                {category === 'ELECTRICITY' && checked && <div className="room-payment-electricity">
-                  <label htmlFor="room-electricity-reading" className="text-sm font-semibold">Current meter reading (kWh)</label>
-                  <input id="room-electricity-reading" type="text" inputMode="decimal" maxLength={14} value={reading} onChange={event => { setReading(event.target.value); setPreview(null); setSubmitError('') }} aria-invalid={Boolean(readingError || electricityErrorText)} aria-describedby={readingError || electricityErrorText ? 'room-electricity-error' : undefined} className="electricity-reading-input" />
-                  <p className="text-xs text-muted-foreground">Rate {quote.electricity ? `${formatMoney(quote.electricity.rateCentsPerKwh)} per kWh` : 'unavailable'} · Consumption is billed from the last settled reading.</p>
-                  {quote.electricity?.consumptionMilliKwh != null && <p className="text-sm font-semibold">{quote.electricity.consumptionMilliKwh / 1000} kWh × {formatMoney(quote.electricity.rateCentsPerKwh)} = {formatMoney(quote.electricity.amountCents ?? 0)}</p>}
-                  {(readingError || electricityErrorText) && <p id="room-electricity-error" role="alert" className="text-sm text-destructive">{readingError ?? electricityErrorText}</p>}
-                </div>}
-              </div>
-            })}
-          </fieldset>}
-          {submitError && <p role="alert" className="mt-3 text-sm text-destructive">{submitError}</p>}
-          <p className="mt-3 text-xs text-muted-foreground">Paid bills are disabled. Electricity remains uncalculated until a valid reading is entered.</p>
+          <select id="payment-room" value={roomId} onChange={event => chooseRoom(event.target.value)} className="payment-tenant-select"><option value="">Choose a room</option>{data.rooms.map(room => <option key={room.id} value={room.id}>Room {room.name}</option>)}</select>
+          {roomId && <div className="payment-obligation-cards">
+            <details open className="payment-obligation-card"><summary><strong>Rent</strong><span>Anniversary-based billing</span></summary><div className="payment-card-content">
+              {rentItems.length === 0
+                ? <p className="text-sm text-muted-foreground"><input aria-label="Rent" type="checkbox" disabled /> {loading ? 'Loading rent periods…' : catalogError ? 'Rent periods unavailable.' : 'All rent periods paid'}</p>
+                : rentItems.map(item => <label key={item.id} className="collection-obligation">
+                  <input type="checkbox" disabled={!item.selectable} checked={selected.includes(item.id)} onChange={() => toggle([item.id])} aria-label={item.charge && item.periodId === periodId ? 'Rent' : `Rent — ${item.periodLabel}`} />
+                  <span><strong>{item.periodLabel}</strong><small>Due {item.dueDate ? formatDate(item.dueDate) : 'date not recorded'} · {item.status}</small><small>Original rate {formatMoney(item.originalCents ?? item.amountCents)}</small>{!item.selectable && <small>{item.detail}</small>}</span>
+                  <strong>{formatMoney(item.amountCents)}</strong>
+                </label>)}
+            </div></details>
+            <details open className="payment-obligation-card"><summary><strong>Utilities</strong><span>Calendar-month billing</span></summary><div className="payment-card-content">
+              <p className="text-xs text-muted-foreground">Historical issued washing bills are collectible. Unissued historical washing requires verified usage; today’s subscription does not prove past usage. Electricity uses one continuous meter interval; choose only one pending month per meter.</p>
+              {months.map(month => {
+                const monthly = utilityItems.filter(item => item.periodId === month)
+                return <section key={month} className="collection-month" aria-label={monthly[0]!.periodLabel}><h3 className="font-semibold">{monthly[0]!.periodLabel}</h3>{(['WATER', 'ELECTRICITY', 'WASHING_MACHINE'] as const).flatMap(category => {
+                  const group = monthly.filter(item => item.category === category)
+                  if (!group.length) return []
+                  const ids = group.map(item => item.id)
+                  const label = month === periodId ? CATEGORY_LABELS[category] : `${CATEGORY_LABELS[category]} — ${group[0]!.periodLabel}`
+                  const awaiting = group.some(item => item.status === 'AWAITING READING')
+                  return [<div key={category} className="room-payment-option"><label className="collection-obligation"><input type="checkbox" aria-label={label} checked={ids.every(id => selected.includes(id))} onChange={() => toggle(ids)} /><span><strong>{CATEGORY_LABELS[category]}</strong><small>{awaiting ? 'AWAITING READING' : group.every(item => item.dueDate) ? group[0]!.status : 'UNPAID · eligible monthly charge'}</small>{group.map(item => <small key={item.id}>{item.label} · {item.detail}</small>)}</span><strong>{awaiting ? 'Amount pending calculation' : formatMoney(group.reduce((sum, item) => sum + item.amountCents, 0))}</strong></label>
+                    {category === 'ELECTRICITY' && ids.some(id => selected.includes(id)) && group.map(item => <div key={item.id} className="room-payment-electricity"><label htmlFor={`reading-${item.id}`}>Current meter reading (kWh)</label><input id={`reading-${item.id}`} className="electricity-reading-input" inputMode="decimal" value={readingText[item.id] ?? ''} onChange={event => { setReadingText(current => ({ ...current, [item.id]: event.target.value })); setInput(null) }} aria-invalid={Boolean(readingText[item.id] && parseMeterReadingMilliKwh(readingText[item.id]!) === null)} /><p className="text-xs">{item.detail}</p><Link to="/rooms" className="text-sm underline">Open Room Details for verified meter setup</Link></div>)}
+                  </div>]
+                })}</section>
+              })}
+              {!utilityItems.length && <p className="text-sm text-muted-foreground">{loading ? 'Loading utility obligations…' : catalogError ? 'Utility obligations unavailable.' : 'No unpaid utility obligations.'}</p>}
+              {currentQuote?.options.filter(option => option.category !== 'RENT' && !utilityItems.some(item => item.periodId === periodId && item.category === option.category)).map(option => <p key={option.category} className="text-sm text-muted-foreground"><input type="checkbox" aria-label={CATEGORY_LABELS[option.category]} disabled /> {CATEGORY_LABELS[option.category]} · {option.state === 'PAID' ? 'PAID' : option.detail}</p>)}
+            </div></details>
+          </div>}
+          {loading && <p role="status">Loading authoritative obligations…</p>}
+          {catalogError && <div role="alert">{catalogError}<Button type="button" onClick={() => { setLoading(true); setRetry(current => current + 1) }}>Retry loading obligations</Button></div>}
+          {error && <p role="alert">{error}</p>}
+          {chosen.some(item => item.status === 'AWAITING READING') && <p className="text-xs text-muted-foreground">Electricity is excluded until a valid reading is entered.</p>}
         </div>
-        <div className="payment-total-panel">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div><p className="text-sm opacity-85">Total to pay</p><output aria-label="Total to pay" aria-live="polite" aria-atomic="true" className="payment-total-value">{quote && quote.selected.length > 0 ? formatMoney(quote.totalCents) : formatMoney(0)}</output>{quote?.pendingElectricity && <p className="mt-1 text-xs">Electricity is excluded until a valid reading is entered.</p>}</div>
-            <span className="payment-total-tag">{selected.length} of 4 selected</span>
-          </div>
-          <div className="mt-5 flex gap-3"><DialogClose asChild><Button type="button" variant="ghost" className="payment-cancel">Cancel</Button></DialogClose><Button type="submit" className="flex-1" disabled={!canReview}>Review payment <Check className="size-4" aria-hidden="true" /></Button></div>
-          {!roomId && <p className="mt-3 text-xs opacity-85">Choose a room to see its bills.</p>}
-        </div>
+        <div className="payment-total-panel"><p>Total to pay</p><output aria-label="Total to pay" aria-live="polite" className="payment-total-value">{formatMoney(total)}</output><p className="text-xs">{selected.length} obligations selected · pending measurements have no peso amount.</p><div className="mt-5 flex gap-3"><DialogClose asChild><Button type="button" variant="ghost" className="payment-cancel">Cancel</Button></DialogClose><Button type="submit" disabled={!canReview} className="flex-1">Review payment <Check className="size-4" /></Button></div></div>
       </form>}
-
-      {step === 'confirm' && quote && preview?.ok && <div className="room-payment-confirm">
-        <span className="payment-eyebrow">REVIEW BEFORE SAVING</span>
-        <DialogTitle className="mt-2 text-2xl">Confirm payment received</DialogTitle>
-        <DialogDescription className="mt-2">Nothing has been saved yet. Confirm that the landlord received the total below.</DialogDescription>
-        <dl className="room-payment-summary">
-          <div><dt>Room</dt><dd>{quote.roomLabel}</dd></div>
-          <div><dt>Billing period</dt><dd>{quote.periodLabel}</dd></div>
-          {quote.selected.map(category => <div key={category}><dt>{CATEGORY_LABELS[category]}</dt><dd>{formatMoney(quote.options.find(option => option.category === category)?.amountCents ?? 0)}</dd></div>)}
-          {quote.electricity?.charge && <div><dt>Electricity interval</dt><dd>{quote.electricity.previousReadingMilliKwh / 1000} → {quote.electricity.currentReadingMilliKwh! / 1000} kWh</dd></div>}
-          <div className="room-payment-summary-total"><dt>Total to receive</dt><dd>{formatMoney(preview.totalCents)}</dd></div>
-        </dl>
-        {preview.payments.length > 1 && <p className="text-sm text-muted-foreground">This room’s bills belong to {preview.payments.length} tenants, so confirmation records {preview.payments.length} separate tenant payments and receipts.</p>}
-        {submitError && <p role="alert" className="text-sm text-destructive">{submitError}</p>}
-        <div className="mt-5 flex gap-3"><Button variant="outline" onClick={() => { setStep('calculator'); setSubmitError('') }}><ArrowLeft aria-hidden="true" />Back</Button><Button className="flex-1" onClick={confirm} disabled={saving}>{saving ? 'Saving payment…' : 'Confirm payment received'}</Button></div>
-      </div>}
-
-      {step === 'success' && preview?.ok && <div className="payment-success">
-        <span className="payment-success-icon"><Check className="size-8" aria-hidden="true" /></span>
-        <span className="payment-eyebrow mt-5">PAYMENT RECORDED</span>
-        <DialogTitle className="mt-2 text-2xl">Payment recorded</DialogTitle>
-        <DialogDescription className="mt-2">Room {rooms.find(room => room.id === roomId)?.name ?? ''} · {periodLabel}. {preview.payments.length === 1 ? 'One room-level payment was recorded and shared with authorized occupants.' : `${preview.payments.length} room payments were recorded.`}</DialogDescription>
-        <p className="payment-success-amount">{formatMoney(preview.totalCents)}</p>
-        <p className="mt-1 text-sm font-semibold">{preview.receipts.map(receipt => receipt.receiptNumber).join(' · ')}</p>
-        {preview.quote.electricity?.charge && <p className="mt-2 text-sm text-muted-foreground">Meter baseline advanced to {preview.quote.electricity.currentReadingMilliKwh! / 1000} kWh.</p>}
-        <Button autoFocus className="mt-5 w-full" onClick={() => changeOpen(false)}>Got it</Button>
-      </div>}
+      {step === 'confirm' && input && <div className="room-payment-confirm"><span className="payment-eyebrow">REVIEW BEFORE SAVING</span><DialogTitle className="mt-2 text-2xl">Confirm payment received</DialogTitle><DialogDescription>Only these selected obligations will be settled. Original periods, rates, due dates, and anniversary anchors remain unchanged.</DialogDescription><dl className="room-payment-summary"><div><dt>Room</dt><dd>Room {data.rooms.find(room => room.id === roomId)?.name}</dd></div><div><dt>Actual collection date</dt><dd>{formatDate(input.collectedOn)}</dd></div>{reviewItems.map(item => <div key={item.id}><dt>{CATEGORY_LABELS[item.category]} · {item.periodLabel}{item.dueDate && <small> · due {formatDate(item.dueDate)}</small>}</dt><dd>{formatMoney(item.amountCents)}</dd></div>)}<div className="room-payment-summary-total"><dt>Total to receive</dt><dd>{formatMoney(reviewItems.reduce((sum, item) => sum + item.amountCents, 0))}</dd></div></dl><p className="text-sm">One cash payment and one itemized receipt, with a separate allocation for each obligation.</p>{error && <p role="alert">{error} {commandError}</p>}<div className="mt-5 flex gap-3"><Button variant="outline" disabled={saving} onClick={() => { setStep('calculator'); setError(''); setRetry(current => current + 1) }}><ArrowLeft />Back</Button><Button onClick={confirm} disabled={saving}>{saving ? 'Saving payment…' : error ? 'Retry payment' : 'Confirm payment received'}</Button></div></div>}
+      {step === 'success' && <div className="payment-success"><span className="payment-success-icon"><Check className="size-8" /></span><DialogTitle className="mt-2 text-2xl">Payment recorded</DialogTitle><DialogDescription>One confirmed room-level cash transaction. Only selected obligations were settled.</DialogDescription><p className="payment-success-amount">{formatMoney(payment?.amountCents ?? 0)}</p><p>{receipt?.receiptNumber}</p>{reviewItems.some(item => item.reading) && <p>Meter baseline advanced to {(reviewItems.find(item => item.reading)?.reading?.readingMilliKwh ?? 0) / 1000} kWh.</p>}<Button autoFocus className="mt-5 w-full" onClick={() => changeOpen(false)}>Got it</Button></div>}
     </DialogContent>
   </Dialog>
 }

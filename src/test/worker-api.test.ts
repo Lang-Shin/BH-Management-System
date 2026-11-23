@@ -9,6 +9,10 @@ import { calendarBillingPeriods } from '@/domain/calculations/billing-periods'
 import { selectBillingRent } from '@/domain/calculations/billing-rent'
 import { buildRoomPaymentQuote } from '@/domain/calculations/room-payment'
 import { selectBillingRooms } from '@/features/billing/billing-room-status'
+import type { CollectibleItem, CollectionInput } from '@/domain/calculations/payment-collection'
+import { rentObligationPaidCents } from '@/domain/calculations/rental-periods'
+import { selectRoomFinance } from '@/domain/calculations/room-finance'
+import { pendingPaymentPeriods } from '@/features/dashboard/pending-payment-groups'
 
 const root = process.cwd()
 const src = path.join(root, 'src')
@@ -424,6 +428,79 @@ describe('Worker and D1 integration', () => {
     const after = await bootstrap()
     expect(after.revision).toBe(before.revision)
     expect(after.data).toEqual(before.data)
+  }, 30_000)
+
+  it('collects historical rent and utilities atomically with concurrent, stale, retry, and rollback protection', async () => {
+    const initial = await bootstrap()
+    const reset = await jsonRequest('/api/v1/admin/clear-records', 'POST', { confirmation: 'RESET', expectedRevision: initial.revision }, { 'idempotency-key': 'collection-test-reset-0001' })
+    expect(reset.status).toBe(200)
+    const createdResponse = await jsonRequest('/api/v1/commands', 'POST', { action: { type: 'tenant/created', draft: {
+      name: 'July Historical Tenant', email: 'july.worker@example.com', phone: '', address: '', notes: '', roomId: 'room-2', moveInDate: '2026-07-06',
+    } } }, { 'idempotency-key': 'collection-create-tenant-0001' })
+    expect(createdResponse.status).toBe(200)
+    const created = await bootstrap()
+    const moveIn = created.data.moveInObligations.find(item => item.roomId === 'room-2')!
+    expect((await jsonRequest('/api/v1/commands', 'POST', { action: { type: 'moveIn/paymentRecorded', obligationId: moveIn.id, categories: ['ADVANCE', 'SECURITY_DEPOSIT'], paidOn: '2026-07-06' } }, { 'idempotency-key': 'collection-move-in-0001' })).status).toBe(200)
+    const db = await worker.getD1Database('DB')
+    const seeded = await bootstrap()
+    const tenant = seeded.data.tenants.find(item => item.name === 'July Historical Tenant')!
+    // Explicitly issued historical washing is evidence of usage; the current flag alone is not.
+    seeded.data.charges.push({ id: 'issued-august-washing', tenantId: tenant.id, billingPeriodId: 'period-2026-08',
+      category: 'WASHING_MACHINE', amountCents: 10_000, description: 'Verified August washing', entryMethod: 'MANUAL',
+      issuedOn: '2026-08-31', dueDate: '2026-08-31', state: 'ISSUED', correction: null })
+    await db.prepare('UPDATE workspace_state SET data_json = ? WHERE workspace_id = ?').bind(JSON.stringify(seeded.data), 'test-workspace').run()
+    const quoteResponse = await jsonRequest('/api/v1/payments/quote', 'POST', { roomId: 'room-2', readings: {} })
+    expect(quoteResponse.status).toBe(200)
+    const quote = await quoteResponse.json() as { items: CollectibleItem[]; serverDate: string }
+    const rent = quote.items.find(item => item.category === 'RENT' && item.dueDate === '2026-08-06')!
+    expect(rent).toMatchObject({ amountCents: 350_000, status: 'OVERDUE' })
+    expect(quote.items.some(item => item.category === 'RENT' && item.dueDate === '2026-07-06')).toBe(false)
+    const water = quote.items.find(item => item.category === 'WATER' && item.periodId === 'period-2026-08')!
+    const washing = quote.items.find(item => item.id === 'issued-august-washing')!
+    const input: CollectionInput = { transactionId: 'historical-collection-0001', roomId: 'room-2', readings: {}, selections: [rent, water, washing], collectedOn: quote.serverDate }
+    const stale = await jsonRequest('/api/v1/commands', 'POST', { action: { type: 'payment/collected', input: { ...input, selections: [{ ...rent, amountCents: 1 }] } } }, { 'idempotency-key': 'historical-stale-0001' })
+    expect(stale.status).toBe(422)
+    const race = await Promise.all(['race-one', 'race-two'].map(transactionId => jsonRequest('/api/v1/commands', 'POST', {
+      action: { type: 'payment/collected', input: { ...input, transactionId } },
+    }, { 'idempotency-key': `historical-${transactionId}-0001` })))
+    expect(race.filter(response => response.status === 200)).toHaveLength(1)
+    expect(race.filter(response => response.status === 409 || response.status === 422)).toHaveLength(1)
+    const winnerIndex = race.findIndex(response => response.status === 200)
+    const winnerId = winnerIndex === 0 ? 'race-one' : 'race-two'
+    const winnerInput = { ...input, transactionId: winnerId }
+    const result = await race[winnerIndex]!.json() as { data: ReturnType<typeof createDemoData>; revision: number }
+    const payment = result.data.payments.find(item => item.id === `payment-collection-${winnerId}`)!
+    expect(payment).toMatchObject({ amountCents: 370_000, paidOn: quote.serverDate })
+    expect(result.data.receipts.find(item => item.paymentId === payment.id)?.allocationIds).toHaveLength(3)
+    expect(result.data.rentObligations.find(item => item.id === rent.id)?.dueDate).toBe('2026-08-06')
+    expect(rentObligationPaidCents(result.data, rent.id, quote.serverDate)).toBe(350_000)
+    expect(result.data.rentObligations.filter(item => item.dueDate >= '2026-09-01').every(item => rentObligationPaidCents(result.data, item.id, quote.serverDate) === 0)).toBe(true)
+    const replay = await jsonRequest('/api/v1/commands', 'POST', { action: { type: 'payment/collected', input: winnerInput } }, { 'idempotency-key': `historical-${winnerId}-0001` })
+    expect(replay.status).toBe(200)
+    await expect(replay.json()).resolves.toMatchObject({ replayed: true, revision: result.revision })
+    const collectionCount = await db.prepare('SELECT COUNT(*) AS count FROM cash_collections').first<{ count: number }>()
+    const allocationCount = await db.prepare('SELECT COUNT(*) AS count FROM cash_collection_allocations').first<{ count: number }>()
+    expect(collectionCount?.count).toBe(1)
+    expect(allocationCount?.count).toBe(3)
+    const refreshed = await bootstrap()
+    const pendingRoom = selectRoomFinance(refreshed.data, quote.serverDate).find(item => item.context.roomId === 'room-2')!
+    expect(pendingPaymentPeriods(refreshed.data, pendingRoom.charges, quote.serverDate, 'room-2').flatMap(period => period.bills).flatMap(bill => bill.charges).some(charge => charge.id === rent.id)).toBe(false)
+
+    const nextQuote = await jsonRequest('/api/v1/payments/quote', 'POST', { roomId: 'room-2', readings: {} })
+    const nextItems = (await nextQuote.json() as { items: CollectibleItem[] }).items
+    const september = nextItems.find(item => item.category === 'RENT' && item.dueDate === '2026-09-06')!
+    const rollbackInput = { ...input, transactionId: 'rollback-collection', selections: [september] }
+    await db.prepare("CREATE TRIGGER fail_collection_allocation BEFORE INSERT ON cash_collection_allocations BEGIN SELECT RAISE(ABORT, 'forced allocation failure'); END").run()
+    try {
+      const failed = await jsonRequest('/api/v1/commands', 'POST', { action: { type: 'payment/collected', input: rollbackInput } }, { 'idempotency-key': 'rollback-collection-0001' })
+      expect(failed.status).toBe(409)
+    } finally { await db.prepare('DROP TRIGGER fail_collection_allocation').run() }
+    const afterFailure = await bootstrap()
+    expect(afterFailure.revision).toBe(refreshed.revision)
+    expect(afterFailure.data.payments).toHaveLength(refreshed.data.payments.length)
+    expect((await db.prepare("SELECT COUNT(*) AS count FROM cash_collections WHERE id = 'rollback-collection'").first<{ count: number }>())?.count).toBe(0)
+    const retry = await jsonRequest('/api/v1/commands', 'POST', { action: { type: 'payment/collected', input: rollbackInput } }, { 'idempotency-key': 'rollback-collection-0001' })
+    expect(retry.status).toBe(200)
   }, 30_000)
 
   it('clears all records atomically while preserving room configuration and rejecting sample restoration', async () => {

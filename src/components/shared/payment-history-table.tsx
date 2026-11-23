@@ -21,7 +21,8 @@ const paymentCategories: { category: ChargeCategory; label: string }[] = [
 function PaymentCategoryBoxes({ data, payment, asOf }: { data: PrototypeAppState; payment: Payment; asOf: string }) {
   const paidCategories = new Set(data.paymentAllocations
     .filter(allocation => allocation.paymentId === payment.id && allocation.state === 'ACTIVE' && allocation.allocatedOn <= asOf)
-    .map(allocation => data.charges.find(charge => charge.id === allocation.chargeId)?.category)
+    .map(allocation => data.charges.find(charge => charge.id === allocation.chargeId)?.category
+      ?? (data.rentObligations.some(rent => rent.id === allocation.chargeId) ? 'RENT' : undefined))
     .filter((category): category is ChargeCategory => Boolean(category)))
   const categories = paymentCategories.filter(item => paidCategories.has(item.category))
 

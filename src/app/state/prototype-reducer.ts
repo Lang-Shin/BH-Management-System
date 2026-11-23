@@ -1,4 +1,5 @@
 import { DEFAULT_ACTION_DATE } from './action-date'
+import { prepareCollection } from '@/domain/calculations/payment-collection'
 import { ensureInitialRateBaseline } from '@/domain/calculations/rate-baseline'
 import type { PrototypeData } from '@/domain/types/models'
 import type { StateAction } from './actions'
@@ -19,6 +20,10 @@ import { prepareRentPrepayment } from '@/domain/calculations/rent-schedule'
 
 export function prototypeReducer(state: PrototypeData, action: StateAction): PrototypeData {
   switch (action.type) {
+    case 'payment/collected': {
+      const result = prepareCollection(state, action.input)
+      return result.ok ? result.data : state
+    }
     case 'data/loaded':
       return repairNewCycleMoveInObligations(reconcileOccupancy(action.data, action.data, action.occupancyDate, { createMoveInObligations: false }), action.occupancyDate, DEFAULT_ACTION_DATE)
     case 'data/serverSynced':

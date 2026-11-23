@@ -28,6 +28,8 @@ export function TransactionDialog({ data, payment, asOf, onClose, onReturnFocus,
     .reduce((sum, allocation) => sum + allocation.amountCents, 0)
   const editUnavailableReason = !onEditPayment ? null
     : payment.state !== 'RECORDED' ? 'Voided payments cannot be edited.'
+      : context.allocations.some(allocation => data.rentObligations.some(rent => rent.id === allocation.chargeId))
+        ? 'This itemized transaction contains anniversary rent. An authorized ledger correction is required; utility-only edits cannot safely reverse it.'
       : correction ? 'This is a revised transaction. Review it in Correction History; a transaction can only be corrected once.'
         : context.allocations.length === 0 ? (advance ? 'Advance payments have no bill categories to correct.' : 'This transaction has no bill allocations to correct.')
           : allocatedCents !== payment.amountCents ? 'This transaction includes unallocated money, so it cannot be corrected safely from this dialog.'

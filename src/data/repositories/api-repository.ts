@@ -1,4 +1,5 @@
 import type { PrototypeAction } from '@/app/state/actions'
+import type { CollectibleItem } from '@/domain/calculations/payment-collection'
 import { isPrototypeData } from '@/domain/validation/prototype-data'
 import type { PrototypeCommandResult, PrototypeRepository, PrototypeSnapshot } from './prototype-repository'
 
@@ -107,6 +108,14 @@ export function createApiRepository(): PrototypeRepository {
       }))
     },
   }
+}
+
+export async function fetchCollectionCatalog(roomId: string, readings: Record<string, number>): Promise<{ items: CollectibleItem[]; serverDate: string }> {
+  const body = await request('/payments/quote', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ roomId, readings }),
+  })
+  if (!Array.isArray(body.items) || typeof body.serverDate !== 'string') throw new ApiRepositoryError('The server returned an invalid payment catalog.', 200, 'INVALID_QUOTE')
+  return { items: body.items as CollectibleItem[], serverDate: body.serverDate }
 }
 
 export interface RentPrepaymentQuoteLine {

@@ -445,7 +445,7 @@ describe('admin workspace integration', () => {
     expect(dialog).toHaveTextContent('Total to receive')
     expect(dialog).toHaveTextContent('₱4,025.00')
     await user.click(within(dialog).getByRole('button', { name: 'Confirm payment received' }))
-    dialog = screen.getByRole('dialog', { name: 'Payment recorded' })
+    dialog = await screen.findByRole('dialog', { name: 'Payment recorded' })
     expect(dialog).toHaveTextContent('₱4,025.00')
     expect(dialog).toHaveTextContent('BHMS-RCT-015')
     expect(dialog).toHaveTextContent('Meter baseline advanced to 325 kWh')

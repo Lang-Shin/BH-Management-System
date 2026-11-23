@@ -76,7 +76,8 @@ export function PaymentsTransactionWorkspace() {
     const matchesSearch = !normalizedSearch || `${receiptNumber} ${roomLabel}`.toLowerCase().includes(normalizedSearch)
     const matchesMonth = month === 'ALL' || inSelectedMonth(payment.paidOn)
       || data.paymentAllocations.some(allocation => allocation.paymentId === payment.id
-        && data.charges.some(charge => charge.id === allocation.chargeId && charge.billingPeriodId === month))
+        && (data.charges.some(charge => charge.id === allocation.chargeId && charge.billingPeriodId === month)
+          || data.rentObligations.some(rent => rent.id === allocation.chargeId && data.billingPeriods.some(period => period.id === month && rent.dueDate >= period.startDate && rent.dueDate <= period.endDate))))
     const matchesStatus = status === 'ALL' || status === effectiveStatus
     return matchesSearch && matchesMonth && matchesStatus
   }).sort((a, b) => b.paidOn.localeCompare(a.paidOn))

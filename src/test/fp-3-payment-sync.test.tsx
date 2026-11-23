@@ -35,8 +35,8 @@ describe('recorded payment synchronization', () => {
       expect(saved.payments).toHaveLength(15)
       expect(saved.receipts).toHaveLength(15)
       expect(saved.receipts.find((receipt: { receiptNumber: string }) => receipt.receiptNumber === 'BHMS-RCT-015')).toMatchObject({ amountCents: 350_000, state: 'ISSUED' })
-      expect(saved.payments.find((payment: { id: string }) => payment.id.includes('payment-room-')).amountCents).toBe(350_000)
-      expect(saved.paymentAllocations.filter((allocation: { paymentId: string }) => allocation.paymentId.includes('payment-room-')).reduce((sum: number, allocation: { amountCents: number }) => sum + allocation.amountCents, 0)).toBe(350_000)
+      expect(saved.payments.find((payment: { id: string }) => payment.id.includes('payment-collection-')).amountCents).toBe(350_000)
+      expect(saved.paymentAllocations.filter((allocation: { paymentId: string }) => allocation.paymentId.includes('payment-collection-')).reduce((sum: number, allocation: { amountCents: number }) => sum + allocation.amountCents, 0)).toBe(350_000)
     })
     await user.click(within(success).getByRole('button', { name: 'Got it' }))
 
@@ -71,7 +71,7 @@ describe('recorded payment synchronization', () => {
     await user.click(within(confirm).getByRole('button', { name: 'Confirm payment received' }))
     expect(await within(confirm).findByText(/Payment was not saved\./)).toHaveTextContent('Simulated storage failure.')
     expect(screen.queryByRole('dialog', { name: 'Payment recorded' })).not.toBeInTheDocument()
-    expect(within(confirm).getByRole('button', { name: 'Confirm payment received' })).toBeEnabled()
+    expect(within(confirm).getByRole('button', { name: 'Retry payment' })).toBeEnabled()
     expect(save).toHaveBeenCalled()
   }, 20000)
 

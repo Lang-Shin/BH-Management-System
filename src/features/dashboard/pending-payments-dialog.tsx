@@ -9,6 +9,7 @@ import { CATEGORY_LABELS } from '@/lib/labels'
 import { formatDate, formatMoney } from '@/lib/format'
 import { pendingPaymentCategories } from './pending-payment-groups'
 import { unresolvedElectricity } from '@/domain/calculations/summary'
+import { collectionCatalog } from '@/domain/calculations/payment-collection'
 
 const icons = { RENT: House, ELECTRICITY: Zap, WATER: Droplets, WASHING_MACHINE: WashingMachine, ADVANCE: Wallet, SECURITY_DEPOSIT: ShieldCheck }
 const timingLabels = { earlier: 'Past month', current: 'Current month', upcoming: 'Upcoming month', review: 'Month needs review' }
@@ -21,7 +22,11 @@ export function PendingPaymentsDialog({ data, room, asOf, onClose, onReturnFocus
   onClose: () => void
   onReturnFocus: () => void
 }) {
-  const categories = pendingPaymentCategories(data, room.charges, asOf, room.context.roomId ?? undefined)
+  const roomId = room.context.roomId
+  const projected = roomId && data.occupancyCycles.some(cycle => cycle.roomId === roomId && cycle.rentSchedule === 'ANNIVERSARY')
+    ? collectionCatalog(data, roomId, asOf).flatMap(item => item.charge && !data.charges.some(charge => charge.id === item.charge!.id) ? [item.charge] : [])
+    : []
+  const categories = pendingPaymentCategories(data, [...room.charges, ...projected], asOf, roomId ?? undefined)
   const total = categories.reduce((sum, category) => sum + category.outstanding, 0)
   const unresolved = categories.reduce((sum, category) => sum + category.unresolved, 0)
   const count = categories.reduce((sum, category) => sum + category.chargeCount, 0)
@@ -63,7 +68,7 @@ export function PendingPaymentsDialog({ data, room, asOf, onClose, onReturnFocus
               <details className="pending-month-details">
                 <summary><span>View bill details</span><ChevronDown aria-hidden="true" /></summary>
                 <ul aria-label={`${CATEGORY_LABELS[category.category]} pending months`}>{category.months.map(month => <li key={month.id} className="pending-month-row">
-                  <div className="min-w-0"><p className="font-semibold">{month.unresolved > 0 ? 'Cumulative electricity' : month.label}</p><p className="mt-0.5 text-xs text-muted-foreground">{month.unresolved > 0 && previousSettled ? `Covers consumption since ${formatDate(previousSettled.readOn)}` : timingLabels[month.timing]}{month.overdue > 0 && month.unresolved === 0 ? ' · Past due' : ''}</p><p className="mt-1 text-xs text-muted-foreground">{month.dueDates.length > 0 ? `Due ${month.dueDates.map(formatDate).join(' / ')}` : 'Due date not recorded'}{month.billed > 0 ? ` · Billed ${formatMoney(month.billed)}` : ''}{month.paid > 0 ? ` · Paid ${formatMoney(month.paid)}` : ''}{month.unresolved > 0 ? ` · Last settled ${formatKwh(previousSettled?.readingMilliKwh ?? 0)} · Current meter reading not entered` : ''}</p></div>
+                  <div className="min-w-0"><p className="font-semibold">{month.unresolved > 0 ? `Cumulative electricity · ${month.label}` : month.label}</p><p className="mt-0.5 text-xs text-muted-foreground">{month.unresolved > 0 && previousSettled ? `Covers consumption since ${formatDate(previousSettled.readOn)}` : timingLabels[month.timing]}{month.overdue > 0 && month.unresolved === 0 ? ' · Past due' : ''}</p><p className="mt-1 text-xs text-muted-foreground">{month.dueDates.length > 0 ? `Due ${month.dueDates.map(formatDate).join(' / ')}` : 'Due date not recorded'}{month.billed > 0 ? ` · Billed ${formatMoney(month.billed)}` : ''}{month.paid > 0 ? ` · Paid ${formatMoney(month.paid)}` : ''}{month.unresolved > 0 ? previousSettled ? ` · Last settled ${formatKwh(previousSettled.readingMilliKwh)} · Current meter reading not entered` : ' · Verified initial meter reading required; no amount calculated' : ''}</p></div>
                   <div className="shrink-0 text-right"><StatusBadge status={month.unresolved > 0 ? 'Not yet paid' : month.status === 'PARTIALLY_PAID' ? 'Partly paid' : 'Not yet paid'} />
                     {month.unresolved > 0 && month.outstanding === 0
                       ? <p className="mt-1 text-sm font-bold">Amount pending calculation</p>

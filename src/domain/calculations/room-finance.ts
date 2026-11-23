@@ -1,5 +1,7 @@
 import type { Charge, ChargeStatus, Payment, PrototypeAppState, RoomPaymentStatus } from '@/domain/types/models'
 import { chargeBalance, chargePaid, chargeStatus, issuedCharges, unresolvedElectricity } from './summary'
+import { rentLedgerCharges } from './rent-ledger-charges'
+import { anniversaryCycleForBillingPeriod } from './billing-rent'
 
 const categoryOrder: Charge['category'][] = ['RENT', 'ELECTRICITY', 'WATER', 'WASHING_MACHINE']
 
@@ -84,7 +86,14 @@ export function roomHasPending(room: Pick<RoomFinance, 'outstanding' | 'unresolv
 /** A presentation grouping of distinct obligations, never a replacement room charge. */
 export function selectRoomFinance(data: PrototypeAppState, asOf: string, periodId?: string): RoomFinance[] {
   const groups = new Map<string, { context: FinancialRoom; charges: Charge[]; unresolved: number }>()
-  for (const charge of issuedCharges(data, asOf, periodId)) {
+  const ledger = rentLedgerCharges(data).filter(charge => charge.issuedOn <= asOf && (!periodId || charge.billingPeriodId === periodId))
+  const legacy = issuedCharges(data, asOf, periodId).filter(charge => {
+    if (charge.category !== 'RENT') return true
+    const period = data.billingPeriods.find(item => item.id === charge.billingPeriodId)
+    const context = chargeRoom(data, charge)
+    return !period || !context.roomId || !anniversaryCycleForBillingPeriod(data, context.roomId, period)
+  })
+  for (const charge of [...legacy, ...ledger]) {
     const context = chargeRoom(data, charge)
     const group = groups.get(context.id) ?? { context, charges: [], unresolved: 0 }
     group.charges.push(charge)
@@ -152,7 +161,10 @@ export function paymentRooms(data: PrototypeAppState, payment: Payment, asOf: st
     && (receiptAllocationIds ? receiptAllocationIds.includes(item.id) : item.state === 'ACTIVE' && payment.state === 'RECORDED'))
     .map(item => {
       const charge = data.charges.find(charge => charge.id === item.chargeId)
-      const context: FinancialRoom = charge ? chargeRoom(data, charge) : { id: `review:${item.chargeId}`, roomId: null, label: 'Room needs review', source: 'unresolved', note: 'Charge context missing' }
+      const rent = data.rentObligations.find(obligation => obligation.id === item.chargeId)
+      const context: FinancialRoom = charge ? chargeRoom(data, charge) : rent
+        ? roomContext(data, rent.roomId, 'rent-assignment', 'Anniversary rent obligation')!
+        : { id: `review:${item.chargeId}`, roomId: null, label: 'Room needs review', source: 'unresolved', note: 'Charge context missing' }
       return { id: item.id, chargeId: item.chargeId, context, amountCents: item.amountCents }
     })
   const unallocated = payment.amountCents - allocations.reduce((sum, item) => sum + item.amountCents, 0)

@@ -1,6 +1,7 @@
 import { parsePrototypeSnapshot, STORAGE_SCHEMA_VERSION } from '@/data/repositories/prototype-storage'
 import { isPrototypeData } from '@/domain/validation/prototype-data'
 import { quoteRentPrepayment } from '@/domain/calculations/rent-schedule'
+import { collectionCatalog } from '@/domain/calculations/payment-collection'
 import type { PrototypeAppState } from '@/domain/types/models'
 import { requireIdentity } from './auth'
 import { assertTimeZone, businessDate } from './date'
@@ -55,6 +56,17 @@ export async function handleRequest(request: Request, env: WorkerEnv): Promise<R
           clearAllRecords: env.ENVIRONMENT !== 'production' && env.ALLOW_TEST_RESET === 'true',
         },
       }, {}, requestKey)
+    }
+
+    if (route === '/payments/quote' && request.method === 'POST') {
+      const body = await readJson(request)
+      if (typeof body.roomId !== 'string' || !body.readings || typeof body.readings !== 'object' || Array.isArray(body.readings)
+        || Object.values(body.readings).some(value => !Number.isSafeInteger(value) || (value as number) < 0)) {
+        throw new ApiError(400, 'INVALID_QUOTE', 'Choose a room and valid meter readings.')
+      }
+      const state = await repo.maintain(serverDate)
+      if (!state.data.rooms.some(room => room.id === body.roomId)) throw new ApiError(404, 'ROOM_NOT_FOUND', 'The selected room no longer exists.')
+      return json({ items: collectionCatalog(state.data, body.roomId, serverDate, body.readings as Record<string, number>), revision: state.revision, serverDate }, {}, requestKey)
     }
 
     if (route === '/commands' && request.method === 'POST') {

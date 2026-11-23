@@ -65,7 +65,7 @@ describe('clear all records', () => {
     dialog = await screen.findByRole('dialog', { name: 'Payment recorded' })
     await user.click(within(dialog).getByRole('button', { name: 'Got it' }))
     await waitFor(() => expect(savedData().payments).toHaveLength(15))
-    const paymentId = savedData().payments.find((payment: { id: string }) => payment.id.includes('payment-room-')).id
+    const paymentId = savedData().payments.find((payment: { id: string }) => payment.id.includes('payment-collection-')).id
 
     await user.click(within(nav).getByRole('link', { name: 'Payments & Receipts' }))
     const transactions = await screen.findByRole('table', { name: 'Transactions' })

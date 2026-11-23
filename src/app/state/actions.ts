@@ -4,8 +4,10 @@ import type { RoomDraft } from '@/domain/calculations/room-management'
 import type { TenantDraft } from '@/domain/calculations/tenant-management'
 import type { MeterInitializationInput } from '@/domain/calculations/meter-initialization'
 import type { RoomChangeRequestDraft } from '@/domain/calculations/room-change-requests'
+import type { CollectionInput } from '@/domain/calculations/payment-collection'
 
 export type PrototypeAction =
+  | { type: 'payment/collected'; input: CollectionInput }
   | { type: 'tenant/noteUpdated'; tenantId: string; notes: string }
   | { type: 'tenant/created'; draft: TenantDraft; asOf?: string }
   | { type: 'tenant/updated'; tenantId: string; draft: TenantDraft; asOf?: string }

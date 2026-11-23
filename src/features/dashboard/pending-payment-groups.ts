@@ -1,6 +1,7 @@
 import type { Charge, PrototypeAppState } from '@/domain/types/models'
 import { chargeBalance, unresolvedElectricity } from '@/domain/calculations/summary'
 import { financialTotals, type FinancialTotals } from '@/domain/calculations/room-finance'
+import { collectionCatalog } from '@/domain/calculations/payment-collection'
 
 export interface PendingBillGroup extends FinancialTotals {
   id: string
@@ -44,6 +45,7 @@ const categoryOrder: Charge['category'][] = ['RENT', 'ELECTRICITY', 'WATER', 'WA
 type PendingItem =
   | { kind: 'charge'; charge: Charge }
   | { kind: 'obligation'; obligation: PrototypeAppState['electricityBillObligations'][number] }
+  | { kind: 'measurement'; periodId: string }
 
 /** Group only remaining amounts; billing periods (not payment dates) determine order. */
 export function pendingPaymentPeriods(data: PrototypeAppState, charges: Charge[], asOf: string, roomId?: string): PendingPaymentPeriod[] {
@@ -53,9 +55,17 @@ export function pendingPaymentPeriods(data: PrototypeAppState, charges: Charge[]
   const obligations: PendingItem[] = roomId
     ? unresolvedElectricity(data, asOf, undefined, roomId).map(obligation => ({ kind: 'obligation', obligation }))
     : []
+  if (roomId && data.occupancyCycles.some(cycle => cycle.roomId === roomId && cycle.rentSchedule === 'ANNIVERSARY')) {
+    // A cumulative meter has one unresolved interval, not one debt per calendar month.
+    const awaiting = collectionCatalog(data, roomId, asOf)
+      .filter(item => item.needsReading && item.status === 'AWAITING READING')
+      .sort((a, b) => b.periodStart.localeCompare(a.periodStart))
+    const latest = awaiting[0]
+    if (latest) obligations.push({ kind: 'measurement', periodId: latest.periodId })
+  }
   const periods = new Map<string, PendingItem[]>()
   for (const item of [...pending, ...obligations]) {
-    const periodId = item.kind === 'charge' ? item.charge.billingPeriodId : item.obligation.billingPeriodId
+    const periodId = item.kind === 'charge' ? item.charge.billingPeriodId : item.kind === 'obligation' ? item.obligation.billingPeriodId : item.periodId
     const items = periods.get(periodId) ?? []
     items.push(item)
     periods.set(periodId, items)
@@ -65,7 +75,7 @@ export function pendingPaymentPeriods(data: PrototypeAppState, charges: Charge[]
     const groups = new Map<string, PendingItem[]>()
     for (const item of items) {
       const category = item.kind === 'charge' ? item.charge.category : 'ELECTRICITY'
-      const dueDate = item.kind === 'charge' ? item.charge.dueDate : item.obligation.dueDate
+      const dueDate = item.kind === 'charge' ? item.charge.dueDate : item.kind === 'obligation' ? item.obligation.dueDate : ''
       const key = JSON.stringify([category, dueDate])
       const group = groups.get(key) ?? []
       group.push(item)
@@ -73,10 +83,10 @@ export function pendingPaymentPeriods(data: PrototypeAppState, charges: Charge[]
     }
     const bills = [...groups].map(([key, group]): PendingBillGroup => {
       const groupCharges = group.flatMap(item => item.kind === 'charge' ? [item.charge] : [])
-      const unresolved = group.filter(item => item.kind === 'obligation').length
+      const unresolved = group.filter(item => item.kind !== 'charge').length
       const first = group[0]!
       const firstCategory = first.kind === 'charge' ? first.charge.category : 'ELECTRICITY'
-      const firstDueDate = first.kind === 'charge' ? first.charge.dueDate : first.obligation.dueDate
+      const firstDueDate = first.kind === 'charge' ? first.charge.dueDate : first.kind === 'obligation' ? first.obligation.dueDate : ''
       return {
         id: key, category: firstCategory, dueDate: firstDueDate, charges: groupCharges,
         ...financialTotals(data, groupCharges, asOf, unresolved),
@@ -106,7 +116,7 @@ export function pendingPaymentCategories(data: PrototypeAppState, charges: Charg
         startDate: period.startDate,
         timing: period.timing,
         chargeCount: items.length + unresolved,
-        dueDates: [...new Set(bills.map(bill => bill.dueDate))].sort(),
+        dueDates: [...new Set(bills.map(bill => bill.dueDate).filter(Boolean))].sort(),
         ...financialTotals(data, items, asOf, unresolved),
       }]
     })
