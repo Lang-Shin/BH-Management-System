@@ -10,6 +10,8 @@ import { selectTenantReceipts } from '@/features/tenant/tenant-receipts'
 import { overdueWorkspace } from './collection-fixture'
 import { prepareMeterInitialization } from '@/domain/calculations/meter-initialization'
 import { prototypeReducer } from '@/app/state/prototype-reducer'
+import { unresolvedElectricity } from '@/domain/calculations/summary'
+import type { Charge } from '@/domain/types/models'
 
 describe('explicit mixed cash collection', () => {
   it('collects the selected August rent and water in November with one itemized receipt', () => {
@@ -48,7 +50,7 @@ describe('explicit mixed cash collection', () => {
 
   it('validates combined legacy utilities and electricity as one transaction', () => {
     const data = createDemoData()
-    const readings = { 'reading:period-nov:room-4': 325_000 }
+    const readings = { 'reading:meter-room-4:cumulative': 325_000 }
     const items = collectionCatalog(data, 'room-4', '2026-11-13', readings)
       .filter(item => item.periodId === 'period-nov' && ['RENT', 'WATER', 'ELECTRICITY'].includes(item.category))
     expect(items.reduce((sum, item) => sum + item.amountCents, 0)).toBe(402_500)
@@ -73,7 +75,7 @@ describe('explicit mixed cash collection', () => {
     const initialized = prepareMeterInitialization(overdueWorkspace(), { roomId: 'room-2', readingMilliKwh: 100_000, readOn: '2026-07-06', initializedOn: '2026-07-06', sourceNote: 'Verified baseline' })
     if (!initialized.ok) throw new Error(initialized.reason)
     const data = initialized.data
-    const id = 'reading:period-2026-08:room-2'
+    const id = 'reading:meter-room-2:cumulative'
     const awaiting = collectionCatalog(data, 'room-2', '2026-11-23').find(item => item.id === id)!
     expect(awaiting).toMatchObject({ status: 'AWAITING READING', amountCents: 0, selectable: false })
     const readings = { [id]: 150_000 }
@@ -89,10 +91,58 @@ describe('explicit mixed cash collection', () => {
     expect(isPrototypeData(result.data)).toBe(true)
     expect(result.data.paymentAllocations.filter(item => item.paymentId === result.paymentId)).toHaveLength(2)
     expect(collectionCatalog(result.data, 'room-2', '2026-11-23').some(item => item.id === id)).toBe(false)
-    const otherId = 'reading:period-2026-09:room-2'
-    const both = collectionCatalog(data, 'room-2', '2026-11-23', { [id]: 150_000, [otherId]: 160_000 })
-      .filter(item => item.id === id || item.id === otherId)
-    expect(prepareCollection(data, { ...input, selections: both, readings: { [id]: 150_000, [otherId]: 160_000 } })).toEqual({ ok: false, reason: 'ONE_INTERVAL_PER_METER' })
+    expect(collectionCatalog(data, 'room-2', '2026-11-23', { [id]: 150_000 }).filter(item => item.category === 'ELECTRICITY')).toHaveLength(1)
+  })
+
+  it('keeps water and washing monthly while electricity is one five-month cumulative row', () => {
+    const initialized = prepareMeterInitialization(overdueWorkspace(), {
+      roomId: 'room-2', readingMilliKwh: 155_000, readOn: '2026-07-06', initializedOn: '2026-07-06', sourceNote: 'Verified 155 kWh baseline',
+    })
+    if (!initialized.ok) throw new Error(initialized.reason)
+    const tenant = initialized.data.tenants[0]!
+    const washing: Charge[] = [
+      { id: 'verified-washing-august', tenantId: tenant.id, billingPeriodId: 'period-2026-08', category: 'WASHING_MACHINE', amountCents: 10_000, description: 'Verified August washing', entryMethod: 'MANUAL', issuedOn: '2026-08-31', dueDate: '2026-08-31', state: 'ISSUED', correction: null },
+      { id: 'verified-washing-september', tenantId: tenant.id, billingPeriodId: 'period-2026-09', category: 'WASHING_MACHINE', amountCents: 10_000, description: 'Verified September washing', entryMethod: 'MANUAL', issuedOn: '2026-09-30', dueDate: '2026-09-30', state: 'ISSUED', correction: null },
+    ]
+    const data = { ...initialized.data, charges: [...initialized.data.charges, ...washing] }
+    expect(unresolvedElectricity(data, '2026-11-23', undefined, 'room-2')).toHaveLength(5)
+    const id = 'reading:meter-room-2:cumulative'
+    const catalog = collectionCatalog(data, 'room-2', '2026-11-23', { [id]: 240_000 })
+    const water = catalog.filter(item => item.category === 'WATER').sort((a, b) => a.periodStart.localeCompare(b.periodStart)).slice(0, 3)
+    const laundry = catalog.filter(item => item.category === 'WASHING_MACHINE')
+    const electricity = catalog.filter(item => item.category === 'ELECTRICITY')
+    expect(water.map(item => item.periodStart)).toEqual(['2026-07-01', '2026-08-01', '2026-09-01'])
+    expect(laundry.map(item => item.periodStart)).toEqual(['2026-08-01', '2026-09-01'])
+    expect(electricity).toHaveLength(1)
+    expect(electricity[0]).toMatchObject({ id, amountCents: 110_500, selectable: true })
+    expect(electricity[0]?.charge).toMatchObject({
+      category: 'ELECTRICITY',
+      electricity: {
+        previousReadingMilliKwh: 155_000, currentReadingMilliKwh: 240_000, consumptionMilliKwh: 85_000,
+        appliedRateCentsPerKwh: 1_300, intervalId: 'meter-room-2:reading-meter-room-2-initial>240000',
+      },
+    })
+    const rent = catalog.find(item => item.category === 'RENT' && item.dueDate === '2026-08-06')!
+    const selections = [rent, ...water, ...laundry, ...electricity]
+    expect(selections.reduce((sum, item) => sum + item.amountCents, 0)).toBe(510_500)
+    const result = prepareCollection(data, { roomId: 'room-2', transactionId: 'five-month-electricity', selections, readings: { [id]: 240_000 }, collectedOn: '2026-11-23' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.totalCents).toBe(510_500)
+    expect(result.data.receipts.filter(receipt => receipt.paymentId === result.paymentId)).toHaveLength(1)
+    expect(result.data.paymentAllocations.filter(allocation => allocation.paymentId === result.paymentId)).toHaveLength(7)
+    expect(collectionCatalog(result.data, 'room-2', '2026-11-23').filter(item => item.category === 'ELECTRICITY')).toHaveLength(0)
+    expect(isPrototypeData(result.data)).toBe(true)
+  })
+
+  it('rejects a lower meter reading and never invents historical washing usage', () => {
+    const initialized = prepareMeterInitialization(overdueWorkspace(), { roomId: 'room-2', readingMilliKwh: 155_000, readOn: '2026-07-06', initializedOn: '2026-07-06', sourceNote: 'Verified baseline' })
+    if (!initialized.ok) throw new Error(initialized.reason)
+    const id = 'reading:meter-room-2:cumulative'
+    const invalid = collectionCatalog(initialized.data, 'room-2', '2026-11-23', { [id]: 150_000 }).find(item => item.category === 'ELECTRICITY')!
+    expect(invalid).toMatchObject({ status: 'AWAITING READING', selectable: false, amountCents: 0 })
+    expect(invalid.detail).toContain('READING_BELOW_PREVIOUS')
+    expect(collectionCatalog(initialized.data, 'room-2', '2026-11-23').filter(item => item.category === 'WASHING_MACHINE')).toHaveLength(0)
   })
 
   it('collects issued historical washing even when not currently subscribed, without inventing usage', () => {

@@ -3,7 +3,7 @@ import { calendarBillingPeriods, ensureBillingPeriod, resolveBillingPeriod } fro
 import { proposedRoomCharges } from './billing-eligibility'
 import { anniversaryCycleForBillingPeriod } from './billing-rent'
 import { chargeRoom } from './room-finance'
-import { chargeBalance } from './summary'
+import { chargeBalance, unresolvedElectricity } from './summary'
 import { rentObligationPaidCents } from './rental-periods'
 import { buildRoomPaymentQuote } from './room-payment'
 import { electricityBaseline, metersForRoom } from './meter-baseline'
@@ -52,6 +52,7 @@ export function collectionCatalog(data: PrototypeAppState, roomId: string, asOf:
   const room = data.rooms.find(item => item.id === roomId)
   if (!room) return []
   const items: CollectibleItem[] = []
+  const issuedElectricity: Charge[] = []
   for (const obligation of data.rentObligations) {
     if (obligation.roomId !== roomId || obligation.state !== 'ISSUED' || obligation.issuedOn > asOf || obligation.dueDate > asOf) continue
     const remaining = obligation.amountCents - rentObligationPaidCents(data, obligation.id, asOf)
@@ -70,8 +71,8 @@ export function collectionCatalog(data: PrototypeAppState, roomId: string, asOf:
     })
   }
 
-  const periods = [...new Map([...data.billingPeriods, ...calendarBillingPeriods(data, asOf)]
-    .filter(period => period.startDate <= asOf).map(period => [period.id, period])).values()]
+  const periods = [...new Map([...calendarBillingPeriods(data, asOf), ...data.billingPeriods]
+    .filter(period => period.startDate <= asOf).map(period => [period.startDate, period])).values()]
   for (const period of periods) {
     const issued = data.charges.filter(charge => collectibleCategories.includes(charge.category)
       && charge.state === 'ISSUED' && charge.issuedOn <= asOf && charge.billingPeriodId === period.id
@@ -80,11 +81,13 @@ export function collectionCatalog(data: PrototypeAppState, roomId: string, asOf:
       if (charge.category === 'RENT' && anniversaryCycleForBillingPeriod(data, roomId, period)) continue
       const remaining = chargeBalance(data, charge, asOf)
       if (remaining <= 0) continue
+      if (charge.category === 'ELECTRICITY') issuedElectricity.push(charge)
       items.push({
         id: charge.id, category: charge.category, label: charge.category === 'WASHING_MACHINE' ? 'Washing machine' : charge.category === 'RENT' ? 'Rent (legacy calendar)' : charge.category === 'WATER' ? 'Water' : 'Electricity',
         periodId: period.id, periodLabel: period.label, periodStart: period.startDate,
         dueDate: charge.dueDate, originalCents: charge.amountCents, amountCents: remaining,
         status: status(charge.dueDate, asOf), selectable: true, detail: 'Issued obligation · original rate retained', charge,
+        meterId: charge.category === 'ELECTRICITY' ? charge.electricity.meterId : undefined,
         basis: JSON.stringify([charge.id, charge.amountCents, charge.issuedOn, charge.dueDate, charge.correction]),
       })
     }
@@ -103,28 +106,37 @@ export function collectionCatalog(data: PrototypeAppState, roomId: string, asOf:
         basis: JSON.stringify([charge.category, charge.tenantId, charge.amountCents, period.id]),
       })
     }
-    const electricityId = `reading:${period.id}:${roomId}`
-    const quote = buildRoomPaymentQuote(data, {
-      roomId, periodId: period.id, selected: ['ELECTRICITY'],
-      electricityReadingMilliKwh: readings[electricityId] ?? null, asOf,
-    })
-    const option = quote.options.find(item => item.category === 'ELECTRICITY')!
-    if (issued.some(charge => charge.category === 'ELECTRICITY') || option.state === 'PAID' || option.state === 'UNAVAILABLE') continue
+  }
+
+  if (issuedElectricity.length === 0) {
     const meter = metersForRoom(data, roomId)
-    const baseline = meter.length === 1 ? electricityBaseline(data, meter[0]!.id) : null
-    // A later settled cumulative interval must never be billed again in an older month.
-    if (baseline && (baseline.readOn > period.endDate || baseline.readOn > asOf)) continue
-    const calculated = quote.electricity?.charge
-    items.push({
-      id: electricityId, category: 'ELECTRICITY', label: 'Electricity', periodId: period.id,
-      periodLabel: period.label, periodStart: period.startDate, dueDate: null,
-      originalCents: calculated?.amountCents ?? null, amountCents: calculated?.amountCents ?? 0,
-      status: calculated ? 'UNPAID' : 'AWAITING READING', selectable: Boolean(calculated),
-      detail: meter.length !== 1 || !baseline ? 'Set a verified initial meter reading in Room Details first.'
-        : quote.electricity?.error ?? `Cumulative from ${baseline.readingMilliKwh / 1000} kWh on ${formatDate(baseline.readOn)}; select only one pending month per meter.`,
-      charge: calculated, reading: quote.electricity?.currentReading, meterId: meter[0]?.id, needsReading: true,
-      basis: JSON.stringify([baseline?.id, calculated?.electricity.rateId, readings[electricityId], period.id]),
-    })
+    const unresolved = [...unresolvedElectricity(data, asOf, undefined, roomId)]
+      .sort((a, b) => (data.billingPeriods.find(period => period.id === b.billingPeriodId)?.startDate ?? '').localeCompare(data.billingPeriods.find(period => period.id === a.billingPeriodId)?.startDate ?? ''))[0]
+    const targetPeriod = unresolved
+      ? periods.find(period => period.id === unresolved.billingPeriodId)
+      : [...periods].sort((a, b) => b.startDate.localeCompare(a.startDate))[0]
+    if (targetPeriod) {
+      const electricityId = `reading:${meter[0]?.id ?? roomId}:cumulative`
+      const quote = meter.length > 1 ? null : buildRoomPaymentQuote(data, {
+        roomId, periodId: targetPeriod.id, selected: ['ELECTRICITY'],
+        electricityReadingMilliKwh: readings[electricityId] ?? null, asOf,
+      })
+      const baseline = meter.length === 1 ? electricityBaseline(data, meter[0]!.id) : null
+      const calculated = quote?.electricity?.charge
+      const electricityOption = quote?.options.find(option => option.category === 'ELECTRICITY')
+      const awaiting = !calculated
+      if (electricityOption?.state !== 'PAID' && electricityOption?.state !== 'UNAVAILABLE') items.push({
+        id: electricityId, category: 'ELECTRICITY', label: 'Cumulative electricity', periodId: targetPeriod.id,
+        periodLabel: targetPeriod.label, periodStart: targetPeriod.startDate, dueDate: null,
+        originalCents: calculated?.amountCents ?? null, amountCents: calculated?.amountCents ?? 0,
+        status: awaiting ? 'AWAITING READING' : status(null, asOf), selectable: Boolean(calculated),
+        detail: meter.length > 1 ? 'Multiple meters require review before one cumulative interval can be collected.'
+          : meter.length !== 1 || !baseline ? 'Set a verified initial meter reading in Room Details first.'
+            : quote?.electricity?.error ?? `Cumulative from ${baseline.readingMilliKwh / 1000} kWh on ${formatDate(baseline.readOn)} since the last settled reading.`,
+        charge: calculated, reading: quote?.electricity?.currentReading, meterId: meter[0]?.id, needsReading: true,
+        basis: JSON.stringify([baseline?.id, calculated?.electricity.rateId, readings[electricityId], targetPeriod.id]),
+      })
+    }
   }
   return [...new Map(items.map(item => [item.id, item])).values()]
     .sort((a, b) => a.periodStart.localeCompare(b.periodStart) || a.category.localeCompare(b.category) || a.id.localeCompare(b.id))

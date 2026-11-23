@@ -9,7 +9,7 @@ export function electricityObligations(data: PrototypeAppState, asOf: string): E
     if (!meter.roomId || metersForRoom(data, meter.roomId).length !== 1) continue
     const initial = data.meterReadings.find(reading => reading.meterId === meter.id && reading.status === 'INITIAL')
     const baseline = electricityBaseline(data, meter.id)
-    if (!initial || !baseline || initial.readOn > asOf || baseline.readOn > asOf) continue
+    if (!initial || !baseline || initial.readOn > asOf || (baseline.status === 'CONFIRMED' && baseline.readOn >= asOf)) continue
     for (const period of data.billingPeriods) {
       if (period.startDate > asOf || period.endDate < baseline.readOn) continue
       if (persisted.some(item => item.meterId === meter.id && item.billingPeriodId === period.id)

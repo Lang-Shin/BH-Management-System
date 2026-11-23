@@ -88,7 +88,17 @@ export function PaymentCalculator({ periodId, periodLabel }: { periodId: string;
   const items = repositoryMode === 'server' ? serverItems : roomId ? collectionCatalog(data, roomId, asOf, readings) : []
   const rentItems = items.filter(item => item.category === 'RENT')
   const utilityItems = items.filter(item => item.category !== 'RENT')
-  const months = [...new Set(utilityItems.map(item => item.periodId))]
+  const electricityItems = utilityItems.filter(item => item.category === 'ELECTRICITY')
+  const electricityGroups = (() => {
+    const groups = new Map<string, CollectibleItem[]>()
+    for (const item of electricityItems) {
+      const key = item.meterId ?? `room:${roomId}`
+      groups.set(key, [...(groups.get(key) ?? []), item])
+    }
+    return [...groups.values()]
+  })()
+  const monthlyUtilityItems = utilityItems.filter(item => item.category !== 'ELECTRICITY')
+  const months = [...new Set(monthlyUtilityItems.map(item => item.periodId))]
   const chosen = items.filter(item => selected.includes(item.id))
   const total = chosen.reduce((sum, item) => sum + item.amountCents, 0)
   const canReview = !loading && !catalogError && (repositoryMode !== 'server' || quotedKey === requestedKey)
@@ -177,22 +187,38 @@ export function PaymentCalculator({ periodId, periodLabel }: { periodId: string;
                 </label>)}
             </div></details>
             <details className="payment-obligation-card"><summary><strong>Utilities</strong><span>Calendar-month billing</span><ChevronDown className="payment-card-chevron" aria-hidden="true" /></summary><div className="payment-card-content">
-              <p className="text-xs text-muted-foreground">Historical issued washing bills are collectible. Unissued historical washing requires verified usage; today’s subscription does not prove past usage. Electricity uses one continuous meter interval; choose only one pending month per meter.</p>
+              <p className="text-xs text-muted-foreground">Water and washing are collected by their original calendar month. Electricity is one cumulative interval from the last settled reading, regardless of how many months have passed.</p>
+              {electricityGroups.map(group => {
+                const ids = group.map(item => item.id)
+                const awaiting = group.some(item => item.status === 'AWAITING READING')
+                const foundCharge = group.find(item => item.charge)?.charge
+                const calculated = foundCharge?.category === 'ELECTRICITY' ? foundCharge : undefined
+                const selectedGroup = ids.every(id => selected.includes(id))
+                return <section key={group[0]!.meterId ?? roomId} className="collection-month" aria-label="Cumulative electricity">
+                  <h3 className="font-semibold">Cumulative electricity</h3>
+                  <div className="room-payment-option"><label className="collection-obligation">
+                    <input type="checkbox" aria-label="Cumulative electricity" checked={selectedGroup} onChange={() => toggle(ids)} />
+                    <span><strong>{group[0]!.meterId ? `Meter ${group[0]!.meterId}` : 'Room meter'}</strong><small>{awaiting ? 'AWAITING READING' : 'UNPAID · cumulative interval'}</small>{group.map(item => <small key={item.id}>{item.detail}</small>)}{calculated && <small>{calculated.electricity.previousReadingMilliKwh / 1000} → {calculated.electricity.currentReadingMilliKwh / 1000} kWh · {calculated.electricity.consumptionMilliKwh / 1000} kWh × {formatMoney(calculated.electricity.appliedRateCentsPerKwh)}/kWh</small>}</span>
+                    <strong>{awaiting ? 'Amount pending calculation' : formatMoney(group.reduce((sum, item) => sum + item.amountCents, 0))}</strong>
+                  </label>
+                  {selectedGroup && group.map(item => item.needsReading && <div key={item.id} className="room-payment-electricity"><label htmlFor={`reading-${item.id}`}>Current meter reading (kWh)</label><input id={`reading-${item.id}`} className="electricity-reading-input" inputMode="decimal" value={readingText[item.id] ?? ''} onChange={event => { setReadingText(current => ({ ...current, [item.id]: event.target.value })); setInput(null) }} aria-invalid={Boolean(readingText[item.id] && parseMeterReadingMilliKwh(readingText[item.id]!) === null)} /><p className="text-xs">{item.detail}</p><Link to="/rooms" className="text-sm underline">Open Room Details for verified meter setup</Link></div>)}
+                  </div>
+                </section>
+              })}
               {months.map(month => {
-                const monthly = utilityItems.filter(item => item.periodId === month)
-                return <section key={month} className="collection-month" aria-label={monthly[0]!.periodLabel}><h3 className="font-semibold">{monthly[0]!.periodLabel}</h3>{(['WATER', 'ELECTRICITY', 'WASHING_MACHINE'] as const).flatMap(category => {
+                const monthly = monthlyUtilityItems.filter(item => item.periodId === month)
+                return <section key={month} className="collection-month" aria-label={monthly[0]!.periodLabel}><h3 className="font-semibold">{monthly[0]!.periodLabel}</h3>{(['WATER', 'WASHING_MACHINE'] as const).flatMap(category => {
                   const group = monthly.filter(item => item.category === category)
                   if (!group.length) return []
                   const ids = group.map(item => item.id)
                   const label = month === periodId ? CATEGORY_LABELS[category] : `${CATEGORY_LABELS[category]} — ${group[0]!.periodLabel}`
                   const awaiting = group.some(item => item.status === 'AWAITING READING')
                   return [<div key={category} className="room-payment-option"><label className="collection-obligation"><input type="checkbox" aria-label={label} checked={ids.every(id => selected.includes(id))} onChange={() => toggle(ids)} /><span><strong>{CATEGORY_LABELS[category]}</strong><small>{awaiting ? 'AWAITING READING' : group.every(item => item.dueDate) ? group[0]!.status : 'UNPAID · eligible monthly charge'}</small>{group.map(item => <small key={item.id}>{item.label} · {item.detail}</small>)}</span><strong>{awaiting ? 'Amount pending calculation' : formatMoney(group.reduce((sum, item) => sum + item.amountCents, 0))}</strong></label>
-                    {category === 'ELECTRICITY' && ids.some(id => selected.includes(id)) && group.map(item => <div key={item.id} className="room-payment-electricity"><label htmlFor={`reading-${item.id}`}>Current meter reading (kWh)</label><input id={`reading-${item.id}`} className="electricity-reading-input" inputMode="decimal" value={readingText[item.id] ?? ''} onChange={event => { setReadingText(current => ({ ...current, [item.id]: event.target.value })); setInput(null) }} aria-invalid={Boolean(readingText[item.id] && parseMeterReadingMilliKwh(readingText[item.id]!) === null)} /><p className="text-xs">{item.detail}</p><Link to="/rooms" className="text-sm underline">Open Room Details for verified meter setup</Link></div>)}
                   </div>]
                 })}</section>
               })}
-              {!utilityItems.length && <p className="text-sm text-muted-foreground">{loading ? 'Loading utility obligations…' : catalogError ? 'Utility obligations unavailable.' : 'No unpaid utility obligations.'}</p>}
-              {currentQuote?.options.filter(option => option.category !== 'RENT' && !utilityItems.some(item => item.periodId === periodId && item.category === option.category)).map(option => <p key={option.category} className="text-sm text-muted-foreground"><input type="checkbox" aria-label={CATEGORY_LABELS[option.category]} disabled /> {CATEGORY_LABELS[option.category]} · {option.state === 'PAID' ? 'PAID' : option.detail}</p>)}
+              {!electricityItems.length && !months.length && <p className="text-sm text-muted-foreground">{loading ? 'Loading utility obligations…' : catalogError ? 'Utility obligations unavailable.' : 'No unpaid utility obligations.'}</p>}
+              {currentQuote?.options.filter(option => option.category !== 'RENT' && !(option.category === 'ELECTRICITY' ? electricityItems.length > 0 : utilityItems.some(item => item.periodId === periodId && item.category === option.category))).map(option => <p key={option.category} className="text-sm text-muted-foreground"><input type="checkbox" aria-label={option.category === 'ELECTRICITY' ? 'Cumulative electricity' : CATEGORY_LABELS[option.category]} disabled /> {option.category === 'ELECTRICITY' ? 'Cumulative electricity' : CATEGORY_LABELS[option.category]} · {option.state === 'PAID' ? 'PAID' : option.detail}</p>)}
             </div></details>
           </div>}
           {loading && <p role="status">Loading authoritative obligations…</p>}

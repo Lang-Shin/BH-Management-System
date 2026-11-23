@@ -40,6 +40,7 @@ export function pendingElectricityForRoom(
   const meter = metersForRoom(data, roomId)[0]
   const meterId = meter?.id ?? `meter-${roomId}`
   const baseline = electricityBaseline(data, meterId)
+  if (baseline?.status === 'CONFIRMED' && baseline.readOn >= asOf) return null
   if (baseline?.status === 'CONFIRMED' && baseline.readOn > period.endDate) return null
   const dueDate = period.endDate >= asOf ? period.endDate : asOf
   return {

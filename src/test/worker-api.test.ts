@@ -282,6 +282,32 @@ describe('Worker and D1 integration', () => {
     await expect(replay.json()).resolves.toMatchObject({ replayed: true, revision: watered.revision })
     const duplicate = await jsonRequest('/api/v1/commands', 'POST', waterBody, { 'idempotency-key': 'worker-utility-water-duplicate-0001' })
     expect(duplicate.status).toBe(422)
+
+    const meter = await jsonRequest('/api/v1/commands', 'POST', {
+      action: { type: 'electricity/meterInitialized', roomId: 'room-7', readingMilliKwh: 155_000, readOn: '2026-07-06', initializedOn: before.serverDate, sourceNote: 'Verified cumulative baseline' },
+    }, { 'idempotency-key': 'worker-utility-meter-0001' })
+    expect(meter.status).toBe(200)
+    const readings = { 'reading:meter-room-7:cumulative': 240_000 }
+    const electricityQuote = await jsonRequest('/api/v1/payments/quote', 'POST', { roomId: 'room-7', readings })
+    expect(electricityQuote.status).toBe(200)
+    const electricityItems = (await electricityQuote.json() as { items: CollectibleItem[] }).items
+    const electricity = electricityItems.filter(item => item.category === 'ELECTRICITY')
+    expect(electricity).toHaveLength(1)
+    expect(electricity[0]).toMatchObject({ amountCents: 110_500, selectable: true })
+    expect(electricity[0]?.charge).toMatchObject({ category: 'ELECTRICITY', electricity: { previousReadingMilliKwh: 155_000, consumptionMilliKwh: 85_000 } })
+    const electricityCollection = await jsonRequest('/api/v1/commands', 'POST', {
+      action: { type: 'payment/collected', input: {
+        transactionId: 'worker-cumulative-electricity', roomId: 'room-7', readings, collectedOn: before.serverDate,
+        selections: electricity.map(({ id, amountCents, periodId, dueDate, basis }) => ({ id, amountCents, periodId, dueDate, basis })),
+      } },
+    }, { 'idempotency-key': 'worker-cumulative-electricity-0001' })
+    expect(electricityCollection.status).toBe(200)
+    const electricityResult = await electricityCollection.json() as { data: ReturnType<typeof createDemoData>; revision: number }
+    expect(electricityResult.data.charges.find(charge => charge.category === 'ELECTRICITY' && charge.electricity.meterId === 'meter-room-7')?.amountCents).toBe(110_500)
+    expect(electricityResult.data.payments.find(payment => payment.id === 'payment-collection-worker-cumulative-electricity')?.amountCents).toBe(110_500)
+    expect(electricityResult.data.receipts.find(receipt => receipt.paymentId === 'payment-collection-worker-cumulative-electricity')?.allocationIds).toHaveLength(1)
+    expect(selectBillingRooms(electricityResult.data, period.id, before.serverDate, false).find(item => item.context.roomId === 'room-7')?.unresolved).toBe(0)
+
     const refreshed = await bootstrap()
     expect(refreshed.data.charges.filter(charge => charge.category === 'WATER' && charge.tenantId === utilityTenant.id)).toHaveLength(1)
     expect(refreshed.data.payments.filter(payment => payment.id.includes('payment-room-')).length).toBeGreaterThanOrEqual(1)
