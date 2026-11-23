@@ -7,6 +7,7 @@ import {
 import { chargeBalance } from '@/domain/calculations/summary'
 import { resolveBillingPeriod } from '@/domain/calculations/billing-periods'
 import { rentObligationPaidCents } from '@/domain/calculations/rental-periods'
+import { pendingElectricityForRoom } from '@/domain/calculations/electricity-pending'
 
 export const billingCategories: ChargeCategory[] = ['RENT', 'ELECTRICITY', 'WATER', 'WASHING_MACHINE']
 export type BillingRoomStatus = 'PAID' | 'PARTLY PAID' | 'NOT YET PAID'
@@ -48,7 +49,8 @@ export function selectBillingRooms(data: PrototypeAppState, periodId: string, as
     const context = finance?.context ?? roomContext(data, room.id, 'period-assignment', 'Selected room')
     if (!context) throw new Error('Selected room context is missing')
 
-    const unresolved = finance?.unresolved ?? 0
+    const pendingElectricity = pendingElectricityForRoom(data, room.id, period, asOf)
+    const unresolved = (finance?.unresolved ?? 0) + (pendingElectricity ? 1 : 0)
     const utilityBilled = utilityCharges.reduce((sum, charge) => sum + charge.amountCents, 0)
     const utilityPaid = utilityCharges.reduce((sum, charge) => sum + Math.max(0, charge.amountCents - chargeBalance(data, charge, asOf)), 0)
     const utilityOutstanding = utilityCharges.reduce((sum, charge) => sum + chargeBalance(data, charge, asOf), 0)

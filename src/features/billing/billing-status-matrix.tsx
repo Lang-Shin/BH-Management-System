@@ -1,7 +1,6 @@
 import { Check, CircleDashed, Clock3 } from 'lucide-react'
 import type { PrototypeAppState } from '@/domain/types/models'
 import { financialTotals } from '@/domain/calculations/room-finance'
-import { unresolvedElectricity } from '@/domain/calculations/summary'
 import { PaginatedDataTable } from '@/components/shared/table-pagination'
 import { CATEGORY_LABELS } from '@/lib/labels'
 import { formatMoney, formatShortDateRange } from '@/lib/format'
@@ -65,9 +64,7 @@ export function BillingStatusMatrix({ data, periodId, asOf, outstandingOnly, sta
       if (category === 'RENT') return <RentCategoryCell room={room} />
       const items = room.charges.filter(charge => charge.category === category)
       const projected = room.projectedCharges.filter(charge => charge.category === category)
-      const awaitingReading = category === 'ELECTRICITY' && room.context.roomId
-        ? unresolvedElectricity(data, asOf, periodId, room.context.roomId).length > 0
-        : false
+      const awaitingReading = category === 'ELECTRICITY' && room.unresolved > 0
       if (awaitingReading) return <AwaitingReadingLabel />
       if (!items.length && !projected.length) return <MissingCategoryLabel washing={category === 'WASHING_MACHINE'} />
       const totals = financialTotals(data, [...items, ...projected], asOf)

@@ -3,6 +3,7 @@ import { initialElectricityRates, initialRoomRentRates, initialWashingRates, ini
 import { calendarBillingPeriods } from '@/domain/calculations/billing-periods'
 import { DEFAULT_MOVE_IN_POLICY } from '@/domain/calculations/move-in-policy'
 import { civilDateInTimeZone } from '@/lib/business-date'
+import { ensureInitialRateBaseline } from '@/domain/calculations/rate-baseline'
 import { initialRooms } from '../room-defaults'
 
 /** Real/development startup state: room configuration and rates, but no tenants or financial records. */
@@ -37,5 +38,6 @@ export function createEmptyData(asOf = civilDateInTimeZone(), configuration?: Pr
     rentPrepayments: [],
     financialReviewCases: [],
   }
-  return { ...base, billingPeriods: calendarBillingPeriods(base, asOf) }
+  const withBaseline = ensureInitialRateBaseline(base, { force: true })
+  return { ...withBaseline, billingPeriods: calendarBillingPeriods(withBaseline, asOf) }
 }

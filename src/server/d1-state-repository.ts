@@ -10,6 +10,7 @@ import { businessDate } from './date'
 import { ensureRegularRentPeriodsThrough } from '@/domain/calculations/rent-schedule'
 import { ensureBillingPeriodsThrough } from '@/domain/calculations/billing-periods'
 import { repairMissingAdvanceApplications } from '@/domain/calculations/advance-reconciliation'
+import { ensureInitialRateBaseline } from '@/domain/calculations/rate-baseline'
 
 export interface CommandOutcome {
   data: PrototypeAppState
@@ -70,7 +71,8 @@ export class D1StateRepository {
   async maintain(serverDate: string): Promise<{ data: PrototypeAppState; revision: number }> {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const current = await this.load()
-      let next = ensureBillingPeriodsThrough(current.data, serverDate)
+      let next = ensureInitialRateBaseline(current.data)
+      next = ensureBillingPeriodsThrough(next, serverDate)
       const repaired = repairMissingAdvanceApplications(next, serverDate)
       next = ensureRegularRentPeriodsThrough(repaired.data, serverDate)
       if (JSON.stringify(next) === JSON.stringify(current.data)) return current

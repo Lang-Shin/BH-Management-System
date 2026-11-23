@@ -1,7 +1,8 @@
 import type { Charge, ChargeCategory, MeterReading, Payment, PrototypeAppState, Receipt } from '@/domain/types/models'
 import { activeAssignments, chargeBalance, issuedCharges, unresolvedElectricity } from './summary'
 import { chargeRoom, roomContext } from './room-finance'
-import { calculateElectricityCharge, type ElectricityCharge } from './electricity-calculation'
+import { calculateElectricityChargeForObligation, type ElectricityCharge } from './electricity-calculation'
+import { pendingElectricityForRoom } from './electricity-pending'
 import { electricityBaseline } from './meter-baseline'
 import { activeElectricityRate } from './billing-rates'
 import { nextReceiptNumbers } from './receipt-numbering'
@@ -96,14 +97,24 @@ export function buildRoomPaymentQuote(data: PrototypeAppState, input: RoomPaymen
       options.push(finalizedOption(category, categoryCharges(data, input.roomId, input.periodId, input.asOf, category), data, input.asOf, proposed.filter(charge => charge.category === category)))
       continue
     }
-    const obligation = unresolvedElectricity(data, input.asOf, input.periodId, input.roomId)[0]
+    const persistedObligation = unresolvedElectricity(data, input.asOf, input.periodId, input.roomId)[0]
+    const pending = !persistedObligation && period ? pendingElectricityForRoom(data, input.roomId, period, input.asOf) : null
+    const obligation = persistedObligation ?? pending?.obligation
     if (!obligation) {
       options.push(finalizedOption(category, categoryCharges(data, input.roomId, input.periodId, input.asOf, category), data, input.asOf, proposed.filter(charge => charge.category === category)))
       continue
     }
     const previous = electricityBaseline(data, obligation.meterId)
+    if (!previous) {
+      options.push({
+        category, state: 'AWAITING_READING', amountCents: null, chargeIds: [],
+        detail: pending ? 'Initial meter reading required' : 'Amount pending calculation',
+        obligationId: obligation.id,
+      })
+      continue
+    }
     const rate = activeElectricityRate(data, input.asOf)
-    if (!previous || !rate) {
+    if (!rate) {
       options.push({ category, state: 'INVALID_READING', amountCents: null, chargeIds: [], detail: 'Meter baseline unavailable', obligationId: obligation.id })
       continue
     }
@@ -116,7 +127,7 @@ export function buildRoomPaymentQuote(data: PrototypeAppState, input: RoomPaymen
       options.push({ category, state: 'AWAITING_READING', amountCents: null, chargeIds: [], detail: 'Amount pending calculation', obligationId: obligation.id })
       continue
     }
-    const calculation = calculateElectricityCharge(data, obligation.id, { readingMilliKwh: input.electricityReadingMilliKwh, readOn: input.asOf })
+    const calculation = calculateElectricityChargeForObligation(data, obligation, { readingMilliKwh: input.electricityReadingMilliKwh, readOn: input.asOf })
     if (!calculation.ok) {
       electricity.error = calculation.reason
       options.push({ category, state: 'INVALID_READING', amountCents: null, chargeIds: [], detail: 'Current reading cannot be used', obligationId: obligation.id })

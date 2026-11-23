@@ -3,6 +3,7 @@ import { createDemoData, DEMO_DATE, DEMO_PERIOD } from '@/data/fixtures/demo'
 import { prototypeReducer } from '@/app/state/prototype-reducer'
 import { prepareMoveInPayment, selectMoveInObligations } from '@/domain/calculations/move-in'
 import { buildRoomPaymentQuote, prepareRoomPayment } from '@/domain/calculations/room-payment'
+import { prepareMeterInitialization } from '@/domain/calculations/meter-initialization'
 import { selectBillingRent } from '@/domain/calculations/billing-rent'
 import { selectBillingRooms } from '@/features/billing/billing-room-status'
 import { formatShortDateRange } from '@/lib/format'
@@ -75,7 +76,25 @@ describe('Bills anniversary rent synchronization', () => {
     expect(water.ok).toBe(true)
     if (!water.ok) return
     data = water.data
-    const room = selectBillingRooms(data, DEMO_PERIOD, DEMO_DATE, false).find(item => item.context.roomId === 'room-14')!
+    const awaiting = selectBillingRooms(data, DEMO_PERIOD, DEMO_DATE, false).find(item => item.context.roomId === 'room-14')!
+    expect(awaiting.rent.status).toBe('PAID')
+    expect(awaiting.outstanding).toBe(0)
+    expect(awaiting.unresolved).toBe(1)
+    expect(awaiting.billingStatus).toBe('PARTLY PAID')
+
+    const meter = prepareMeterInitialization(data, {
+      roomId: 'room-14', readingMilliKwh: 0, readOn: DEMO_DATE,
+      sourceNote: 'Verified starting reading', initializedOn: DEMO_DATE,
+    })
+    expect(meter.ok).toBe(true)
+    if (!meter.ok) return
+    const electricity = prepareRoomPayment(meter.data, {
+      roomId: 'room-14', periodId: DEMO_PERIOD, selected: ['ELECTRICITY'],
+      electricityReadingMilliKwh: 500_000, asOf: DEMO_DATE,
+    })
+    expect(electricity.ok).toBe(true)
+    if (!electricity.ok) return
+    const room = selectBillingRooms(electricity.data, DEMO_PERIOD, DEMO_DATE, false).find(item => item.context.roomId === 'room-14')!
     expect(room.rent.status).toBe('PAID')
     expect(room.outstanding).toBe(0)
     expect(room.unresolved).toBe(0)

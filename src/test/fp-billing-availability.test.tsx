@@ -137,7 +137,7 @@ describe('dynamic Billing room availability', () => {
     const rows = selectBillingRooms(data, DEMO_PERIOD, DEMO_DATE, false)
     const projected = rows.find(row => row.context.roomId === room.room.id)!
     expect(rows.filter(row => row.context.roomId === room.room.id)).toHaveLength(1)
-    expect(projected).toMatchObject({ billingStatus: 'NOT YET PAID', paid: 0, outstanding: 420_000, unresolved: 0 })
+    expect(projected).toMatchObject({ billingStatus: 'NOT YET PAID', paid: 0, outstanding: 420_000, unresolved: 1 })
     expect(new Set(rows.map(row => row.id)).size).toBe(rows.length)
     expect(projected.charges).toHaveLength(0)
     expect(projected.projectedCharges.map(charge => charge.category).sort()).toEqual(['WATER', 'WATER'])
@@ -156,7 +156,7 @@ describe('dynamic Billing room availability', () => {
     expect(full.ok).toBe(true)
     if (!full.ok) return
     const fullRow = selectBillingRooms(full.data, DEMO_PERIOD, DEMO_DATE, false).find(row => row.context.roomId === room.room.id)!
-    expect(fullRow).toMatchObject({ billingStatus: 'PAID', paid: 420_000, outstanding: 0 })
+    expect(fullRow).toMatchObject({ billingStatus: 'PARTLY PAID', paid: 420_000, outstanding: 0, unresolved: 1 })
     expect(fullRow.projectedCharges).toHaveLength(0)
   })
 
@@ -242,7 +242,8 @@ describe('Billing selector UI after tenant creation', () => {
 
     row = within(await screen.findByRole('table', { name: 'Who has paid' })).getByRole('row', { name: /Room 908/ })
     expect(row).not.toHaveTextContent('NOT YET PAID')
-    expect(row).toHaveTextContent('Paid')
+    expect(row).toHaveTextContent('AWAITING READING')
+    expect(row).toHaveTextContent('PARTLY PAID')
 
     await user.click(screen.getByRole('button', { name: 'Switch to Tenant UI' }))
     await screen.findByRole('heading', { level: 1, name: 'Overview' })

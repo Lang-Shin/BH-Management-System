@@ -1,4 +1,5 @@
 import { DEFAULT_ACTION_DATE } from './action-date'
+import { ensureInitialRateBaseline } from '@/domain/calculations/rate-baseline'
 import type { PrototypeData } from '@/domain/types/models'
 import type { StateAction } from './actions'
 import { activeAssignments } from '@/domain/calculations/summary'
@@ -32,7 +33,7 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
     case 'tenant/created': {
       const asOf = action.asOf ?? DEFAULT_ACTION_DATE
       const result = createTenant(state, action.draft, asOf)
-      return result.ok ? reconcileOccupancy(state, result.data, asOf, { createMoveInObligations: true }) : state
+      return result.ok ? ensureInitialRateBaseline(reconcileOccupancy(state, result.data, asOf, { createMoveInObligations: true })) : state
     }
     case 'tenant/updated': {
       const asOf = action.asOf ?? DEFAULT_ACTION_DATE
@@ -43,7 +44,7 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
       const withRequests = previousRoom !== nextRoom
         ? expirePendingRoomChangeRequests(result.data, action.tenantId, asOf, 'Tenant assignment changed before the request was reviewed.')
         : result.data
-      return reconcileOccupancy(state, withRequests, asOf, { createMoveInObligations: false })
+      return ensureInitialRateBaseline(reconcileOccupancy(state, withRequests, asOf, { createMoveInObligations: false }))
     }
     case 'tenant/movedOut': {
       const asOf = action.asOf ?? DEFAULT_ACTION_DATE

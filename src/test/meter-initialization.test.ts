@@ -132,7 +132,7 @@ describe('billing from an initial meter reading', () => {
     expect(latestSettledReading(result.data, result.meter.id)).toBeNull()
     expect(buildRoomPaymentQuote(result.data, { ...quoteInput, electricityReadingMilliKwh: 849_000 }).electricity?.error).toBe('READING_BELOW_PREVIOUS')
     expect(buildRoomPaymentQuote(result.data, { ...quoteInput, electricityReadingMilliKwh: 850_000 }).electricity?.error).toBe('READING_NOT_ADVANCED')
-    expect(buildRoomPaymentQuote(result.data, { ...quoteInput, asOf: '2026-11-12' }).options.find(item => item.category === 'ELECTRICITY')?.state).toBe('UNAVAILABLE')
+    expect(buildRoomPaymentQuote(result.data, { ...quoteInput, asOf: '2026-11-12' }).options.find(item => item.category === 'ELECTRICITY')?.state).toBe('INVALID_READING')
   })
 
   it('keeps both tenants awaiting a reading after initialization and shares only a real payment receipt', () => {

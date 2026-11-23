@@ -8,6 +8,7 @@ import { prototypeReducer } from '@/app/state/prototype-reducer'
 import type { PrototypeAction } from '@/app/state/actions'
 import type { PrototypeData } from '@/domain/types/models'
 import { repairMissingAdvanceApplications } from '@/domain/calculations/advance-reconciliation'
+import { ensureInitialRateBaseline } from '@/domain/calculations/rate-baseline'
 import { ApplicationDateProvider, type ApplicationClock } from './application-date'
 import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { usePrototype } from '@/hooks/use-prototype'
@@ -56,7 +57,7 @@ export function PrototypeProvider({ children, repository, now }: { children: Rea
       const occupancyDate = civilDateInTimeZone(clock())
       const loadedData = serverRepository
         ? snapshot.data
-        : repairMissingAdvanceApplications(snapshot.data, occupancyDate).data
+        : repairMissingAdvanceApplications(ensureInitialRateBaseline(snapshot.data), occupancyDate).data
       confirmedData.current = loadedData
       confirmedRevision.current = snapshot.revision ?? null
       reduce(serverRepository

@@ -1,4 +1,4 @@
-import type { Charge, MeterReading, PrototypeAppState } from '@/domain/types/models'
+import type { Charge, ElectricityBillObligation, MeterReading, PrototypeAppState } from '@/domain/types/models'
 import { activeElectricityRate } from './billing-rates'
 import { electricityBaseline } from './meter-baseline'
 import { electricityObligations } from './electricity-obligations'
@@ -35,6 +35,15 @@ export function parseMeterReadingMilliKwh(value: string): number | null {
 export function calculateElectricityCharge(data: PrototypeAppState, obligationId: string, current: { readingMilliKwh: number; readOn: string }): ElectricityCalculationResult {
   const obligation = electricityObligations(data, current.readOn).find(item => item.id === obligationId && item.state === 'AWAITING_READING')
   if (!obligation) return { ok: false, reason: 'OBLIGATION_NOT_FOUND' }
+  return calculateElectricityChargeForObligation(data, obligation, current)
+}
+
+/** Same calculation for a verified persisted or derived awaiting-reading obligation. */
+export function calculateElectricityChargeForObligation(
+  data: PrototypeAppState,
+  obligation: ElectricityBillObligation,
+  current: { readingMilliKwh: number; readOn: string },
+): ElectricityCalculationResult {
   const previous = electricityBaseline(data, obligation.meterId)
   if (!previous) return { ok: false, reason: 'STALE_BASELINE' }
   if (previous.id !== obligation.previousReadingId) return { ok: false, reason: 'STALE_BASELINE' }

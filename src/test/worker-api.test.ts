@@ -8,6 +8,7 @@ import { createDemoData } from '@/data/fixtures/demo'
 import { calendarBillingPeriods } from '@/domain/calculations/billing-periods'
 import { selectBillingRent } from '@/domain/calculations/billing-rent'
 import { buildRoomPaymentQuote } from '@/domain/calculations/room-payment'
+import { selectBillingRooms } from '@/features/billing/billing-room-status'
 
 const root = process.cwd()
 const src = path.join(root, 'src')
@@ -222,6 +223,64 @@ describe('Worker and D1 integration', () => {
     const repairAuditCount = await db.prepare("SELECT COUNT(*) AS count FROM audit_events WHERE workspace_id = ? AND action = 'ADVANCE_APPLIED' AND actor_id = 'system-reconciliation'")
       .bind('test-workspace').first<{ count: number }>()
     expect(repairAuditCount?.count).toBe(1)
+  }, 30_000)
+
+  it('persists first-month water independently while electricity remains awaiting', async () => {
+    const before = await bootstrap()
+    const createResponse = await jsonRequest('/api/v1/commands', 'POST', {
+      action: {
+        type: 'tenant/created',
+        draft: {
+          name: 'Utility Worker Tenant', email: 'utility.worker@example.com', phone: '+63 900 555 0198',
+          address: '7 Utility Street, Demo City', roomId: 'room-7', moveInDate: '2026-07-06', notes: '',
+        },
+      },
+    }, { 'idempotency-key': 'worker-utility-tenant-0001' })
+    expect(createResponse.status).toBe(200)
+    const created = await createResponse.json() as { data: ReturnType<typeof createDemoData>; revision: number }
+    const utilityTenant = created.data.tenants.find(tenant => tenant.name === 'Utility Worker Tenant')!
+    const cycle = created.data.occupancyCycles.find(item => item.roomId === 'room-7' && item.status === 'ACTIVE')!
+    const obligation = created.data.moveInObligations.find(item => item.occupancyCycleId === cycle.id)!
+    const moveInPayment = await jsonRequest('/api/v1/commands', 'POST', {
+      action: { type: 'moveIn/paymentRecorded', obligationId: obligation.id, categories: ['ADVANCE', 'SECURITY_DEPOSIT'], paidOn: '2026-07-06' },
+    }, { 'idempotency-key': 'worker-utility-move-in-0001' })
+    expect(moveInPayment.status).toBe(200)
+    const paid = await moveInPayment.json() as { data: ReturnType<typeof createDemoData>; revision: number }
+
+    const period = paid.data.billingPeriods.find(item => item.startDate === '2026-07-01')!
+    const quote = buildRoomPaymentQuote(paid.data, {
+      roomId: 'room-7', periodId: period.id, selected: ['WATER'],
+      electricityReadingMilliKwh: null, asOf: before.serverDate,
+    })
+    expect(quote.options.find(option => option.category === 'RENT')).toMatchObject({ state: 'PAID', amountCents: 0 })
+    expect(quote.options.find(option => option.category === 'WATER')).toMatchObject({ state: 'SELECTABLE', amountCents: 10_000 })
+    expect(quote.options.find(option => option.category === 'ELECTRICITY')).toMatchObject({ state: 'AWAITING_READING', amountCents: null })
+    expect(quote.options.find(option => option.category === 'WASHING_MACHINE')?.state).toBe('UNAVAILABLE')
+    expect(selectBillingRooms(paid.data, period.id, before.serverDate, false).find(item => item.context.roomId === 'room-7')).toMatchObject({
+      billingStatus: 'PARTLY PAID', unresolved: 1, outstanding: 10_000,
+    })
+
+    const waterBody = {
+      action: { type: 'room/paymentConfirmed', roomId: 'room-7', periodId: period.id, selected: ['WATER'], electricityReadingMilliKwh: null, asOf: before.serverDate },
+    }
+    const waterResponse = await jsonRequest('/api/v1/commands', 'POST', waterBody, { 'idempotency-key': 'worker-utility-water-0001' })
+    expect(waterResponse.status).toBe(200)
+    const watered = await waterResponse.json() as { data: ReturnType<typeof createDemoData>; revision: number }
+    expect(watered.data.charges.filter(charge => charge.category === 'WATER' && charge.tenantId === utilityTenant.id)).toHaveLength(1)
+    expect(watered.data.charges.filter(charge => charge.category === 'WASHING_MACHINE' && charge.tenantId === utilityTenant.id)).toHaveLength(0)
+    expect(watered.data.charges.some(charge => charge.category === 'ELECTRICITY')).toBe(false)
+    expect(selectBillingRooms(watered.data, period.id, before.serverDate, false).find(item => item.context.roomId === 'room-7')).toMatchObject({
+      billingStatus: 'PARTLY PAID', unresolved: 1, outstanding: 0,
+    })
+
+    const replay = await jsonRequest('/api/v1/commands', 'POST', waterBody, { 'idempotency-key': 'worker-utility-water-0001' })
+    expect(replay.status).toBe(200)
+    await expect(replay.json()).resolves.toMatchObject({ replayed: true, revision: watered.revision })
+    const duplicate = await jsonRequest('/api/v1/commands', 'POST', waterBody, { 'idempotency-key': 'worker-utility-water-duplicate-0001' })
+    expect(duplicate.status).toBe(422)
+    const refreshed = await bootstrap()
+    expect(refreshed.data.charges.filter(charge => charge.category === 'WATER' && charge.tenantId === utilityTenant.id)).toHaveLength(1)
+    expect(refreshed.data.payments.filter(payment => payment.id.includes('payment-room-')).length).toBeGreaterThanOrEqual(1)
   }, 30_000)
 
   it('quotes and records one multi-period prepayment excluding the advance-covered period', async () => {
