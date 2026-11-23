@@ -1,5 +1,5 @@
 import type { PrototypeAction } from '@/app/state/actions'
-import type { CollectibleItem } from '@/domain/calculations/payment-collection'
+import type { CollectibleItem, RentPrepaymentCatalog } from '@/domain/calculations/payment-collection'
 import { isPrototypeData } from '@/domain/validation/prototype-data'
 import type { PrototypeCommandResult, PrototypeRepository, PrototypeSnapshot } from './prototype-repository'
 
@@ -116,6 +116,27 @@ export async function fetchCollectionCatalog(roomId: string, readings: Record<st
   })
   if (!Array.isArray(body.items) || typeof body.serverDate !== 'string') throw new ApiRepositoryError('The server returned an invalid payment catalog.', 200, 'INVALID_QUOTE')
   return { items: body.items as CollectibleItem[], serverDate: body.serverDate }
+}
+
+export async function fetchRentPrepaymentCatalog(input: {
+  roomId: string
+  cycleId: string
+  startSequence: number
+  periodCount: number
+}): Promise<RentPrepaymentCatalog & { serverDate: string }> {
+  const body = await request('/payments/rent-range-quote', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input),
+  })
+  if (!Array.isArray(body.items) || typeof body.serverDate !== 'string'
+    || !(body.reason === null || typeof body.reason === 'string')) {
+    throw new ApiRepositoryError('The server returned an invalid rent prepayment quote.', 200, 'INVALID_QUOTE')
+  }
+  return {
+    quote: body.quote as RentPrepaymentCatalog['quote'],
+    items: body.items as CollectibleItem[],
+    reason: body.reason as string | null,
+    serverDate: body.serverDate,
+  }
 }
 
 export interface RentPrepaymentQuoteLine {

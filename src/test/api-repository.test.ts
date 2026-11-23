@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createDemoData } from '@/data/fixtures/demo'
 import {
-  ApiRepositoryError, createApiRepository, fetchRentPrepaymentQuote,
+  ApiRepositoryError, createApiRepository, fetchRentPrepaymentCatalog, fetchRentPrepaymentQuote,
 } from '@/data/repositories/api-repository'
 
 beforeAll(() => {
@@ -63,6 +63,20 @@ describe('server-authoritative API repository', () => {
       message: 'The command was rejected.',
     })
     await expect(repository.command!({ type: 'tenant/noteUpdated', tenantId: 'tenant-1', notes: 'Retry' })).rejects.toBeInstanceOf(ApiRepositoryError)
+  })
+
+  it('loads a ranged rent prepayment quote and structured conflict through the API', async () => {
+    const response = { quote: null, items: [], reason: 'PAID_PERIOD_CONFLICT', serverDate: '2026-11-22' }
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(response))
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(fetchRentPrepaymentCatalog({
+      roomId: 'room-13', cycleId: 'cycle-13', startSequence: 2, periodCount: 3,
+    })).resolves.toEqual(response)
+    const request = fetchMock.mock.calls[0]![1] as RequestInit
+    expect(JSON.parse(String(request.body))).toEqual({
+      roomId: 'room-13', cycleId: 'cycle-13', startSequence: 2, periodCount: 3,
+    })
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/payments/rent-range-quote', expect.objectContaining({ method: 'POST' }))
   })
 
   it('loads a rent prepayment quote through the typed endpoint', async () => {

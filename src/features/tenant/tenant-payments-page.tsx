@@ -9,7 +9,7 @@ import { TransactionPaidLines } from '@/components/shared/transaction-paid-lines
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { usePrototype } from '@/hooks/use-prototype'
 import { useTenantDemo } from '@/app/providers/tenant-demo'
-import { formatDate, formatMoney } from '@/lib/format'
+import { formatDate, formatMoney, previousCalendarDate } from '@/lib/format'
 import { receiptsForPeriod, selectTenantReceipts, type TenantReceiptView } from './tenant-receipts'
 
 const receiptStatusLabels: Record<Receipt['state'], string> = {
@@ -65,6 +65,15 @@ function ReceiptCard({ view, historical = false }: { view: TenantReceiptView; hi
           </p>}
           <p className="mt-3 text-xs text-muted-foreground">Read-only receipt. Only allocations included in this transaction are shown. Other bills may be settled by separate transactions.</p>
         </section>
+        {view.rentPeriods.length > 0 && <section aria-label="Covered rent periods" className="mt-5 min-w-0">
+          <h3 className="mb-3 font-semibold">Covered rent periods</h3>
+          <ul className="divide-y rounded-2xl border px-4">
+            {view.rentPeriods.map(period => <li key={period.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
+              <span><strong>{formatDate(period.startDate)} – {formatDate(previousCalendarDate(period.endDateExclusive))}</strong><small className="block text-xs text-muted-foreground">Due {formatDate(period.dueDate)}</small></span>
+              <span className="font-semibold tabular-nums">{formatMoney(period.amountCents)}</span>
+            </li>)}
+          </ul>
+        </section>}
         {corrected && <div role="note" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
           <p><strong className="font-semibold">Corrected {formatDate(corrected.correctedAt)}.</strong> {corrected.reason}</p>
           <p className="mt-1">{correctionSettlementText(corrected)}</p>

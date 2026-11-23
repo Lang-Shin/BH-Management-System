@@ -102,6 +102,15 @@ export function parseAction(value: unknown): PrototypeAction {
         || !isRecord(input.readings) || Object.values(input.readings).some(reading => !Number.isSafeInteger(reading) || (reading as number) < 0)) {
         invalid('Select valid obligations and verified meter readings.')
       }
+      if (input.rentPrepayment !== undefined) {
+        const prepayment = input.rentPrepayment
+        if (!isRecord(prepayment) || !isId(prepayment.cycleId)
+          || !Number.isSafeInteger(prepayment.startSequence) || (prepayment.startSequence as number) < 1
+          || !Number.isSafeInteger(prepayment.periodCount) || (prepayment.periodCount as number) < 1
+          || (prepayment.startSequence as number) + (prepayment.periodCount as number) - 1 > 120) {
+          invalid('The rent prepayment range is invalid.')
+        }
+      }
       return { type: 'payment/collected', input: input as unknown as Extract<PrototypeAction, { type: 'payment/collected' }>['input'] }
     }
     case 'tenant/noteUpdated':
@@ -212,6 +221,7 @@ export function parseAction(value: unknown): PrototypeAction {
 export function withServerDate(action: PrototypeAction, serverDate: string): PrototypeAction {
   switch (action.type) {
     case 'payment/collected': return { ...action, input: { ...action.input, collectedOn: serverDate } }
+    case 'rent/prepaymentRecorded': return { ...action, paidOn: serverDate }
     case 'tenant/created': return { ...action, asOf: serverDate }
     case 'tenant/updated': return { ...action, asOf: serverDate }
     case 'tenant/movedOut': return { ...action, asOf: serverDate }

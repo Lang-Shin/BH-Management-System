@@ -1,5 +1,5 @@
 import { DEFAULT_ACTION_DATE } from './action-date'
-import { prepareCollection } from '@/domain/calculations/payment-collection'
+import { prepareCollection, prepareRentPrepaymentCollection } from '@/domain/calculations/payment-collection'
 import { ensureInitialRateBaseline } from '@/domain/calculations/rate-baseline'
 import type { PrototypeData } from '@/domain/types/models'
 import type { StateAction } from './actions'
@@ -16,7 +16,7 @@ import { approveRoomChangeRequest, cancelApprovedRoomChangeRequest, cancelRoomCh
 import { createRoom, deleteRoom, updateRoom } from '@/domain/calculations/room-management'
 import { createTenant, deleteTenant, moveOutBlockers, moveOutTenant, updateTenant } from '@/domain/calculations/tenant-management'
 import { prepareShortStayAdvanceRefund } from '@/domain/calculations/advance-refund'
-import { prepareRentPrepayment } from '@/domain/calculations/rent-schedule'
+import { openFinancialReviewCase } from '@/domain/calculations/rent-schedule'
 
 export function prototypeReducer(state: PrototypeData, action: StateAction): PrototypeData {
   switch (action.type) {
@@ -63,8 +63,23 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
         if (!refund.ok) return state
         working = refund.data
       }
+      const assignment = activeAssignments(working, asOf).find(item => item.tenantId === action.tenantId)
+      const cycle = assignment ? working.occupancyCycles.find(item => item.roomId === assignment.roomId && item.status === 'ACTIVE' && item.startedAt <= asOf) : undefined
+      const futurePrepaid = Boolean(cycle && working.rentPrepayments.some(prepayment => prepayment.occupancyCycleId === cycle.id
+        && prepayment.rentalPeriodIds.some(id => {
+          const period = working.rentalPeriods.find(item => item.id === id)
+          return Boolean(period && period.startDate > asOf)
+        })))
       const result = moveOutTenant(working, action.tenantId, asOf)
-      return result.ok ? reconcileOccupancy(working, expirePendingRoomChangeRequests(result.data, action.tenantId, asOf, 'Tenant moved out before the request was reviewed.'), asOf, { createMoveInObligations: false }) : state
+      if (!result.ok) return state
+      let next = reconcileOccupancy(working, expirePendingRoomChangeRequests(result.data, action.tenantId, asOf, 'Tenant moved out before the request was reviewed.'), asOf, { createMoveInObligations: false })
+      if (futurePrepaid && assignment && cycle) {
+        next = openFinancialReviewCase(next, {
+          type: 'PREPAID_RENT_EARLY_DEPARTURE', roomId: assignment.roomId, occupancyCycleId: cycle.id, tenantId: action.tenantId,
+          note: 'Early departure leaves prepaid rent for one or more future periods. The original payment, receipt, and allocations are preserved; no automatic refund or transfer was created.', asOf,
+        })
+      }
+      return next
     }
     case 'tenant/deleted': {
       const asOf = action.asOf ?? DEFAULT_ACTION_DATE
@@ -132,8 +147,10 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
       return result.ok ? result.data : state
     }
     case 'rent/prepaymentRecorded': {
-      const result = prepareRentPrepayment(state, action)
-      return result.ok ? result.data : state
+      const result = prepareRentPrepaymentCollection(state, {
+        cycleId: action.cycleId, periodCount: action.periodCount, collectedOn: action.paidOn,
+      })
+      return result.ok ? result.prepared.result.data : state
     }
     case 'moveIn/policyUpdated': {
       const asOf = action.asOf ?? DEFAULT_ACTION_DATE

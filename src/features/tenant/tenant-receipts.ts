@@ -19,6 +19,14 @@ export interface ReceiptCategoryLine {
   amountCents: number
 }
 
+export interface ReceiptRentPeriod {
+  id: string
+  startDate: string
+  endDateExclusive: string
+  dueDate: string
+  amountCents: number
+}
+
 export interface TenantReceiptView {
   receipt: Receipt
   payment: Payment
@@ -26,6 +34,7 @@ export interface TenantReceiptView {
   tenant: Tenant | null
   viewerIsPayer: boolean
   periods: BillingPeriod[]
+  rentPeriods: ReceiptRentPeriod[]
   rooms: PaymentRoomPresentation
   categories: ReceiptCategoryLine[]
   unallocatedCents: number
@@ -46,7 +55,7 @@ export interface TenantReceiptView {
 export function selectTenantReceipts(data: PrototypeAppState, tenantId: string): { receipts: TenantReceiptView[]; unmatched: number } {
   const tenantsById = new Map(data.tenants.map(item => [item.id, item]))
   const paymentsById = new Map(data.payments.map(item => [item.id, item]))
-  const chargesById = new Map([...data.charges, ...rentLedgerCharges(data)].map(item => [item.id, item]))
+  const chargesById = new Map([...data.charges, ...rentLedgerCharges(data, { includeFuturePeriods: true })].map(item => [item.id, item]))
   const periodsById = new Map(data.billingPeriods.map(item => [item.id, item]))
   const cyclesById = new Map(data.occupancyCycles.map(item => [item.id, item]))
   let unmatched = 0
@@ -87,9 +96,19 @@ export function selectTenantReceipts(data: PrototypeAppState, tenantId: string):
       .map(id => periodsById.get(id))
       .filter((period): period is BillingPeriod => Boolean(period))
       .sort((a, b) => a.startDate.localeCompare(b.startDate))
-    const periods = allocatedPeriods.length > 0
+    const rentPeriods: ReceiptRentPeriod[] = [...new Map(allocations.flatMap(allocation => {
+      const obligation = data.rentObligations.find(item => item.id === allocation.chargeId)
+      const period = obligation ? data.rentalPeriods.find(item => item.id === obligation.rentalPeriodId) : undefined
+      return period ? [[period.id, { id: period.id, startDate: period.startDate, endDateExclusive: period.endDateExclusive, dueDate: period.dueDate, amountCents: obligation!.amountCents }] as const] : []
+    })).values()].sort((a, b) => a.startDate.localeCompare(b.startDate))
+    const collectionPeriod = data.billingPeriods.find(item => item.startDate <= payment.paidOn && item.endDate >= payment.paidOn)
+    const futureRentCoverage = rentPeriods.some(period => period.startDate > payment.paidOn)
+    const basePeriods = allocatedPeriods.length > 0
       ? allocatedPeriods
-      : data.billingPeriods.filter(item => item.startDate <= payment.paidOn && item.endDate >= payment.paidOn)
+      : collectionPeriod ? [collectionPeriod] : []
+    const periods = futureRentCoverage && collectionPeriod && !basePeriods.some(period => period.id === collectionPeriod.id)
+      ? [...basePeriods, collectionPeriod].sort((a, b) => a.startDate.localeCompare(b.startDate))
+      : basePeriods
     const rooms = paymentRooms(data, payment, receipt.issuedOn, receipt.allocationIds)
     const otherTenantNames = [...new Set(allocations
       .map(item => chargesById.get(item.chargeId)?.tenantId)
@@ -107,7 +126,7 @@ export function selectTenantReceipts(data: PrototypeAppState, tenantId: string):
       : null
 
     receipts.push({
-      receipt, payment, tenant: payer, viewerIsPayer, periods, rooms, categories, unallocatedCents: rooms.unallocated, otherTenantNames, depositDisposition,
+      receipt, payment, tenant: payer, viewerIsPayer, periods, rentPeriods, rooms, categories, unallocatedCents: rooms.unallocated, otherTenantNames, depositDisposition,
       effective: receipt.state === 'ISSUED', correction, supersedesReceipt, supersededBy,
     })
   }

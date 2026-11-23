@@ -25,6 +25,8 @@ export type RentScheduleError =
   | 'DUPLICATE_PREPAYMENT'
   | 'PARTIAL_RENT'
   | 'UNPAID_PERIOD_CONFLICT'
+  | 'PAID_PERIOD_CONFLICT'
+  | 'VOIDED_RENT'
   | 'INVALID_AMOUNT'
   | 'TRANSFER_REVIEW_REQUIRED'
 
@@ -160,10 +162,11 @@ function materializePeriod(
   source: RentObligation['source'] = 'PREPAYMENT',
 ): PrototypeAppState {
   if (!cycle.rentAnchorDate) return data
-  if (rentalPeriodsForCycle(data, cycle.id).some(period => period.sequence === sequence)) return data
   const bounds = rentalPeriodBounds(cycle.rentAnchorDate, sequence)
   const periodId = rentalPeriodId(cycle.id, sequence)
-  const period: RentalPeriod = {
+  const existingPeriod = data.rentalPeriods.find(period => period.id === periodId)
+  if (existingPeriod && data.rentObligations.some(obligation => obligation.rentalPeriodId === periodId)) return data
+  const period: RentalPeriod = existingPeriod ?? {
     id: periodId, occupancyCycleId: cycle.id, roomId: cycle.roomId, sequence,
     startDate: bounds.startDate, endDateExclusive: bounds.endDateExclusive, dueDate: rentDueDate(bounds.startDate),
     status: 'OPEN', origin: 'ANNIVERSARY',
@@ -171,12 +174,12 @@ function materializePeriod(
   const obligation: RentObligation = {
     id: rentObligationId(cycle.id, sequence), occupancyCycleId: cycle.id, rentalPeriodId: periodId, roomId: cycle.roomId,
     amountCents: rate.monthlyRentCents, rateId: rate.id, rateEffectiveFrom: rate.effectiveFrom,
-    rateSnapshotCents: rate.monthlyRentCents, issuedOn, dueDate: rentDueDate(bounds.startDate),
+    rateSnapshotCents: rate.monthlyRentCents, issuedOn, dueDate: rentDueDate(period.startDate),
     source, state: 'ISSUED', correction: null,
   }
   return {
     ...data,
-    rentalPeriods: [...data.rentalPeriods, period],
+    rentalPeriods: existingPeriod ? data.rentalPeriods : [...data.rentalPeriods, period],
     rentObligations: [...data.rentObligations, obligation],
   }
 }
@@ -252,6 +255,221 @@ export function quoteRentPrepayment(
       rateCents: current.rate.monthlyRentCents, rateLockedOn: input.asOf, periods: lines, totalCents,
     },
   }
+}
+
+export type RentPeriodConflict = 'ALREADY_PAID' | 'VOIDED' | 'ADVANCE_UNPAID' | 'PARTIAL_RENT_REVIEW'
+
+export interface RentRangeLine {
+  sequence: number
+  rentalPeriodId: string
+  rentObligationId: string
+  startDate: string
+  endDateExclusive: string
+  dueDate: string
+  /** Amount collectible when the range is payable. Conflicts and partial rent resolve to zero. */
+  amountCents: number
+  originalCents: number
+  paidCents: number
+  status: ChargeStatus
+  coveredByAdvance: boolean
+  existing: boolean
+  rateId: string
+  rateEffectiveFrom: string
+  rateSnapshotCents: number
+  conflict: RentPeriodConflict | null
+}
+
+export interface RentRangeConflict {
+  sequence: number
+  rentalPeriodId: string
+  startDate: string
+  endDateExclusive: string
+  amountCents: number
+  paidCents: number
+  reason: RentPeriodConflict
+}
+
+export interface RentRangeQuote {
+  cycleId: string
+  roomId: string
+  startSequence: number
+  periodCount: number
+  rateId: string
+  rateCents: number
+  rateLockedOn: string
+  periods: RentRangeLine[]
+  totalCents: number
+  conflicts: RentRangeConflict[]
+  payable: boolean
+}
+
+export interface RentRangeSelection {
+  cycleId: string
+  startSequence: number
+  periodCount: number
+}
+
+export type RentRangeQuoteResult =
+  | { ok: true; quote: RentRangeQuote }
+  | { ok: false; reason: RentScheduleError; quote?: RentRangeQuote }
+
+export interface RentPrepaymentStart {
+  cycleId: string
+  roomId: string
+  sequence: number
+  startDate: string
+  endDateExclusive: string
+  dueDate: string
+  amountCents: number
+  originalCents: number
+  paidCents: number
+  status: ChargeStatus
+}
+
+/**
+ * Quotes an explicitly selected consecutive anniversary range. New future periods use the current
+ * approved room rate, while already materialized obligations retain their issued rate snapshots.
+ * Paid periods are returned as conflicts instead of being skipped or replaced.
+ */
+export function quoteRentRange(data: PrototypeAppState, input: RentRangeSelection & { asOf: string }): RentRangeQuoteResult {
+  const cycle = cycleFor(data, input.cycleId)
+  if (!cycle) return { ok: false, reason: 'CYCLE_NOT_FOUND' }
+  if (cycle.status !== 'ACTIVE') return { ok: false, reason: 'CYCLE_NOT_ACTIVE' }
+  if (cycle.rentSchedule !== 'ANNIVERSARY' || !cycle.rentAnchorDate) return { ok: false, reason: 'NOT_ANNIVERSARY' }
+  if (data.financialReviewCases.some(review => review.occupancyCycleId === cycle.id
+    && review.status === 'OPEN' && review.type === 'TRANSFER_PREPAID_RENT')) {
+    return { ok: false, reason: 'TRANSFER_REVIEW_REQUIRED' }
+  }
+  if (!isCivilDate(input.asOf)) return { ok: false, reason: 'INVALID_PAYMENT_DATE' }
+  if (!Number.isSafeInteger(input.startSequence) || input.startSequence < 1 || !Number.isSafeInteger(input.periodCount)
+    || input.periodCount < 1 || input.startSequence + input.periodCount - 1 > 120) {
+    return { ok: false, reason: 'INVALID_PERIOD_COUNT' }
+  }
+  const current = currentRate(data, cycle, input.asOf)
+  if (!current) return { ok: false, reason: 'NO_RATE' }
+
+  const working = ensureFirstRentalPeriod(data, cycle, 'REGULAR')
+  const firstPeriod = rentalPeriodsForCycle(working, cycle.id).find(period => period.sequence === 1)
+  const firstObligation = firstPeriod ? rentObligationForPeriod(working, firstPeriod.id) : undefined
+  if (!firstPeriod || !firstObligation) return { ok: false, reason: 'FIRST_RENT_REVIEW_REQUIRED' }
+  const firstPaid = rentObligationPaidCents(working, firstObligation.id, input.asOf)
+  const firstActiveAdvance = working.advanceApplications.find(application =>
+    application.rentObligationId === firstObligation.id && application.state === 'ACTIVE')
+  if (firstObligation.source === 'MOVE_IN_ADVANCE' && firstPaid < firstObligation.amountCents) {
+    return { ok: false, reason: firstActiveAdvance ? 'FIRST_RENT_REVIEW_REQUIRED' : 'ADVANCE_UNPAID' }
+  }
+
+  const periods: RentRangeLine[] = []
+  for (let offset = 0; offset < input.periodCount; offset += 1) {
+    const sequence = input.startSequence + offset
+    const bounds = rentalPeriodBounds(cycle.rentAnchorDate, sequence)
+    const periodId = rentalPeriodId(cycle.id, sequence)
+    const obligationId = rentObligationId(cycle.id, sequence)
+    const period = rentalPeriodsForCycle(working, cycle.id).find(item => item.sequence === sequence)
+    const obligation = period ? rentObligationForPeriod(working, period.id) : undefined
+    const paidCents = obligation ? rentObligationPaidCents(working, obligation.id, input.asOf) : 0
+    const coveredByAdvance = Boolean(obligation && working.advanceApplications.some(application =>
+      application.rentObligationId === obligation.id && application.state === 'ACTIVE'))
+    const rateId = obligation?.rateId ?? current.rate.id
+    const rateEffectiveFrom = obligation?.rateEffectiveFrom ?? current.rate.effectiveFrom
+    const rateSnapshotCents = obligation?.rateSnapshotCents ?? current.rate.monthlyRentCents
+    const originalCents = obligation?.amountCents ?? current.rate.monthlyRentCents
+    const conflict: RentPeriodConflict | null = obligation?.state === 'VOIDED' ? 'VOIDED'
+      : obligation && paidCents >= obligation.amountCents ? 'ALREADY_PAID'
+        : obligation?.source === 'MOVE_IN_ADVANCE' && paidCents < obligation.amountCents ? 'ADVANCE_UNPAID'
+          : obligation && paidCents > 0 ? 'PARTIAL_RENT_REVIEW'
+            : null
+    periods.push({
+      sequence, rentalPeriodId: period?.id ?? periodId, rentObligationId: obligation?.id ?? obligationId,
+      startDate: period?.startDate ?? bounds.startDate, endDateExclusive: period?.endDateExclusive ?? bounds.endDateExclusive,
+      dueDate: period?.dueDate ?? rentDueDate(bounds.startDate), amountCents: conflict ? 0 : Math.max(0, originalCents - paidCents),
+      originalCents, paidCents, status: obligation ? rentObligationStatus(working, obligation, input.asOf) : 'UNPAID',
+      coveredByAdvance, existing: Boolean(obligation), rateId, rateEffectiveFrom, rateSnapshotCents, conflict,
+    })
+  }
+  const conflicts: RentRangeConflict[] = periods.filter(line => line.conflict).map(line => ({
+    sequence: line.sequence, rentalPeriodId: line.rentalPeriodId, startDate: line.startDate,
+    endDateExclusive: line.endDateExclusive, amountCents: line.originalCents, paidCents: line.paidCents,
+    reason: line.conflict!,
+  }))
+  const totalCents = periods.reduce((sum, line) => sum + line.amountCents, 0)
+  const quote: RentRangeQuote = {
+    cycleId: cycle.id, roomId: cycle.roomId, startSequence: input.startSequence, periodCount: input.periodCount,
+    rateId: current.rate.id, rateCents: current.rate.monthlyRentCents, rateLockedOn: input.asOf,
+    periods, totalCents, conflicts, payable: conflicts.length === 0 && totalCents > 0,
+  }
+  if (conflicts.length > 0) {
+    const reason = conflicts.some(line => line.reason === 'VOIDED') ? 'VOIDED_RENT'
+      : conflicts.some(line => line.reason === 'ADVANCE_UNPAID') ? 'ADVANCE_UNPAID'
+        : conflicts.some(line => line.reason === 'PARTIAL_RENT_REVIEW') ? 'PARTIAL_RENT' : 'PAID_PERIOD_CONFLICT'
+    return { ok: false, reason, quote }
+  }
+  if (!Number.isSafeInteger(totalCents) || totalCents <= 0) return { ok: false, reason: 'INVALID_AMOUNT', quote }
+  return { ok: true, quote }
+}
+
+/** Materializes only the selected future periods/obligations; existing issued amounts are untouched. */
+export function materializeRentRange(data: PrototypeAppState, quote: RentRangeQuote): PrototypeAppState {
+  const cycle = cycleFor(data, quote.cycleId)
+  if (!cycle) return data
+  let next = data
+  for (const line of quote.periods) {
+    if (line.conflict) continue
+    if (next.rentObligations.some(obligation => obligation.rentalPeriodId === line.rentalPeriodId)) continue
+    next = materializePeriod(next, cycle, line.sequence, {
+      id: line.rateId, effectiveFrom: line.rateEffectiveFrom, monthlyRentCents: line.rateSnapshotCents,
+    }, quote.rateLockedOn, 'PREPAYMENT')
+  }
+  return next
+}
+
+/** Stable stale-quote guard for one prepaid period. */
+export function rentPrepaymentBasis(quote: RentRangeQuote, line: RentRangeLine): string {
+  return JSON.stringify([
+    'RENT_PREPAYMENT', quote.cycleId, quote.startSequence, quote.periodCount, line.sequence, line.rentalPeriodId,
+    line.rentObligationId, line.originalCents, line.amountCents, line.paidCents, line.dueDate,
+    line.rateId, line.rateEffectiveFrom, line.rateSnapshotCents, quote.rateId, quote.rateCents, quote.rateLockedOn,
+  ])
+}
+
+/**
+ * Starts offered by the landlord UI. Materialized unpaid periods remain eligible, and the next
+ * anniversary after the current materialized horizon is offered without persisting a projection.
+ */
+export function rentPrepaymentStarts(data: PrototypeAppState, roomId: string, asOf: string): RentPrepaymentStart[] {
+  const cycle = [...data.occupancyCycles]
+    .filter(item => item.roomId === roomId && item.status === 'ACTIVE' && item.rentSchedule === 'ANNIVERSARY' && item.rentAnchorDate)
+    .sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0]
+  if (!cycle || !cycle.rentAnchorDate) return []
+  if (data.financialReviewCases.some(review => review.occupancyCycleId === cycle.id
+    && review.status === 'OPEN' && review.type === 'TRANSFER_PREPAID_RENT')) return []
+  const current = currentRate(data, cycle, asOf)
+  if (!current) return []
+  const periods = rentalPeriodsForCycle(data, cycle.id)
+  const firstPeriod = periods.find(period => period.sequence === 1)
+  const firstObligation = firstPeriod ? rentObligationForPeriod(data, firstPeriod.id) : undefined
+  if (firstObligation?.source === 'MOVE_IN_ADVANCE'
+    && rentObligationPaidCents(data, firstObligation.id, asOf) < firstObligation.amountCents) return []
+  const maxSequence = Math.min(120, periods.reduce((max, period) => Math.max(max, period.sequence), 0))
+  const candidates = Array.from({ length: Math.min(120, maxSequence + 1) }, (_, index) => index + 1)
+  return candidates.flatMap((sequence): RentPrepaymentStart[] => {
+    const period = periods.find(item => item.sequence === sequence)
+    const generated = rentalPeriodBounds(cycle.rentAnchorDate!, sequence)
+    const bounds = period
+      ? { startDate: period.startDate, endDateExclusive: period.endDateExclusive, dueDate: period.dueDate }
+      : { startDate: generated.startDate, endDateExclusive: generated.endDateExclusive, dueDate: rentDueDate(generated.startDate) }
+    const obligation = period ? rentObligationForPeriod(data, period.id) : undefined
+    if (obligation?.state === 'VOIDED') return []
+    const paidCents = obligation ? rentObligationPaidCents(data, obligation.id, asOf) : 0
+    if (obligation && paidCents >= obligation.amountCents) return []
+    if (obligation?.source === 'MOVE_IN_ADVANCE' && paidCents < obligation.amountCents) return []
+    const originalCents = obligation?.amountCents ?? current.rate.monthlyRentCents
+    return [{
+      cycleId: cycle.id, roomId, sequence, ...bounds,
+      amountCents: originalCents - paidCents, originalCents, paidCents,
+      status: obligation ? rentObligationStatus(data, obligation, asOf) : 'UNPAID',
+    }]
+  })
 }
 
 export type RentPrepaymentResult =

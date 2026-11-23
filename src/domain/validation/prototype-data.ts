@@ -99,7 +99,7 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     && positive(r.periodCount) && r.periodCount === r.rentalPeriodIds.length
     && positive(r.totalCents) && positive(r.rateCents) && date(r.rateLockedOn) && date(r.createdAt)
     && oneOf(r.reviewState, ['NONE', 'TRANSFER_REVIEW']))) return false
-  if (!rows(value, 'financialReviewCases', r => oneOf(r.type, ['TRANSFER_RENT_DIFFERENCE', 'TRANSFER_PREPAID_RENT', 'LEGACY_ADVANCE_UNALLOCATED', 'ADVANCE_APPLICATION_REVIEW'])
+  if (!rows(value, 'financialReviewCases', r => oneOf(r.type, ['TRANSFER_RENT_DIFFERENCE', 'TRANSFER_PREPAID_RENT', 'PREPAID_RENT_EARLY_DEPARTURE', 'LEGACY_ADVANCE_UNALLOCATED', 'ADVANCE_APPLICATION_REVIEW'])
     && id(r.roomId) && (r.occupancyCycleId === null || id(r.occupancyCycleId))
     && (r.tenantId === null || id(r.tenantId)) && (r.rentalPeriodId === null || id(r.rentalPeriodId))
     && oneOf(r.status, ['OPEN', 'RESOLVED', 'DISMISSED']) && text(r.note) && r.note.length <= 500
@@ -350,7 +350,11 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
   })) return false
   if (!data.rentPrepayments.every(prepayment => {
     const payment = data.payments.find(item => item.id === prepayment.paymentId)
-    const allocations = activeAllocations.filter(allocation => allocation.paymentId === prepayment.paymentId)
+    const obligationIds = new Set(data.rentObligations
+      .filter(obligation => prepayment.rentalPeriodIds.includes(obligation.rentalPeriodId))
+      .map(obligation => obligation.id))
+    const allocations = activeAllocations.filter(allocation => allocation.paymentId === prepayment.paymentId
+      && obligationIds.has(allocation.chargeId))
     return payment?.scope === 'ROOM' && payment.roomId === prepayment.roomId && payment.occupancyCycleId === prepayment.occupancyCycleId
       && allocations.length === prepayment.periodCount
       && prepayment.rentalPeriodIds.every(id => data.rentalPeriods.some(period => period.id === id && period.roomId === prepayment.roomId))

@@ -89,7 +89,7 @@ export type PaymentCorrectionError =
   | 'PAYMENT_NOT_FOUND' | 'RECEIPT_NOT_FOUND' | 'NO_CATEGORIES' | 'INVALID_CATEGORY'
   | 'REASON_REQUIRED' | 'REASON_TOO_LONG' | 'DUPLICATE_CORRECTION' | 'UNALLOCATED_PAYMENT'
   | 'LATER_DEPENDENT_READING' | 'INVALID_READING' | 'INVALID_SETTLEMENT'
-  | 'INVALID_TOTAL' | 'DUPLICATE_PAYMENT' | 'INVALID_DATE' | 'REFUND_EXISTS'
+  | 'INVALID_TOTAL' | 'DUPLICATE_PAYMENT' | 'INVALID_DATE' | 'REFUND_EXISTS' | 'RENT_LEDGER_CORRECTION_UNSUPPORTED'
 
 export type PaymentCorrectionResult =
   | { ok: true; data: PrototypeAppState; correction: PaymentCorrection; payment: Payment; receipt: Receipt }
@@ -124,6 +124,9 @@ export function buildPaymentCorrectionQuote(data: PrototypeAppState, input: Paym
   if (data.paymentCorrections.some(correction => correction.originalPaymentId === payment.id)) return { quoteError: 'DUPLICATE_CORRECTION' }
   const allocations = activeAllocations(data, payment.id)
   if (allocations.reduce((sum, allocation) => sum + allocation.amountCents, 0) !== payment.amountCents) return { quoteError: 'UNALLOCATED_PAYMENT' }
+  if (allocations.some(allocation => data.rentObligations.some(obligation => obligation.id === allocation.chargeId))) {
+    return { quoteError: 'RENT_LEDGER_CORRECTION_UNSUPPORTED' }
+  }
   const chargeById = new Map(allocations.flatMap(allocation => {
     const charge = data.charges.find(item => item.id === allocation.chargeId && item.state === 'ISSUED')
     return charge ? [[charge.id, charge] as const] : []

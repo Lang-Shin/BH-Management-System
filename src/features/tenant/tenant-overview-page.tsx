@@ -13,7 +13,9 @@ import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { useTenantDemo } from '@/app/providers/tenant-demo'
 import { roomOccupants, roomOccupancy, tenantAccount } from '@/domain/calculations/summary'
 import { selectMoveInObligations } from '@/domain/calculations/move-in'
-import { formatDate, formatMoney, formatMonthYear } from '@/lib/format'
+import { selectRentCycleReport } from '@/domain/calculations/rent-reporting'
+import { rentPrepaymentStarts } from '@/domain/calculations/rent-schedule'
+import { formatDate, formatMoney, formatMonthYear, previousCalendarDate } from '@/lib/format'
 import { selectTenantPersona } from './tenant-persona'
 import { tenantRoomBilling } from './tenant-room-billing'
 import { selectTenantReceipts } from './tenant-receipts'
@@ -40,6 +42,10 @@ export default function TenantOverview() {
   const occupancy = persona?.room ? roomOccupancy(data, persona.room, occupancyDate) : null
   const billing = tenantRoomBilling(data, tenantId, persona?.room?.id ?? null, period?.id ?? '', occupancyDate)
   const moveIn = persona?.room ? selectMoveInObligations(data, occupancyDate, persona.room.id).find(view => view.cycle.status === 'ACTIVE') : undefined
+  const activeCycle = persona?.room ? data.occupancyCycles.find(cycle => cycle.roomId === persona.room!.id && cycle.status === 'ACTIVE' && cycle.startedAt <= occupancyDate) : undefined
+  const rentCoverage = activeCycle ? selectRentCycleReport(data, activeCycle.id, occupancyDate) : null
+  const prepaidPeriodIds = new Set(activeCycle ? data.rentPrepayments.filter(item => item.occupancyCycleId === activeCycle.id).flatMap(item => item.rentalPeriodIds) : [])
+  const nextRent = persona?.room ? rentPrepaymentStarts(data, persona.room.id, occupancyDate)[0] : undefined
   const statusTone = billing.status === 'PAID' ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
     : billing.status === 'NOT PAID' ? 'border-rose-200 bg-rose-50 text-rose-900' : 'border-amber-200 bg-amber-50 text-amber-950'
 
@@ -96,6 +102,26 @@ export default function TenantOverview() {
         </CardContent>
       </Card>
     </section>
+    {rentCoverage && <section aria-label="Rent coverage" className="mt-6">
+      <Card>
+        <CardHeader><CardTitle>Rent coverage</CardTitle><CardDescription>Anniversary periods covered by the move-in advance or prepaid rent. Rent is room-level and shared with authorized occupants.</CardDescription></CardHeader>
+        <CardContent>
+          <p className="text-sm"><span className="text-muted-foreground">Next unpaid rent period:</span> <strong>{nextRent ? `${formatDate(nextRent.startDate)} – ${formatDate(previousCalendarDate(nextRent.endDateExclusive))}` : 'No unpaid period in the current schedule'}</strong></p>
+          <ul className="mt-4 divide-y rounded-2xl border px-4">
+            {rentCoverage.periods.map(item => <li key={item.period.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
+              <span className="min-w-0"><strong>{formatDate(item.period.startDate)} – {formatDate(previousCalendarDate(item.period.endDateExclusive))}</strong><small className="block text-xs text-muted-foreground">Due {formatDate(item.period.dueDate)}</small></span>
+              <span className="flex flex-wrap items-center justify-end gap-3">
+                <span className="move-in-status" data-status={item.status === 'PAID' ? 'PAID' : item.status === 'PARTIALLY_PAID' ? 'PARTLY PAID' : 'NOT PAID'}>{item.status === 'PAID' ? 'PAID' : item.status === 'PARTIALLY_PAID' ? 'PARTLY PAID' : 'NOT PAID'}</span>
+                <span className="text-xs text-muted-foreground">{item.advanceAppliedCents > 0 ? 'Move-in advance' : prepaidPeriodIds.has(item.period.id) ? 'Prepaid rent' : item.cashPaidCents > 0 ? 'Rent payment' : 'Unpaid'}</span>
+                <span className="font-semibold tabular-nums">{formatMoney(item.amountCents)}</span>
+              </span>
+            </li>)}
+          </ul>
+          <p className="mt-3 text-xs text-muted-foreground">Receipts list each covered period and its collection date. A prepaid period is not counted as new cash when its future month begins.</p>
+          <Button variant="outline" className="mt-4" asChild><Link to="/tenant/payments">View payment dates and receipts <ArrowRight /></Link></Button>
+        </CardContent>
+      </Card>
+    </section>}
     <div className="mt-6 grid items-start gap-6 xl:grid-cols-2">
       <Card>
         <CardHeader>

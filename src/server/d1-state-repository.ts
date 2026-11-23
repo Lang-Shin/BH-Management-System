@@ -11,7 +11,8 @@ import { ensureRegularRentPeriodsThrough } from '@/domain/calculations/rent-sche
 import { ensureBillingPeriodsThrough } from '@/domain/calculations/billing-periods'
 import { repairMissingAdvanceApplications } from '@/domain/calculations/advance-reconciliation'
 import { ensureInitialRateBaseline } from '@/domain/calculations/rate-baseline'
-import { prepareCollection } from '@/domain/calculations/payment-collection'
+import { prepareCollection, prepareRentPrepaymentCollection } from '@/domain/calculations/payment-collection'
+import type { CollectionInput, CollectionResult } from '@/domain/calculations/payment-collection'
 
 export interface CommandOutcome {
   data: PrototypeAppState
@@ -134,13 +135,23 @@ export class D1StateRepository {
     }
 
     const current = await this.load()
+    let collection: { input: CollectionInput; result: Extract<CollectionResult, { ok: true }> } | null = null
     if (action.type === 'payment/collected') {
       const prepared = prepareCollection(current.data, action.input)
       if (!prepared.ok) throw new ApiError(422, prepared.reason, 'The selected obligations changed or cannot be collected. Refresh the payment catalog and review again.')
+      collection = { input: action.input, result: prepared }
+    } else if (action.type === 'rent/prepaymentRecorded') {
+      const prepared = prepareRentPrepaymentCollection(current.data, {
+        cycleId: action.cycleId, periodCount: action.periodCount, collectedOn: action.paidOn,
+      })
+      if (!prepared.ok) throw new ApiError(422, prepared.reason, 'The rent prepayment range cannot be collected. Refresh and review again.')
+      collection = prepared.prepared
     }
-    const next = prototypeReducer(current.data, action)
-    if (action.type === 'payment/collected' && next !== current.data) {
-      next.auditEvents = next.auditEvents.map(event => event.id === `audit-payment-collection-${action.input.transactionId}` ? { ...event, actorId: actor.id } : event)
+    const next = collection ? collection.result.data : prototypeReducer(current.data, action)
+    if ((action.type === 'payment/collected' || action.type === 'rent/prepaymentRecorded') && next !== current.data) {
+      const priorAuditIds = new Set(current.data.auditEvents.map(event => event.id))
+      next.auditEvents = next.auditEvents.map(event =>
+        !priorAuditIds.has(event.id) && event.actorId === 'landlord' ? { ...event, actorId: actor.id } : event)
     }
     if (next === current.data) {
       if (action.type === 'occupancy/dateChanged') {
@@ -172,21 +183,19 @@ export class D1StateRepository {
       this.db.prepare("UPDATE workspace_operations SET status = 'COMPLETED', completed_at = ? WHERE id = ?")
         .bind(now, `command-${requestId}`),
     ]
-    if (action.type === 'payment/collected') {
-      const prepared = prepareCollection(current.data, action.input)
-      if (!prepared.ok) throw new ApiError(422, prepared.reason, 'The selected payment obligations changed.')
-      const receipt = next.receipts.find(item => item.id === prepared.receiptId)!
+    if (collection) {
+      const receipt = next.receipts.find(item => item.id === collection!.result.receiptId)!
       statements.push(this.db.prepare(`INSERT INTO cash_collections
         (id, workspace_id, payment_id, receipt_id, receipt_number, room_id, collected_on, amount_cents, idempotency_key, actor_id, items_json)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .bind(action.input.transactionId, this.workspaceId, prepared.paymentId, receipt.id, receipt.receiptNumber,
-          action.input.roomId, action.input.collectedOn, prepared.totalCents, idempotencyKey, actor.id,
-          JSON.stringify(prepared.items.map(item => ({ id: item.charge?.id ?? item.id, category: item.category, periodId: item.periodId, periodLabel: item.periodLabel, dueDate: item.dueDate, amountCents: item.amountCents })))))
-      for (const item of prepared.items) {
+        .bind(collection.input.transactionId, this.workspaceId, collection.result.paymentId, receipt.id, receipt.receiptNumber,
+          collection.input.roomId, collection.input.collectedOn, collection.result.totalCents, idempotencyKey, actor.id,
+          JSON.stringify(collection.result.items.map(item => ({ id: item.charge?.id ?? item.id, category: item.category, periodId: item.periodId, periodLabel: item.periodLabel, dueDate: item.dueDate, amountCents: item.amountCents })))))
+      for (const item of collection.result.items) {
         statements.push(this.db.prepare(`INSERT INTO cash_collection_allocations
           (id, collection_id, workspace_id, target_id, category, original_period_id, original_period_label, original_due_date, amount_cents)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-          .bind(`collection-allocation-${action.input.transactionId}-${item.id}`, action.input.transactionId, this.workspaceId,
+          .bind(`collection-allocation-${collection.input.transactionId}-${item.id}`, collection.input.transactionId, this.workspaceId,
             item.charge?.id ?? item.id, item.category, item.periodId, item.periodLabel, item.dueDate, item.amountCents))
       }
     }

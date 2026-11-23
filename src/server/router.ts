@@ -1,7 +1,7 @@
 import { parsePrototypeSnapshot, STORAGE_SCHEMA_VERSION } from '@/data/repositories/prototype-storage'
 import { isPrototypeData } from '@/domain/validation/prototype-data'
 import { quoteRentPrepayment } from '@/domain/calculations/rent-schedule'
-import { collectionCatalog } from '@/domain/calculations/payment-collection'
+import { collectionCatalog, rentPrepaymentCatalog } from '@/domain/calculations/payment-collection'
 import type { PrototypeAppState } from '@/domain/types/models'
 import { requireIdentity } from './auth'
 import { assertTimeZone, businessDate } from './date'
@@ -69,6 +69,21 @@ export async function handleRequest(request: Request, env: WorkerEnv): Promise<R
       return json({ items: collectionCatalog(state.data, body.roomId, serverDate, body.readings as Record<string, number>), revision: state.revision, serverDate }, {}, requestKey)
     }
 
+    if (route === '/payments/rent-range-quote' && request.method === 'POST') {
+      const body = await readJson(request)
+      if (typeof body.roomId !== 'string' || !body.roomId || typeof body.cycleId !== 'string' || !body.cycleId
+        || !Number.isSafeInteger(body.startSequence) || (body.startSequence as number) < 1
+        || !Number.isSafeInteger(body.periodCount) || (body.periodCount as number) < 1
+        || (body.startSequence as number) + (body.periodCount as number) - 1 > 120) {
+        throw new ApiError(400, 'INVALID_RENT_RANGE', 'Choose a valid consecutive rent prepayment range.')
+      }
+      const state = await repo.maintain(serverDate)
+      const result = rentPrepaymentCatalog(state.data, body.roomId, {
+        cycleId: body.cycleId, startSequence: body.startSequence as number, periodCount: body.periodCount as number,
+      }, serverDate)
+      return json({ ...result, serverDate, revision: state.revision }, {}, requestKey)
+    }
+
     if (route === '/commands' && request.method === 'POST') {
       const body = await readJson(request)
       const action = parseAction(body.action)
@@ -101,6 +116,7 @@ export async function handleRequest(request: Request, env: WorkerEnv): Promise<R
       const input = parseRentQuoteBody(body)
       const paidOn = typeof body.paidOn === 'string' ? body.paidOn : serverDate
       if (!/^\d{4}-\d{2}-\d{2}$/.test(paidOn)) throw new ApiError(400, 'INVALID_PAYMENT_DATE', 'Use an ISO date for the payment date.')
+      if (paidOn !== serverDate) throw new ApiError(409, 'COLLECTION_DATE_CHANGED', 'Rent prepayments use the current Manila collection date. Refresh and review again.')
       const outcome = await repo.command(
         { type: 'rent/prepaymentRecorded', cycleId: input.cycleId, periodCount: input.periodCount, paidOn },
         actor, idempotencyKey(request), requestKey, serverDate,

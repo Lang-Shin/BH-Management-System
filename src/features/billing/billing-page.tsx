@@ -28,6 +28,8 @@ export default function Billing() {
   const billingReviews = approvedRoomChangeBillingReviews(data, periodId)
   const financialReviews = data.financialReviewCases.filter(review => review.status === 'OPEN'
     && (review.type === 'TRANSFER_RENT_DIFFERENCE' || review.type === 'TRANSFER_PREPAID_RENT'))
+  const earlyDepartureReviews = data.financialReviewCases.filter(review => review.status === 'OPEN' && review.type === 'PREPAID_RENT_EARLY_DEPARTURE')
+
 
   return <>
     <PageHeader title="Billing" description="Check rent, electricity, water, and washing payments in one place." />
@@ -44,6 +46,11 @@ export default function Billing() {
       <ul>{financialReviews.map(review => <li key={review.id}>
         Room {data.rooms.find(room => room.id === review.roomId)?.name ?? '—'}: {review.note}
       </li>)}</ul>
+    </div>}
+    {earlyDepartureReviews.length > 0 && <div className="room-change-billing-review" role="note">
+      <strong>Prepaid rent review</strong>
+      <p>{earlyDepartureReviews.length === 1 ? 'One early departure has prepaid rent remaining.' : `${earlyDepartureReviews.length} early departures have prepaid rent remaining.`} The original payments and receipts are preserved. No automatic refund, transfer, or rent reversal was created.</p>
+      <ul>{earlyDepartureReviews.map(review => <li key={review.id}>Room {data.rooms.find(room => room.id === review.roomId)?.name ?? '—'}: {data.tenants.find(tenant => tenant.id === review.tenantId)?.name ?? 'Tenant'} — {review.note}</li>)}</ul>
     </div>}
     <section className="mb-7 grid gap-5 xl:grid-cols-3" aria-label="Bills overview">
       <StatCard label="Total bills" value={formatMoney(summary.billed)} detail="All bills for the month you chose." icon={ReceiptText} />

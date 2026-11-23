@@ -231,6 +231,7 @@ export interface RentPrepayment {
 export type FinancialReviewType =
   | 'TRANSFER_RENT_DIFFERENCE'
   | 'TRANSFER_PREPAID_RENT'
+  | 'PREPAID_RENT_EARLY_DEPARTURE'
   | 'LEGACY_ADVANCE_UNALLOCATED'
   | 'ADVANCE_APPLICATION_REVIEW'
 

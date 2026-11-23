@@ -351,6 +351,84 @@ describe('Worker and D1 integration', () => {
     expect(repeated.payment.id).toBe(prepaid.payment.id)
   }, 30_000)
 
+  it('collects future anniversary rent and water atomically through the collection command', async () => {
+    const before = await bootstrap()
+    const createResponse = await jsonRequest('/api/v1/commands', 'POST', {
+      action: { type: 'tenant/created', draft: {
+        name: 'Future Prepayment Tenant', email: 'future.prepay@example.com', phone: '', address: '', notes: '', roomId: 'room-13', moveInDate: before.serverDate,
+      } },
+    }, { 'idempotency-key': 'worker-future-prepay-tenant-0001' })
+    expect(createResponse.status).toBe(200)
+    const created = await createResponse.json() as { data: ReturnType<typeof createDemoData>; revision: number }
+    const cycle = created.data.occupancyCycles.find(item => item.roomId === 'room-13' && item.status === 'ACTIVE')!
+    const obligation = created.data.moveInObligations.find(item => item.occupancyCycleId === cycle.id)!
+    expect((await jsonRequest('/api/v1/commands', 'POST', {
+      action: { type: 'moveIn/paymentRecorded', obligationId: obligation.id, categories: ['ADVANCE', 'SECURITY_DEPOSIT'], paidOn: before.serverDate },
+    }, { 'idempotency-key': 'worker-future-prepay-move-in-0001' })).status).toBe(200)
+
+    const quoteResponse = await jsonRequest('/api/v1/payments/rent-range-quote', 'POST', {
+      roomId: 'room-13', cycleId: cycle.id, startSequence: 2, periodCount: 3,
+    })
+    expect(quoteResponse.status).toBe(200)
+    const range = await quoteResponse.json() as {
+      quote: { cycleId: string; startSequence: number; periodCount: number; rateCents: number; totalCents: number; payable: boolean; periods: { id?: string; sequence: number; amountCents: number; dueDate: string }[] }
+      items: CollectibleItem[]
+      reason: string | null
+    }
+    expect(range.reason).toBeNull()
+    expect(range.quote).toMatchObject({ startSequence: 2, periodCount: 3, payable: true })
+    expect(range.quote.periods.map(period => period.sequence)).toEqual([2, 3, 4])
+    expect(range.items.filter(item => item.category === 'RENT')).toHaveLength(3)
+    const regularQuote = await jsonRequest('/api/v1/payments/quote', 'POST', { roomId: 'room-13', readings: {} })
+    const water = (await regularQuote.json() as { items: CollectibleItem[] }).items.find(item => item.category === 'WATER')!
+    expect(water).toBeDefined()
+    const input: CollectionInput = {
+      transactionId: 'worker-future-prepayment', roomId: 'room-13', readings: {}, collectedOn: before.serverDate,
+      rentPrepayment: { cycleId: cycle.id, startSequence: 2, periodCount: 3 },
+      selections: [...range.items.filter(item => item.category === 'RENT'), water].map(({ id, amountCents, periodId, dueDate, basis }) => ({ id, amountCents, periodId, dueDate, basis })),
+    }
+    const db = await worker.getD1Database('DB')
+    await db.prepare("CREATE TRIGGER fail_rent_prepayment_projection BEFORE INSERT ON rent_prepayments BEGIN SELECT RAISE(ABORT, 'forced prepayment failure'); END").run()
+    try {
+      const failed = await jsonRequest('/api/v1/commands', 'POST', { action: { type: 'payment/collected', input } }, { 'idempotency-key': 'worker-future-prepayment-0001' })
+      expect(failed.status).toBe(409)
+    } finally { await db.prepare('DROP TRIGGER fail_rent_prepayment_projection').run() }
+    const afterFailure = await bootstrap()
+    expect(afterFailure.data.payments.some(payment => payment.id === 'payment-collection-worker-future-prepayment')).toBe(false)
+    expect((await db.prepare("SELECT COUNT(*) AS count FROM cash_collections WHERE id = 'worker-future-prepayment'").first<{ count: number }>())?.count).toBe(0)
+
+    const success = await jsonRequest('/api/v1/commands', 'POST', { action: { type: 'payment/collected', input } }, { 'idempotency-key': 'worker-future-prepayment-0001' })
+    if (success.status !== 200) throw new Error(await success.clone().text())
+    const result = await success.json() as { data: ReturnType<typeof createDemoData>; revision: number }
+    const payment = result.data.payments.find(item => item.id === 'payment-collection-worker-future-prepayment')!
+    expect(payment).toMatchObject({ amountCents: range.quote.totalCents + water.amountCents, paidOn: before.serverDate, occupancyCycleId: cycle.id })
+    const receipt = result.data.receipts.find(item => item.paymentId === payment.id)!
+    expect(receipt.allocationIds).toHaveLength(4)
+    const prepayment = result.data.rentPrepayments.find(item => item.occupancyCycleId === cycle.id)!
+    expect(prepayment).toMatchObject({ paymentId: payment.id, periodCount: 3, totalCents: range.quote.totalCents, rateCents: range.quote.rateCents })
+    const covered = result.data.rentObligations.filter(item => item.occupancyCycleId === cycle.id)
+    expect(covered).toHaveLength(4)
+    expect(covered.every(item => rentObligationPaidCents(result.data, item.id, before.serverDate) === item.amountCents)).toBe(true)
+    expect((await db.prepare("SELECT COUNT(*) AS count FROM cash_collections WHERE id = 'worker-future-prepayment'").first<{ count: number }>())?.count).toBe(1)
+    expect((await db.prepare("SELECT COUNT(*) AS count FROM cash_collection_allocations WHERE collection_id = 'worker-future-prepayment'").first<{ count: number }>())?.count).toBe(4)
+    expect((await db.prepare('SELECT COUNT(*) AS count FROM rent_prepayment_periods WHERE rent_prepayment_id = ?').bind(prepayment.id).first<{ count: number }>())?.count).toBe(3)
+
+    const replay = await jsonRequest('/api/v1/commands', 'POST', { action: { type: 'payment/collected', input } }, { 'idempotency-key': 'worker-future-prepayment-0001' })
+    expect(replay.status).toBe(200)
+    await expect(replay.json()).resolves.toMatchObject({ replayed: true, revision: result.revision })
+    const duplicate = await jsonRequest('/api/v1/commands', 'POST', {
+      action: { type: 'payment/collected', input: { ...input, transactionId: 'worker-future-prepayment-duplicate' } },
+    }, { 'idempotency-key': 'worker-future-prepayment-duplicate-0001' })
+    expect(duplicate.status).toBe(422)
+    const refreshed = await bootstrap()
+    expect(refreshed.data.payments.filter(item => item.id === 'payment-collection-worker-future-prepayment')).toHaveLength(1)
+    expect(refreshed.data.rentPrepayments.filter(item => item.occupancyCycleId === cycle.id)).toHaveLength(1)
+    expect((await db.prepare("SELECT COUNT(*) AS count FROM cash_collections WHERE id IN ('worker-future-prepayment', 'worker-future-prepayment-duplicate')").first<{ count: number }>())?.count).toBe(1)
+    const nextRange = await jsonRequest('/api/v1/payments/rent-range-quote', 'POST', { roomId: 'room-13', cycleId: cycle.id, startSequence: 5, periodCount: 1 })
+    const next = await nextRange.json() as { quote: { periods: { sequence: number; startDate: string }[] } }
+    expect(next.quote.periods[0]?.sequence).toBe(5)
+    expect(next.quote.periods[0]!.startDate > range.quote.periods[2]!.dueDate).toBe(true)
+  }, 30_000)
   it('rolls back a move-in payment when its advance application projection fails', async () => {
     const db = await worker.getD1Database('DB')
     const before = await bootstrap()
