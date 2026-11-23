@@ -14,6 +14,13 @@ function renderApp(route = '/') {
   return render(<PrototypeProvider repository={localStorageRepository}><MemoryRouter initialEntries={[route]}><AppRouter /></MemoryRouter></PrototypeProvider>)
 }
 
+async function expandCalculationCard(user: ReturnType<typeof userEvent.setup>, dialog: HTMLElement, name: 'Rent' | 'Utilities') {
+  const card = [...dialog.querySelectorAll<HTMLDetailsElement>('details.payment-obligation-card')]
+    .find(candidate => candidate.querySelector('summary')?.textContent?.includes(name))
+  if (!card) throw new Error(`Missing ${name} card`)
+  if (!card.open) await user.click(card.querySelector('summary')!)
+}
+
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-11-13T04:00:00.000Z'))
@@ -114,7 +121,9 @@ describe('admin workspace integration', () => {
     const review = within(dialog).getByRole('button', { name: /Review payment/ })
     expect(review).toBeDisabled()
     await user.selectOptions(within(dialog).getByLabelText('Choose room'), 'room-4')
+    await expandCalculationCard(user, dialog, 'Rent')
     await user.click(within(dialog).getByRole('checkbox', { name: 'Rent' }))
+    await expandCalculationCard(user, dialog, 'Utilities')
     expect(total).toHaveTextContent('₱3,500.00')
     await user.click(within(dialog).getByRole('checkbox', { name: 'Water' }))
     expect(total).toHaveTextContent('₱3,700.00')
@@ -130,6 +139,8 @@ describe('admin workspace integration', () => {
     expect(within(dialog).getByRole('checkbox', { name: 'Washing machine' })).toBeDisabled()
 
     await user.selectOptions(within(dialog).getByLabelText('Choose room'), 'room-1')
+    await expandCalculationCard(user, dialog, 'Rent')
+    await expandCalculationCard(user, dialog, 'Utilities')
     expect(within(dialog).getByRole('checkbox', { name: 'Rent' })).toBeDisabled()
     expect(within(dialog).getByRole('checkbox', { name: 'Water' })).toBeDisabled()
     expect(within(dialog).getByRole('checkbox', { name: 'Electricity' })).toBeDisabled()
@@ -435,7 +446,9 @@ describe('admin workspace integration', () => {
     await user.click(await screen.findByRole('button', { name: /Calculate payment/ }))
     let dialog = screen.getByRole('dialog', { name: 'Choose a room and its bills.' })
     await user.selectOptions(within(dialog).getByLabelText('Choose room'), 'room-4')
+    await expandCalculationCard(user, dialog, 'Rent')
     await user.click(within(dialog).getByRole('checkbox', { name: 'Rent' }))
+    await expandCalculationCard(user, dialog, 'Utilities')
     await user.click(within(dialog).getByRole('checkbox', { name: 'Water' }))
     await user.click(within(dialog).getByRole('checkbox', { name: 'Electricity' }))
     await user.type(within(dialog).getByLabelText('Current meter reading (kWh)'), '325')

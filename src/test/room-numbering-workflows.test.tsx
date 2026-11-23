@@ -181,7 +181,8 @@ describe('room numbering across electricity, tenants, dashboard, and reports', (
     const calculator = screen.getByRole('dialog', { name: 'Choose a room and its bills.' })
     const roomSelect = within(calculator).getByLabelText('Choose room')
     expect(within(roomSelect).getAllByRole('option').slice(1).map(option => [option.getAttribute('value'), option.textContent]))
-      .toEqual(createDemoData().rooms.map(room => [room.id, `Room ${room.name}`]))
+      .toEqual(createDemoData().rooms.filter(room => ['room-1', 'room-2', 'room-3', 'room-4'].includes(room.id)).map(room => [room.id, `Room ${room.name}`]))
+    expect(within(roomSelect).queryByRole('option', { name: 'Room 6' })).not.toBeInTheDocument()
     await user.click(within(calculator).getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 

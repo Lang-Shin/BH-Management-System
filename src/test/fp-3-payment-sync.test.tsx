@@ -16,6 +16,8 @@ async function reviewRoomRentPayment(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole('button', { name: /Calculate payment/ }))
   const calculator = screen.getByRole('dialog', { name: 'Choose a room and its bills.' })
   await user.selectOptions(within(calculator).getByLabelText('Choose room'), 'room-4')
+  await user.click([...calculator.querySelectorAll('details.payment-obligation-card')]
+    .find(card => card.textContent?.includes('Anniversary-based billing'))!.querySelector('summary')!)
   await user.click(within(calculator).getByRole('checkbox', { name: 'Rent' }))
   await user.click(within(calculator).getByRole('button', { name: /Review payment/ }))
   return screen.getByRole('dialog', { name: 'Confirm payment received' })

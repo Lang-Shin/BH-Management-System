@@ -8,7 +8,8 @@ import type { RoomFinance } from '@/domain/calculations/room-finance'
 import { CATEGORY_LABELS } from '@/lib/labels'
 import { formatDate, formatMoney } from '@/lib/format'
 import { pendingPaymentCategories } from './pending-payment-groups'
-import { unresolvedElectricity } from '@/domain/calculations/summary'
+import { activeAssignments, unresolvedElectricity } from '@/domain/calculations/summary'
+import { Link } from 'react-router-dom'
 import { collectionCatalog } from '@/domain/calculations/payment-collection'
 
 const icons = { RENT: House, ELECTRICITY: Zap, WATER: Droplets, WASHING_MACHINE: WashingMachine, ADVANCE: Wallet, SECURITY_DEPOSIT: ShieldCheck }
@@ -31,6 +32,7 @@ export function PendingPaymentsDialog({ data, room, asOf, onClose, onReturnFocus
   const unresolved = categories.reduce((sum, category) => sum + category.unresolved, 0)
   const count = categories.reduce((sum, category) => sum + category.chargeCount, 0)
   const pendingElectricity = room.context.roomId ? unresolvedElectricity(data, asOf, undefined, room.context.roomId)[0] : undefined
+  const hasActiveOccupant = room.context.roomId ? activeAssignments(data, asOf).some(assignment => assignment.roomId === room.context.roomId) : false
   const previousSettled = pendingElectricity ? data.meterReadings.find(reading => reading.id === pendingElectricity.previousReadingId) : undefined
   const { open, requestClose, onOpenChange, onAnimationEnd } = useAnimatedDialogClose(onClose)
 
@@ -82,7 +84,7 @@ export function PendingPaymentsDialog({ data, room, asOf, onClose, onReturnFocus
         })}
         <p className="mt-4 text-xs text-muted-foreground">Fully paid months are hidden. Each category lists its older unpaid months first.{unresolved > 0 ? ` ${unresolved} electricity ${unresolved === 1 ? 'bill is' : 'bills are'} awaiting a meter reading ${unresolved === 1 ? 'and is' : 'and are'} not included in the known amount.` : ''} {categories.some(category => category.optional) ? 'Washing is optional and cannot be used while unpaid.' : 'Washing is optional. If a washing bill is not paid, the washing machine cannot be used.'}</p>
       </div>
-      <DialogFooter className="pending-dialog-footer"><Button aria-label="Close pending payments" onClick={requestClose}>Close</Button></DialogFooter>
+      <DialogFooter className="pending-dialog-footer">{room.context.roomId && !hasActiveOccupant && <Button asChild variant="outline"><Link to={`/billing?collectRoom=${room.context.roomId}`}>Collect historical balance</Link></Button>}<Button aria-label="Close pending payments" onClick={requestClose}>Close</Button></DialogFooter>
     </DialogContent>
   </Dialog>
 }

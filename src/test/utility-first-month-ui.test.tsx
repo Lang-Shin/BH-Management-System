@@ -74,6 +74,9 @@ describe('first-month utility billing UI', () => {
     await user.click(await screen.findByRole('button', { name: /Calculate payment/ }))
     let dialog = screen.getByRole('dialog', { name: 'Choose a room and its bills.' })
     await user.selectOptions(within(dialog).getByLabelText('Choose room'), 'room-2')
+    const cards = [...dialog.querySelectorAll('details.payment-obligation-card')]
+    await user.click(cards.find(card => card.textContent?.includes('Anniversary-based billing'))!.querySelector('summary')!)
+    await user.click(cards.find(card => card.textContent?.includes('Calendar-month billing'))!.querySelector('summary')!)
     expect(within(dialog).getByRole('checkbox', { name: 'Rent' })).toBeDisabled()
     await user.click(within(dialog).getByRole('checkbox', { name: 'Water' }))
     expect(within(dialog).getByLabelText('Total to pay')).toHaveTextContent('100.00')

@@ -1751,7 +1751,12 @@ li:nth-child(n + 5) > .notification-item { animation-delay: 120ms; }
 /* Two independent ledgers inside the existing payment modal. */
 .payment-obligation-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; margin-top: 1rem; }
 .payment-obligation-card { min-width: 0; border: 1px solid var(--border); border-radius: 1rem; background: var(--card); overflow: hidden; }
-.payment-obligation-card > summary { cursor: pointer; padding: 1rem; color: var(--foreground); background: var(--muted); }
+.payment-obligation-card > summary { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 1rem; cursor: pointer; padding: 1rem; color: var(--foreground); background: var(--muted); list-style: none; }
+.payment-obligation-card > summary::-webkit-details-marker { display: none; }
+.payment-obligation-card > summary > strong { grid-column: 1; }
+.payment-obligation-card > summary > span { grid-column: 1 / -1; grid-row: 2; }
+.payment-card-chevron { grid-column: 2; grid-row: 1; width: 1.1rem; height: 1.1rem; transition: transform .18s ease; }
+.payment-obligation-card[open] .payment-card-chevron { transform: rotate(180deg); }
 .payment-obligation-card > summary strong { font-size: 1.1rem; }
 .payment-obligation-card > summary span { display: block; font-size: .8rem; color: var(--muted-foreground); padding-top: .2rem; }
 .payment-card-content { padding: .9rem; }

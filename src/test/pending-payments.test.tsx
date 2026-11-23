@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import { createDemoData, DEMO_DATE } from '@/data/fixtures/demo'
 import { isPrototypeData } from '@/domain/validation/prototype-data'
@@ -31,6 +32,14 @@ function historicalPendingFixture() {
 }
 
 describe('room pending-payment presentation', () => {
+  it('offers an authorized historical collection path for a now-vacant room', () => {
+    const data = createDemoData()
+    data.roomAssignments = data.roomAssignments.map(assignment => assignment.roomId === 'room-1' ? { ...assignment, endDate: '2026-11-01' } : assignment)
+    const room = selectRoomFinance(data, DEMO_DATE).find(item => item.id === 'room-1')!
+    render(<MemoryRouter><PendingPaymentsDialog data={data} room={room} asOf={DEMO_DATE} onClose={() => {}} onReturnFocus={() => {}} /></MemoryRouter>)
+    expect(screen.getByRole('link', { name: 'Collect historical balance' })).toHaveAttribute('href', '/billing?collectRoom=room-1')
+  })
+
   it('sorts past billing periods before current bills and shows only remaining amounts', () => {
     const data = historicalPendingFixture()
     expect(isPrototypeData(data)).toBe(true)

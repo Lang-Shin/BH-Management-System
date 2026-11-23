@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, ArrowUpRight, Calculator, Check } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowLeft, ArrowUpRight, Calculator, Check, ChevronDown } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { usePrototype } from '@/hooks/use-prototype'
 import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { collectionCatalog, prepareCollection, type CollectibleItem, type CollectionInput } from '@/domain/calculations/payment-collection'
+import { occupiedRoomSelection } from '@/domain/calculations/occupied-rooms'
 import { buildRoomPaymentQuote } from '@/domain/calculations/room-payment'
 import { parseMeterReadingMilliKwh } from '@/domain/calculations/electricity-calculation'
 import { formatDate, formatMoney } from '@/lib/format'
@@ -14,9 +15,15 @@ import { CATEGORY_LABELS } from '@/lib/labels'
 export function PaymentCalculator({ periodId, periodLabel }: { periodId: string; periodLabel: string }) {
   const { data, commitAction, loadCollectionCatalog, persistSnapshot, repositoryMode, commandError } = usePrototype()
   const occupancyDate = useOccupancyDate()
-  const [open, setOpen] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedHistoricalRoom = searchParams.get('collectRoom')
+  const initialHistoricalRoom = requestedHistoricalRoom && data.rooms.some(room => room.id === requestedHistoricalRoom) ? requestedHistoricalRoom : null
+  const handledHistoricalRoom = useRef<string | null>(initialHistoricalRoom)
+  const [historicalRoomId, setHistoricalRoomId] = useState<string | null>(initialHistoricalRoom)
+  const [cardsEpoch, setCardsEpoch] = useState(0)
+  const [open, setOpen] = useState(Boolean(initialHistoricalRoom))
   const [step, setStep] = useState<'calculator' | 'confirm' | 'success'>('calculator')
-  const [roomId, setRoomId] = useState('')
+  const [roomId, setRoomId] = useState(initialHistoricalRoom ?? '')
   const [selected, setSelected] = useState<string[]>([])
   const [readingText, setReadingText] = useState<Record<string, string>>({})
   const [serverItems, setServerItems] = useState<CollectibleItem[]>([])
@@ -29,6 +36,8 @@ export function PaymentCalculator({ periodId, periodLabel }: { periodId: string;
   const [saving, setSaving] = useState(false)
   const [input, setInput] = useState<CollectionInput | null>(null)
   const [reviewItems, setReviewItems] = useState<CollectibleItem[]>([])
+  const occupied = useMemo(() => occupiedRoomSelection(data, occupancyDate), [data, occupancyDate])
+  const occupiedRoomIdsKey = occupied.rooms.map(room => room.id).join('|')
   const readings = useMemo(() => Object.fromEntries(Object.entries(readingText)
     .flatMap(([id, value]) => { const parsed = parseMeterReadingMilliKwh(value); return parsed === null ? [] : [[id, parsed]] })), [readingText]) as Record<string, number>
   const requestedKey = JSON.stringify({ roomId, readings })
@@ -50,6 +59,31 @@ export function PaymentCalculator({ periodId, periodLabel }: { periodId: string;
     return () => { cancelled = true; clearTimeout(timer) }
   }, [open, roomId, repositoryMode, readings, retry, step, loadCollectionCatalog])
 
+  useEffect(() => {
+    if (!requestedHistoricalRoom || handledHistoricalRoom.current === requestedHistoricalRoom) return
+    if (!data.rooms.some(room => room.id === requestedHistoricalRoom)) return
+    const timer = setTimeout(() => {
+      handledHistoricalRoom.current = requestedHistoricalRoom
+      setHistoricalRoomId(requestedHistoricalRoom)
+      setRoomId(requestedHistoricalRoom)
+      setSelected([]); setReadingText({}); setServerItems([]); setQuotedKey(''); setError(''); setCatalogError('')
+      setCardsEpoch(epoch => epoch + 1)
+      setStep('calculator')
+      setOpen(true)
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [requestedHistoricalRoom, data.rooms])
+
+  useEffect(() => {
+    if (!open || !roomId || historicalRoomId) return
+    if (occupiedRoomIdsKey.split('|').includes(roomId)) return
+    const timer = setTimeout(() => {
+      setRoomId(''); setSelected([]); setReadingText({}); setServerItems([]); setQuotedKey(''); setError(''); setCatalogError(''); setInput(null)
+      setCardsEpoch(epoch => epoch + 1)
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [open, roomId, historicalRoomId, occupiedRoomIdsKey])
+
   const asOf = repositoryMode === 'server' ? serverDate : occupancyDate
   const items = repositoryMode === 'server' ? serverItems : roomId ? collectionCatalog(data, roomId, asOf, readings) : []
   const rentItems = items.filter(item => item.category === 'RENT')
@@ -65,14 +99,26 @@ export function PaymentCalculator({ periodId, periodLabel }: { periodId: string;
   const payment = input ? data.payments.find(item => item.id === `payment-collection-${input.transactionId}`) : undefined
   const receipt = payment ? data.receipts.find(item => item.paymentId === payment.id) : undefined
 
+  function clearHistoricalQuery() {
+    if (!searchParams.has('collectRoom')) return
+    const next = new URLSearchParams(searchParams)
+    next.delete('collectRoom')
+    setSearchParams(next, { replace: true })
+    handledHistoricalRoom.current = null
+  }
+
   function changeOpen(next: boolean) {
     if (saving) return
     setOpen(next)
     if (next) { setStep('calculator'); chooseRoom(''); setInput(null); setReviewItems([]) }
+    else { setHistoricalRoomId(null); clearHistoricalQuery() }
   }
 
   function chooseRoom(id: string) {
+    setHistoricalRoomId(null)
+    clearHistoricalQuery()
     setRoomId(id); setSelected([]); setReadingText({}); setServerItems([]); setQuotedKey(''); setError(''); setCatalogError('')
+    setCardsEpoch(epoch => epoch + 1)
     setLoading(repositoryMode === 'server' && Boolean(id))
     setInput(null)
   }
@@ -113,9 +159,15 @@ export function PaymentCalculator({ periodId, periodLabel }: { periodId: string;
         <div className="payment-calculator-heading"><span className="payment-eyebrow">PAYMENT STUDIO · PHP</span><DialogTitle className="mt-2 text-2xl">Choose a room and its bills.</DialogTitle><DialogDescription id="payment-calculator-description" className="mt-2">Select specific unpaid rent periods and calendar-month utilities. Nothing is selected automatically.</DialogDescription><p className="mt-2 text-xs text-muted-foreground">Viewing Billing: {periodLabel}. Collection includes earlier outstanding obligations. Collection date: {formatDate(asOf)}.</p></div>
         <div className="payment-calculator-body">
           <label htmlFor="payment-room" className="mb-2 block text-sm font-semibold">Choose room</label>
-          <select id="payment-room" value={roomId} onChange={event => chooseRoom(event.target.value)} className="payment-tenant-select"><option value="">Choose a room</option>{data.rooms.map(room => <option key={room.id} value={room.id}>Room {room.name}</option>)}</select>
-          {roomId && <div className="payment-obligation-cards">
-            <details open className="payment-obligation-card"><summary><strong>Rent</strong><span>Anniversary-based billing</span></summary><div className="payment-card-content">
+          <select id="payment-room" value={historicalRoomId ? '' : roomId} onChange={event => chooseRoom(event.target.value)} className="payment-tenant-select" disabled={occupied.rooms.length === 0} aria-describedby="occupied-room-note">
+            <option value="">{occupied.rooms.length === 0 ? 'No occupied rooms available' : 'Choose a room'}</option>
+            {occupied.rooms.map(room => <option key={room.id} value={room.id}>Room {room.name}</option>)}
+          </select>
+          <p id="occupied-room-note" role="status" className="mt-2 text-xs text-muted-foreground">{occupied.rooms.length === 0 ? 'No occupied rooms available. Historical balances remain accessible from Pending Payments.' : 'Only rooms with at least one active occupant are shown.'}</p>
+          {occupied.warnings.length > 0 && <ul role="note" className="mt-2 space-y-1 text-xs text-amber-900">{occupied.warnings.map(warning => <li key={warning}>{warning}</li>)}</ul>}
+          {historicalRoomId && roomId === historicalRoomId && <div role="note" className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><strong>Historical room collection: Room {data.rooms.find(room => room.id === historicalRoomId)?.name}</strong><span className="block text-xs">Opened from Pending Payments for an authorized historical balance.</span><Button type="button" variant="outline" className="mt-2 min-h-9" onClick={() => chooseRoom('')}>Clear historical room</Button></div>}
+          {roomId && <div key={`${roomId}:${cardsEpoch}`} className="payment-obligation-cards">
+            <details className="payment-obligation-card"><summary><strong>Rent</strong><span>Anniversary-based billing</span><ChevronDown className="payment-card-chevron" aria-hidden="true" /></summary><div className="payment-card-content">
               {rentItems.length === 0
                 ? <p className="text-sm text-muted-foreground"><input aria-label="Rent" type="checkbox" disabled /> {loading ? 'Loading rent periods…' : catalogError ? 'Rent periods unavailable.' : 'All rent periods paid'}</p>
                 : rentItems.map(item => <label key={item.id} className="collection-obligation">
@@ -124,7 +176,7 @@ export function PaymentCalculator({ periodId, periodLabel }: { periodId: string;
                   <strong>{formatMoney(item.amountCents)}</strong>
                 </label>)}
             </div></details>
-            <details open className="payment-obligation-card"><summary><strong>Utilities</strong><span>Calendar-month billing</span></summary><div className="payment-card-content">
+            <details className="payment-obligation-card"><summary><strong>Utilities</strong><span>Calendar-month billing</span><ChevronDown className="payment-card-chevron" aria-hidden="true" /></summary><div className="payment-card-content">
               <p className="text-xs text-muted-foreground">Historical issued washing bills are collectible. Unissued historical washing requires verified usage; today’s subscription does not prove past usage. Electricity uses one continuous meter interval; choose only one pending month per meter.</p>
               {months.map(month => {
                 const monthly = utilityItems.filter(item => item.periodId === month)

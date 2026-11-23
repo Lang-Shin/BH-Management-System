@@ -4,31 +4,59 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PrototypeProvider } from '@/app/providers/prototype-provider'
 import { AppRouter } from '@/app/router/app-router'
+import { createEmptyData } from '@/data/fixtures/empty'
 import { localStorageRepository, STORAGE_KEY } from '@/data/repositories/local-storage-repository'
 import type { PrototypeRepository } from '@/data/repositories/prototype-repository'
 import { collectionCatalog } from '@/domain/calculations/payment-collection'
+import { prototypeReducer } from '@/app/state/prototype-reducer'
 import { rentObligationPaidCents } from '@/domain/calculations/rental-periods'
 import { overdueWorkspace } from './collection-fixture'
 
 const now = () => new Date('2026-11-23T04:00:00Z')
-const renderApp = (repository: PrototypeRepository = localStorageRepository) => render(<PrototypeProvider repository={repository} now={now}><MemoryRouter initialEntries={['/billing']}><AppRouter /></MemoryRouter></PrototypeProvider>)
+const renderApp = (repository: PrototypeRepository = localStorageRepository, route = '/billing') => render(<PrototypeProvider repository={repository} now={now}><MemoryRouter initialEntries={[route]}><AppRouter /></MemoryRouter></PrototypeProvider>)
+const cardsFor = (dialog: HTMLElement) => [...dialog.querySelectorAll<HTMLDetailsElement>('details.payment-obligation-card')]
+const cardFor = (dialog: HTMLElement, subtitle: string) => cardsFor(dialog).find(card => card.textContent?.includes(subtitle))!
+async function expand(user: ReturnType<typeof userEvent.setup>, dialog: HTMLElement, subtitle: string) {
+  const card = cardFor(dialog, subtitle)
+  if (!card.open) await user.click(card.querySelector('summary')!)
+  return card
+}
 beforeEach(async () => { expect(await localStorageRepository.save(overdueWorkspace())).toBeNull() })
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs() })
 
 describe('two-card historical payment workflow', () => {
-  it('collects August rent in November, preserves other months, renders the receipt and survives refresh', async () => {
+  it('lists only occupied rooms, starts collapsed, and collects August rent in November', async () => {
     const user = userEvent.setup()
     const app = renderApp()
     await user.click(await screen.findByRole('button', { name: /Calculate payment/ }))
     const calculator = screen.getByRole('dialog', { name: 'Choose a room and its bills.' })
-    await user.selectOptions(within(calculator).getByLabelText('Choose room'), 'room-2')
-    expect(calculator.querySelectorAll('.payment-obligation-card')).toHaveLength(2)
-    expect(within(calculator).getByText('Anniversary-based billing')).toBeVisible()
-    expect(within(calculator).getByText('Calendar-month billing')).toBeVisible()
+    const roomSelect = within(calculator).getByLabelText('Choose room') as HTMLSelectElement
+    expect([...roomSelect.options].map(option => [option.value, option.textContent])).toEqual([['', 'Choose a room'], ['room-2', 'Room 2']])
+    await user.selectOptions(roomSelect, 'room-2')
+    const cards = cardsFor(calculator)
+    expect(cards).toHaveLength(2)
+    const rentCard = cards[0]!
+    const utilitiesCard = cards[1]!
+    expect(rentCard).not.toHaveAttribute('open')
+    expect(utilitiesCard).not.toHaveAttribute('open')
+    expect(rentCard.querySelector('.payment-card-chevron')).toHaveAttribute('aria-hidden', 'true')
+    const rentSummary = rentCard.querySelector('summary')!
+    rentSummary.focus()
+    expect(rentSummary).toHaveFocus()
+    expect(rentSummary).toHaveAccessibleName(/Rent.*Anniversary-based billing/)
+    expect(within(calculator).getByLabelText('Total to pay')).toHaveTextContent('0.00')
+    await expand(user, calculator, 'Anniversary-based billing')
+    expect(rentCard).toHaveAttribute('open')
+    expect(utilitiesCard).not.toHaveAttribute('open')
     expect(within(calculator).queryByText('Rent is due in anniversary billing')).not.toBeInTheDocument()
     expect(within(calculator).queryByRole('checkbox', { name: /Rent — Jul/ })).not.toBeInTheDocument()
-    expect(within(calculator).getByLabelText('Total to pay')).toHaveTextContent('0.00')
     await user.click(within(calculator).getByRole('checkbox', { name: /Rent — Aug 6/ }))
+    expect(within(calculator).getByLabelText('Total to pay')).toHaveTextContent('3,500.00')
+    await expand(user, calculator, 'Calendar-month billing')
+    expect(rentCard).toHaveAttribute('open')
+    expect(utilitiesCard).toHaveAttribute('open')
+    await user.click(rentCard.querySelector('summary')!)
+    expect(rentCard).not.toHaveAttribute('open')
     expect(within(calculator).getByLabelText('Total to pay')).toHaveTextContent('3,500.00')
     await user.click(within(calculator).getByRole('button', { name: /Review payment/ }))
     const review = screen.getByRole('dialog', { name: 'Confirm payment received' })
@@ -51,25 +79,64 @@ describe('two-card historical payment workflow', () => {
     await user.click(await screen.findByRole('button', { name: /Calculate payment/ }))
     const refreshed = screen.getByRole('dialog', { name: 'Choose a room and its bills.' })
     await user.selectOptions(within(refreshed).getByLabelText('Choose room'), 'room-2')
+    expect(cardsFor(refreshed).every(card => !card.open)).toBe(true)
+    await expand(user, refreshed, 'Anniversary-based billing')
     expect(within(refreshed).queryByRole('checkbox', { name: /Rent — Aug 6/ })).not.toBeInTheDocument()
     expect(within(refreshed).getByRole('checkbox', { name: /Rent — Sep 6/ })).not.toBeChecked()
-  })
+  }, 30000)
 
-  it('collapses cards independently, clears selections on room changes, and displays empty rooms', async () => {
+  it('resets collapsed cards and selections when the room changes', async () => {
+    let data = overdueWorkspace()
+    data = prototypeReducer(data, { type: 'tenant/created', asOf: '2026-11-23', draft: {
+      name: 'Second occupied room', email: 'room3@example.com', phone: '', address: '', notes: '', roomId: 'room-3', moveInDate: '2026-11-01',
+    } })
+    expect(await localStorageRepository.save(data)).toBeNull()
     const user = userEvent.setup()
     renderApp()
     await user.click(await screen.findByRole('button', { name: /Calculate payment/ }))
     const dialog = screen.getByRole('dialog', { name: 'Choose a room and its bills.' })
     await user.selectOptions(within(dialog).getByLabelText('Choose room'), 'room-2')
+    await expand(user, dialog, 'Anniversary-based billing')
     await user.click(within(dialog).getByRole('checkbox', { name: /Rent — Aug 6/ }))
-    const cards = dialog.querySelectorAll('details.payment-obligation-card')
-    await user.click(cards[0]!.querySelector('summary')!)
-    expect(cards[0]).not.toHaveAttribute('open')
-    expect(cards[1]).toHaveAttribute('open')
-    await user.selectOptions(within(dialog).getByLabelText('Choose room'), 'room-8')
+    expect(within(dialog).getByLabelText('Total to pay')).toHaveTextContent('3,500.00')
+    expect(cardsFor(dialog)[1]).not.toHaveAttribute('open')
+    await user.selectOptions(within(dialog).getByLabelText('Choose room'), 'room-3')
     expect(within(dialog).getByLabelText('Total to pay')).toHaveTextContent('0.00')
-    expect(within(dialog).getByText('All rent periods paid')).toBeInTheDocument()
-    expect(within(dialog).getByText('No unpaid utility obligations.')).toBeInTheDocument()
+    expect(cardsFor(dialog).every(card => !card.open)).toBe(true)
+    await user.selectOptions(within(dialog).getByLabelText('Choose room'), 'room-2')
+    expect(within(dialog).getByLabelText('Total to pay')).toHaveTextContent('0.00')
+    expect(cardsFor(dialog).every(card => !card.open)).toBe(true)
+  })
+
+  it('shows a disabled empty state when no rooms are occupied', async () => {
+    expect(await localStorageRepository.save(createEmptyData('2026-11-23'))).toBeNull()
+    const user = userEvent.setup()
+    renderApp()
+    await user.click(await screen.findByRole('button', { name: /Calculate payment/ }))
+    const dialog = screen.getByRole('dialog', { name: 'Choose a room and its bills.' })
+    const roomSelect = within(dialog).getByLabelText('Choose room') as HTMLSelectElement
+    expect(roomSelect).toBeDisabled()
+    expect(within(roomSelect).getByRole('option', { name: 'No occupied rooms available' })).toBeInTheDocument()
+    expect(within(dialog).getByText(/Historical balances remain accessible from Pending Payments/)).toBeInTheDocument()
+    expect(cardsFor(dialog)).toHaveLength(0)
+    expect(within(dialog).getByRole('button', { name: /Review payment/ })).toBeDisabled()
+  })
+
+  it('opens an authorized historical room from Pending Payments without adding it to the occupied selector', async () => {
+    const data = overdueWorkspace()
+    data.roomAssignments = data.roomAssignments.map(assignment => assignment.roomId === 'room-2' ? { ...assignment, endDate: '2026-11-01' } : assignment)
+    expect(await localStorageRepository.save(data)).toBeNull()
+    const user = userEvent.setup()
+    renderApp(localStorageRepository, '/billing?collectRoom=room-2')
+    const dialog = await screen.findByRole('dialog', { name: 'Choose a room and its bills.' })
+    const roomSelect = within(dialog).getByLabelText('Choose room') as HTMLSelectElement
+    expect(roomSelect).toBeDisabled()
+    expect(within(roomSelect).getByRole('option', { name: 'No occupied rooms available' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('note', { name: '' })).toHaveTextContent('Historical room collection: Room 2')
+    expect(cardsFor(dialog).every(card => !card.open)).toBe(true)
+    await expand(user, dialog, 'Anniversary-based billing')
+    await user.click(within(dialog).getByRole('checkbox', { name: /Rent — Aug 6/ }))
+    expect(within(dialog).getByLabelText('Total to pay')).toHaveTextContent('3,500.00')
   })
 
   it('uses the server catalog, reports a failed command, retries the same key, and never writes localStorage', async () => {
@@ -87,6 +154,7 @@ describe('two-card historical payment workflow', () => {
     await user.selectOptions(within(dialog).getByLabelText('Choose room'), 'room-2')
     expect(within(dialog).getByText('Loading authoritative obligations…')).toBeInTheDocument()
     await user.click(await within(dialog).findByRole('button', { name: 'Retry loading obligations' }))
+    await expand(user, dialog, 'Anniversary-based billing')
     await user.click(await within(dialog).findByRole('checkbox', { name: /Rent — Aug 6/ }))
     await user.click(within(dialog).getByRole('button', { name: /Review payment/ }))
     const review = screen.getByRole('dialog', { name: 'Confirm payment received' })

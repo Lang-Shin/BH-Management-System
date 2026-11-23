@@ -58,6 +58,8 @@ describe('clear all records', () => {
     await user.click(await screen.findByRole('button', { name: /Calculate payment/ }))
     let dialog = screen.getByRole('dialog', { name: 'Choose a room and its bills.' })
     await user.selectOptions(within(dialog).getByLabelText('Choose room'), 'room-4')
+    await user.click([...dialog.querySelectorAll('details.payment-obligation-card')]
+      .find(card => card.textContent?.includes('Anniversary-based billing'))!.querySelector('summary')!)
     await user.click(within(dialog).getByRole('checkbox', { name: 'Rent' }))
     await user.click(within(dialog).getByRole('button', { name: /Review payment/ }))
     dialog = screen.getByRole('dialog', { name: 'Confirm payment received' })
