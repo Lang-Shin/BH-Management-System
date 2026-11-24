@@ -39,7 +39,6 @@ export function TenantShell() {
         <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-3">
           <Sheet open={menuOpen} onOpenChange={setMenuOpen}><SheetTrigger asChild><Button variant="outline" size="icon" className="shrink-0 lg:hidden" aria-label="Open menu"><Menu /></Button></SheetTrigger><SheetContent side="left" className="sidebar-surface inset-y-2 left-2 h-auto w-72 max-w-[calc(100vw-1rem)] gap-0 overflow-y-auto rounded-[26px] p-0"><SheetHeader className="sr-only"><SheetTitle>Main menu</SheetTitle><SheetDescription>Choose Overview, My Payments &amp; Receipts, or My Room.</SheetDescription></SheetHeader><SidebarContent navItems={tenantNavigation} topContent={<DemoTenantSelector />} onNavigate={() => setMenuOpen(false)} onLogout={event => { logoutTrigger.current = event.currentTarget; setMenuOpen(false); setLogoutOpen(true) }} /></SheetContent></Sheet>
           <div className="mobile-header-title min-w-0 flex-1">
-            <p className="brand-name mobile-header-brand text-[1rem] text-muted-foreground lg:hidden">Halili BH</p>
             <AnimatedPageTitle key={location.pathname} text={active?.label ?? 'Tenant Workspace'} />
           </div>
         </div>
