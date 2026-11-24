@@ -107,6 +107,10 @@ export function selectSummary(data: PrototypeAppState, asOf: string, periodId?: 
   const unresolved = unresolvedElectricity(data, asOf, periodId).length
   const received = data.payments.filter(p => p.state === 'RECORDED' && p.paidOn <= asOf
     && (!period || (p.paidOn >= period.startDate && p.paidOn <= period.endDate))).reduce((sum, p) => sum + paymentCashReceived(data, p), 0)
+  const refundPaid = (data.prepaidRentRefunds ?? []).filter(refund => refund.status === 'COMPLETED'
+    && refund.refundedOn !== null && refund.refundedOn <= asOf
+    && (!period || (refund.refundedOn >= period.startDate && refund.refundedOn <= period.endDate)))
+    .reduce((total, refund) => total + refund.amountCents, 0)
   const rentStatuses = anniversaryRent.map(obligation => {
     const paid = rentObligationPaidCents(data, obligation.id, asOf)
     return paid >= obligation.amountCents ? 'PAID' : paid > 0 ? 'PARTIALLY_PAID' : 'UNPAID'
@@ -114,7 +118,7 @@ export function selectSummary(data: PrototypeAppState, asOf: string, periodId?: 
   return {
     tenants: data.tenants.filter(t => t.status === 'ACTIVE').length,
     ...selectRoomSummary(data, occupancyAsOf),
-    billed, applied, received, outstanding: billed - applied, unresolved,
+    billed, applied, received, refundPaid, netReceived: received - refundPaid, outstanding: billed - applied, unresolved,
     credit: data.tenantCredits.reduce((sum, c) => sum + creditRemaining(data, c, asOf), 0),
     overdue: charges.filter(c => c.dueDate < asOf && chargeBalance(data, c, asOf) > 0).length
       + anniversaryRent.filter(obligation => obligation.dueDate < asOf

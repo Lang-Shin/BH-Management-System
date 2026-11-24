@@ -9,11 +9,12 @@ import { usePrototype } from '@/hooks/use-prototype'
 import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { activeAssignments, tenantAccount } from '@/domain/calculations/summary'
 import { evaluateShortStayAdvanceRefund } from '@/domain/calculations/advance-refund'
+import { prepaidRentReconciliation } from '@/domain/calculations/prepaid-rent-refund'
 import {
   moveOutBlockers, tenantDeletionBlockers, validateTenantDraft,
   type TenantDraft, type TenantDraftErrors,
 } from '@/domain/calculations/tenant-management'
-import { formatDate, formatMoney } from '@/lib/format'
+import { formatDate, formatMoney, previousCalendarDate } from '@/lib/format'
 import { ACCOUNT_STATUS_LABELS, TENANT_STATUS_LABELS } from '@/lib/labels'
 import type { Tenant } from '@/domain/types/models'
 import { TenantFormFields } from './tenant-form-fields'
@@ -24,7 +25,7 @@ export function TenantDetailsDialog({ tenant, onClose, onReturnFocus, onNotice }
   onReturnFocus: () => void
   onNotice: (message: string) => void
 }) {
-  const { data, dispatch } = usePrototype()
+  const { data, dispatch, commitAction } = usePrototype()
   const occupancyDate = useOccupancyDate()
   const [notes, setNotes] = useState(tenant.notes)
   const [mode, setMode] = useState<'details' | 'edit' | 'moveOut' | 'delete'>('details')
@@ -39,6 +40,8 @@ export function TenantDetailsDialog({ tenant, onClose, onReturnFocus, onNotice }
   const [refundAdvance, setRefundAdvance] = useState(false)
   const [refundReason, setRefundReason] = useState('')
   const [refundError, setRefundError] = useState('')
+  const [proposePrepaidRefund, setProposePrepaidRefund] = useState(false)
+  const [prepaidReason, setPrepaidReason] = useState('')
   const { open, requestClose, onOpenChange, onAnimationEnd } = useAnimatedDialogClose(onClose)
   const account = tenantAccount(data, tenant.id, occupancyDate)
   const assignments = data.roomAssignments.filter(assignment => assignment.tenantId === tenant.id)
@@ -47,6 +50,7 @@ export function TenantDetailsDialog({ tenant, onClose, onReturnFocus, onNotice }
   const deletionBlockers = tenantDeletionBlockers(data, tenant.id, occupancyDate)
   const moveOutIssues = moveOutBlockers(data, tenant.id, occupancyDate)
   const refundEligibility = evaluateShortStayAdvanceRefund(data, tenant.id, occupancyDate)
+  const prepaidReconciliation = prepaidRentReconciliation(data, tenant.id, occupancyDate)
 
   function startEdit() {
     submitting.current = false
@@ -82,7 +86,7 @@ export function TenantDetailsDialog({ tenant, onClose, onReturnFocus, onNotice }
     setMode('details')
   }
 
-  function confirmMoveOut() {
+  async function confirmMoveOut() {
     if (movingOut || submitting.current || moveOutBlockers(data, tenant.id, occupancyDate).length > 0) return
     if (refundAdvance && !refundEligibility.eligible) {
       setRefundError(refundEligibility.blockers[0] ?? 'The short-stay advance refund is not available.')
@@ -92,15 +96,40 @@ export function TenantDetailsDialog({ tenant, onClose, onReturnFocus, onNotice }
       setRefundError('Enter a reason for the advance refund.')
       return
     }
+    if (proposePrepaidRefund) {
+      if (!prepaidReconciliation?.canPropose) {
+        setRefundError(prepaidReconciliation?.blockers[0] ?? 'The prepaid rent refund cannot be proposed yet.')
+        return
+      }
+      if (prepaidReason.trim().length < 3) {
+        setRefundError('Enter a reason for the prepaid rent refund proposal.')
+        return
+      }
+    }
     submitting.current = true
     setMovingOut(true)
+    setRefundError('')
+    if (proposePrepaidRefund) {
+      const proposed = await commitAction({
+        type: 'prepaidRefund/proposed', tenantId: tenant.id, moveOutDate: occupancyDate,
+        reason: prepaidReason.trim(), asOf: occupancyDate,
+      })
+      if (!proposed) {
+        setMovingOut(false)
+        submitting.current = false
+        setRefundError('The prepaid rent refund proposal was not saved. Refresh and review the current records.')
+        return
+      }
+    }
     dispatch({
       type: 'tenant/movedOut', tenantId: tenant.id, asOf: occupancyDate,
       refundAdvance: refundAdvance ? { refundedOn: occupancyDate, reason: refundReason.trim() } : undefined,
     })
-    onNotice(refundAdvance
-      ? `Tenant ${tenant.name} was moved out. The unused advance was recorded as refunded; the non-refundable deposit remains held.`
-      : `Tenant ${tenant.name} was moved out. Historical bills and receipts remain available.`)
+    onNotice(proposePrepaidRefund
+      ? `Tenant ${tenant.name} was moved out. A prepaid rent refund was proposed, not yet paid; review and complete it in Payments & Receipts.`
+      : refundAdvance
+        ? `Tenant ${tenant.name} was moved out. The unused advance was recorded as refunded; the non-refundable deposit remains held.`
+        : `Tenant ${tenant.name} was moved out. Historical bills and receipts remain available.`)
     requestClose()
   }
 
@@ -156,6 +185,43 @@ export function TenantDetailsDialog({ tenant, onClose, onReturnFocus, onNotice }
             ? <div role="alert" className="mt-4"><p className="font-semibold text-destructive">Move-out cannot be completed yet.</p><ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-muted-foreground">{moveOutIssues.map(issue => <li key={issue}>{issue}</li>)}</ul></div>
             : <p className="mt-4 text-sm text-muted-foreground">The tenant will leave current room occupancy and no longer appear as an active tenant. Historical bills, receipts, and reports remain identifiable.</p>}
         </section>
+        {prepaidReconciliation && (prepaidReconciliation.periods.length > 0 || prepaidReconciliation.currentRefund) && <section className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sky-950" aria-labelledby="prepaid-refund-title">
+          <h2 id="prepaid-refund-title" className="font-semibold">Prepaid Rent Reconciliation</h2>
+          <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+            <div><dt className="text-sky-900/70">Tenant and room</dt><dd className="font-semibold">{prepaidReconciliation.tenantName} - Room {prepaidReconciliation.roomName}</dd></div>
+            <div><dt className="text-sky-900/70">Effective move-out date</dt><dd className="font-semibold">{formatDate(prepaidReconciliation.moveOutDate)}</dd></div>
+            <div><dt className="text-sky-900/70">Total prepaid rent identified</dt><dd className="font-semibold">{formatMoney(prepaidReconciliation.totalPrepaidCents)}</dd></div>
+            <div><dt className="text-sky-900/70">Proposed refundable amount</dt><dd className="font-semibold">{formatMoney(prepaidReconciliation.refundableCents)}</dd></div>
+            <div><dt className="text-sky-900/70">Nonrefundable started period</dt><dd className="font-semibold">{formatMoney(prepaidReconciliation.nonRefundableCents)}</dd></div>
+            <div><dt className="text-sky-900/70">Started periods requiring review</dt><dd className="font-semibold">{formatMoney(prepaidReconciliation.reviewRequiredCents)}</dd></div>
+          </dl>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[30rem] text-left text-sm">
+              <thead><tr className="border-b border-sky-200"><th className="py-2 pr-3">Anniversary period</th><th className="py-2 pr-3 text-right">Paid</th><th className="py-2 pr-3 text-right">Occupied days</th><th className="py-2 pr-3 text-right">Refundable</th><th className="py-2">Status</th></tr></thead>
+              <tbody>{prepaidReconciliation.periods.map(period => <tr key={period.rentalPeriodId} className="border-b border-sky-100 last:border-0">
+                <td className="py-2 pr-3">{formatDate(period.startDate)} - {formatDate(previousCalendarDate(period.endDateExclusive))}<small className="block text-xs text-sky-900/70">Rate snapshot {formatMoney(period.rateSnapshotCents)}</small></td>
+                <td className="py-2 pr-3 text-right font-semibold">{formatMoney(period.paidCents)}</td>
+                <td className="py-2 pr-3 text-right">{period.occupiedDays}</td>
+                <td className="py-2 pr-3 text-right font-semibold">{formatMoney(period.refundableCents)}</td>
+                <td className="py-2 font-semibold">{period.status === 'FUTURE' ? 'Future - refundable' : period.status === 'NON_REFUNDABLE' ? '7+ days - nonrefundable' : period.status === 'REVIEW_REQUIRED' ? 'Under 7 days - review required' : 'Reserved'}</td>
+              </tr>)}</tbody>
+            </table>
+          </div>
+          {prepaidReconciliation.blockers.length > 0 && <ul role="alert" className="mt-3 list-disc space-y-1 pl-5 text-sm font-medium text-rose-900">{prepaidReconciliation.blockers.map(blocker => <li key={blocker}>{blocker}</li>)}</ul>}
+          {prepaidReconciliation.currentRefund
+            ? <p className="mt-3 rounded-lg border border-sky-200 bg-card p-3 text-sm"><strong>Refund status: {prepaidReconciliation.currentRefund.status}.</strong> {formatMoney(prepaidReconciliation.currentRefund.amountCents)} for {prepaidReconciliation.currentRefund.reason}. {prepaidReconciliation.currentRefund.status === 'PROPOSED' ? 'It is not paid yet. Approve and complete it in Payments & Receipts after review.' : prepaidReconciliation.currentRefund.status === 'APPROVED' ? 'Approved but not yet paid. Complete the actual cash outflow in Payments & Receipts.' : prepaidReconciliation.currentRefund.status === 'COMPLETED' ? `Actual refund recorded on ${formatDate(prepaidReconciliation.currentRefund.refundedOn ?? prepaidReconciliation.currentRefund.recordedAt)}.` : 'This refund was reversed.'}</p>
+            : prepaidReconciliation.canPropose
+              ? <div className="mt-3 rounded-lg border border-sky-200 bg-card p-3">
+                <p className="text-sm">The future periods are fully refundable. The started period follows the confirmed seven-day rule; no amount is automatically prorated for an under-seven-day start.</p>
+                <label className="mt-3 flex items-start gap-2 text-sm font-medium"><input type="checkbox" checked={proposePrepaidRefund} onChange={event => { setProposePrepaidRefund(event.target.checked); setRefundError('') }} className="mt-0.5 size-4 shrink-0" /><span>Record a proposed prepaid rent refund of {formatMoney(prepaidReconciliation.refundableCents)}. This does not return cash yet.</span></label>
+                {proposePrepaidRefund && <label className="mt-3 grid gap-2 text-sm font-semibold">Refund proposal reason
+                  <textarea rows={2} maxLength={500} value={prepaidReason} onChange={event => { setPrepaidReason(event.target.value); setRefundError('') }} className="w-full rounded-xl border border-sky-300 bg-background p-3 text-foreground" placeholder="For example: tenant is moving out with future prepaid periods." />
+                </label>}
+              </div>
+              : <p className="mt-3 rounded-lg border border-sky-200 bg-card p-3 text-sm text-sky-900">No refund is automatically proposed. {prepaidReconciliation.entitlementReviewRequired ? 'Refund entitlement needs landlord verification because this is a shared room.' : 'Review the period calculation before recording any refund.'}</p>}
+          {prepaidReconciliation.entitlementReviewRequired && <p role="note" className="mt-3 text-sm font-semibold">Shared-room entitlement review is required. Do not treat the room-level payment as belonging to another tenant or a continuing occupancy.</p>}
+          <p className="mt-3 text-xs">Proposed and approved refunds do not count as cash returned. Only an actual completed refund records cash outflow, and the original receipt stays available.</p>
+        </section>}
         {refundEligibility.stayDays !== null && refundEligibility.stayDays < refundEligibility.windowDays && (
           <section className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-950" aria-labelledby="short-stay-refund-title">
             <h2 id="short-stay-refund-title" className="font-semibold">Short-stay advance refund</h2>

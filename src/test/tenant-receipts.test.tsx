@@ -48,7 +48,7 @@ describe('tenant digital receipts', () => {
     expect(within(breakdown).getByText('Water')).toBeInTheDocument()
     expect(within(breakdown).getByText('Washing machine')).toBeInTheDocument()
     expect(within(rentReceipt).queryByRole('checkbox')).not.toBeInTheDocument()
-    expect(within(rentReceipt).queryByRole('button', { name: 'Edit Payment' })).not.toBeInTheDocument()
+    expect(within(rentReceipt).queryByRole('button', { name: 'Correct Transaction' })).not.toBeInTheDocument()
     expect(within(rentReceipt).getByText('₱3,500.00')).toBeInTheDocument()
     expect(within(rentReceipt).getByText(/Other bills may be settled by separate transactions/)).toBeInTheDocument()
 

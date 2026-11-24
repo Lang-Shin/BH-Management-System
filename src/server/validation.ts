@@ -85,6 +85,7 @@ const actionTypes = new Set<PrototypeAction['type']>([
   'room/paymentConfirmed', 'payment/corrected', 'moveIn/paymentRecorded', 'rent/prepaymentRecorded',
   'moveIn/policyUpdated', 'roomChange/requested', 'roomChange/cancelled', 'roomChange/approved',
   'roomChange/rejected', 'roomChange/reservationCancelled', 'roomChange/reservationRescheduled',
+  'prepaidRefund/proposed', 'prepaidRefund/approved', 'prepaidRefund/completed', 'prepaidRefund/reversed',
   'occupancy/dateChanged',
 ])
 
@@ -166,11 +167,26 @@ export function parseAction(value: unknown): PrototypeAction {
       return action as unknown as PrototypeAction
     case 'payment/corrected':
       categoryArray(action.selectedCategories)
-      if (!isId(action.paymentId) || !isText(action.reason, 500) || !isIsoDate(action.correctedAt)
+      if (!isId(action.paymentId) || !isText(action.reason, 500) || action.reason.trim().length < 3 || !isIsoDate(action.correctedAt)
         || !(action.correctedElectricityReadingMilliKwh === null || Number.isSafeInteger(action.correctedElectricityReadingMilliKwh))
         || typeof action.moneyExchangeConfirmed !== 'boolean'
-        || !oneOf(action.settlementStatus, ['', 'CORRECTED', 'REFUNDED', 'ADDITIONAL_RECEIVED'])) {
+        || !oneOf(action.settlementStatus, ['', 'CORRECTED', 'REFUNDED', 'ADDITIONAL_RECEIVED'])
+        || (action.reverseAll !== undefined && typeof action.reverseAll !== 'boolean')
+        || (action.correctedMethod !== undefined && action.correctedMethod !== null
+          && !oneOf(action.correctedMethod, ['cash', 'bank-transfer']))) {
         invalid('The payment correction is invalid.')
+      }
+      if (action.lines !== undefined && (!Array.isArray(action.lines) || action.lines.length > 200
+        || !action.lines.every(line => isRecord(line) && isId(line.targetId) && oneOf(line.category, categories)
+          && isMoney(line.amountCents) && line.amountCents > 0
+          && (line.sourceAllocationId === undefined || line.sourceAllocationId === null || isId(line.sourceAllocationId))))) {
+        invalid('The corrected allocation lines are invalid.')
+      }
+      if (action.retainedAllocationIds !== undefined && (!Array.isArray(action.retainedAllocationIds)
+        || action.retainedAllocationIds.length > 1000 || !action.retainedAllocationIds.every(isId)
+        || !isId(action.expectedReceiptId) || !Number.isSafeInteger(action.expectedReceiptRevision)
+        || (action.expectedReceiptRevision as number) < 1 || action.lines !== undefined)) {
+        invalid('The original receipt and retained payment allocation identifiers are required.')
       }
       return { ...(action as unknown as Extract<PrototypeAction, { type: 'payment/corrected' }>), settlementStatus: action.settlementStatus as CorrectionSettlementStatus | '' }
     case 'moveIn/paymentRecorded':
@@ -209,6 +225,25 @@ export function parseAction(value: unknown): PrototypeAction {
     case 'roomChange/reservationRescheduled':
       if (!isId(action.requestId) || !isIsoDate(action.effectiveDate) || !isText(action.reason, 500) || !isIsoDate(action.asOf)) invalid('The reschedule is invalid.')
       return action as unknown as PrototypeAction
+    case 'prepaidRefund/proposed':
+      if (!isId(action.tenantId) || !isIsoDate(action.moveOutDate) || !isText(action.reason, 500)
+        || action.reason.trim().length < 3 || !isIsoDate(action.asOf)) invalid('The prepaid refund proposal is invalid.')
+      return action as unknown as PrototypeAction
+    case 'prepaidRefund/approved':
+      if (!isId(action.refundId) || !isIsoDate(action.asOf)
+        || (action.reason !== undefined && !isText(action.reason, 500))
+        || (action.entitlementConfirmed !== undefined && typeof action.entitlementConfirmed !== 'boolean')) {
+        invalid('The prepaid refund approval is invalid.')
+      }
+      return action as unknown as PrototypeAction
+    case 'prepaidRefund/completed':
+      if (!isId(action.refundId) || !isIsoDate(action.refundedOn) || !isIsoDate(action.asOf)
+        || (action.reason !== undefined && !isText(action.reason, 500))) invalid('The prepaid refund completion is invalid.')
+      return action as unknown as PrototypeAction
+    case 'prepaidRefund/reversed':
+      if (!isId(action.refundId) || !isIsoDate(action.asOf) || !isText(action.reason, 500)
+        || action.reason.trim().length < 3) invalid('The prepaid refund reversal is invalid.')
+      return action as unknown as PrototypeAction
     case 'occupancy/dateChanged':
       if (!isIsoDate(action.asOf)) invalid('The occupancy date is invalid.')
       return action as unknown as PrototypeAction
@@ -232,6 +267,10 @@ export function withServerDate(action: PrototypeAction, serverDate: string): Pro
     case 'room/statusToggled': return { ...action, asOf: serverDate }
     case 'room/paymentConfirmed': return { ...action, asOf: serverDate }
     case 'payment/corrected': return { ...action, correctedAt: serverDate }
+    case 'prepaidRefund/proposed': return { ...action, asOf: serverDate }
+    case 'prepaidRefund/approved': return { ...action, asOf: serverDate }
+    case 'prepaidRefund/completed': return { ...action, refundedOn: serverDate, asOf: serverDate }
+    case 'prepaidRefund/reversed': return { ...action, asOf: serverDate }
     case 'moveIn/policyUpdated': return { ...action, asOf: serverDate }
     case 'occupancy/dateChanged': return { ...action, asOf: serverDate }
     default: return action

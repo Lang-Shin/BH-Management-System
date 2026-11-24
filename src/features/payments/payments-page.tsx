@@ -9,6 +9,7 @@ import { moveInSummary, selectMoveInObligations } from '@/domain/calculations/mo
 import { latestPaymentReceipt } from '@/domain/calculations/payment-correction'
 import { formatDate, formatMoney } from '@/lib/format'
 import { PaymentsTransactionWorkspace } from './payments-transaction-workspace'
+import { PrepaidRentRefundsSection } from './prepaid-refunds-section'
 
 export default function Payments() {
   const { data } = usePrototype()
@@ -21,12 +22,13 @@ export default function Payments() {
     <PageHeader title="Payments & Receipts" description="See who paid, when they paid, and what the payment was for." />
     <PreviewNotice>Electricity payments are recorded from Billing or a room pending-payments view. Other payment workflows remain separate.</PreviewNotice>
     <section className="mb-7 grid gap-5 xl:grid-cols-4" aria-label="Payments overview">
-      <StatCard label="Money received" value={formatMoney(summary.received)} detail="All payments received in November." icon={Wallet} />
+      <StatCard label="Money received" value={formatMoney(summary.received)} detail={`Gross collections in November; ${formatMoney(summary.refundPaid)} completed prepaid refunds are shown separately.`} icon={Wallet} />
       <StatCard label="Move-in deposits held" value={formatMoney(moveIn.depositCollectedCents)} detail={`${data.moveInPolicy.depositDisposition === 'NON_REFUNDABLE' ? 'Non-refundable' : 'Refundable with manual review'} under current policy; plus ${formatMoney(moveIn.advanceCollectedCents)} advance collected.`} icon={ShieldCheck} />
       <StatCard label="Unapplied tenant credit" value={formatMoney(summary.credit)} detail="Money kept for a future monthly bill." icon={CircleDollarSign} />
       <StatCard label="Partly paid bills" value={summary.partial} detail="November bills that still have an amount left to pay." icon={Banknote} />
     </section>
     <PaymentsTransactionWorkspace />
+    <PrepaidRentRefundsSection />
     <h2 className="mt-8 mb-2 text-xl font-semibold">Move-in advance &amp; security deposit</h2><p className="mb-5 text-base text-muted-foreground">Collected at the room level. Deposits are {data.moveInPolicy.depositDisposition === 'NON_REFUNDABLE' ? 'non-refundable' : 'refundable with manual review'} under current policy but remain separate from monthly bills and rental income.</p><PaginatedDataTable rows={moveInRows} resetKey={moveInRows.length} recordLabel="move-in balances" caption="Move-in advance and security deposit" emptyState={<p className="rounded-2xl border bg-card p-5 text-sm text-muted-foreground">No move-in obligations are recorded yet.</p>} columns={[
       { key: 'room', label: 'Room', render: view => <span className="font-semibold">Room {view.room.name}</span> },
       { key: 'payer', label: 'Payer', render: view => view.payerName },

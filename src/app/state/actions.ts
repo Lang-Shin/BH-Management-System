@@ -5,6 +5,7 @@ import type { TenantDraft } from '@/domain/calculations/tenant-management'
 import type { MeterInitializationInput } from '@/domain/calculations/meter-initialization'
 import type { RoomChangeRequestDraft } from '@/domain/calculations/room-change-requests'
 import type { CollectionInput } from '@/domain/calculations/payment-collection'
+import type { CorrectionLineInput } from '@/domain/calculations/transaction-correction'
 
 export type PrototypeAction =
   | { type: 'payment/collected'; input: CollectionInput }
@@ -22,7 +23,11 @@ export type PrototypeAction =
   | { type: 'electricity/paymentConfirmed'; obligationId: string; currentReadingMilliKwh: number; paidOn: string }
   | ({ type: 'electricity/meterInitialized' } & MeterInitializationInput)
   | { type: 'room/paymentConfirmed'; roomId: string; periodId: string; selected: ChargeCategory[]; electricityReadingMilliKwh: number | null; asOf: string }
-  | { type: 'payment/corrected'; paymentId: string; selectedCategories: ChargeCategory[]; correctedElectricityReadingMilliKwh: number | null; reason: string; settlementStatus: CorrectionSettlementStatus | ''; moneyExchangeConfirmed: boolean; correctedAt: string }
+  | { type: 'payment/corrected'; paymentId: string; selectedCategories: ChargeCategory[]; correctedElectricityReadingMilliKwh: number | null; reason: string; settlementStatus: CorrectionSettlementStatus | ''; moneyExchangeConfirmed: boolean; correctedAt: string; lines?: CorrectionLineInput[]; reverseAll?: boolean; correctedMethod?: 'cash' | 'bank-transfer' | null; retainedAllocationIds?: string[]; expectedReceiptId?: string; expectedReceiptRevision?: number }
+  | { type: 'prepaidRefund/proposed'; tenantId: string; moveOutDate: string; reason: string; asOf: string }
+  | { type: 'prepaidRefund/approved'; refundId: string; reason?: string; entitlementConfirmed?: boolean; asOf: string }
+  | { type: 'prepaidRefund/completed'; refundId: string; refundedOn: string; reason?: string; asOf: string }
+  | { type: 'prepaidRefund/reversed'; refundId: string; reason: string; asOf: string }
   | { type: 'moveIn/paymentRecorded'; obligationId: string; categories: ('ADVANCE' | 'SECURITY_DEPOSIT')[]; paidOn: string }
   | { type: 'rent/prepaymentRecorded'; cycleId: string; periodCount: number; paidOn: string }
   | { type: 'moveIn/policyUpdated'; advanceApplication?: 'FIRST_MONTH' | 'LAST_MONTH' | 'MANUAL'; depositDisposition?: DepositDisposition; asOf?: string }

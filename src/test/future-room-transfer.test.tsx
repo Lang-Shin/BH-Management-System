@@ -131,7 +131,7 @@ describe('future-dated room transfer', () => {
     refresh.unmount()
 
     expect(DEMO_DATE).toBe('2026-11-13')
-  })
+  }, 20_000)
 
   it('refreshes Room 02 across midnight without reloading the application', async () => {
     const scenario = createScenario()

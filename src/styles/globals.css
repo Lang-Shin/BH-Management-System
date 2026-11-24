@@ -1033,6 +1033,13 @@ textarea { background-color: var(--input-bg); }
 .payment-calculator-heading { padding: 28px 28px 20px; background: transparent; }
 .payment-eyebrow { display: block; font-size: 11px; font-weight: 800; letter-spacing: 0.16em; color: var(--tint); }
 .payment-calculator-body { padding: 0 28px 24px; }
+.edit-payment-dialog:has(> form) { overflow: hidden; }
+.edit-payment-dialog > form { display: flex; flex-direction: column; max-height: calc(90dvh - 2px); }
+.correction-scroll-content { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.edit-payment-dialog form > .payment-total-panel { position: relative; flex: none; }
+.correction-allocation-row { transition: background-color 150ms ease; }
+.correction-allocation-row:focus-within { outline: 2px solid var(--tint); outline-offset: -3px; border-radius: 10px; }
+.correction-allocation-row input[type="checkbox"] { accent-color: var(--tint); }
 .payment-tenant-select { width: 100%; min-height: 48px; border: 1px solid var(--input-border); border-radius: 999px; background-color: var(--input-bg); padding: 10px 12px; }
 .payment-input-group { min-width: 0; margin-top: 20px; padding: 0 14px; border: 1px solid var(--border); border-radius: 20px; background: color-mix(in srgb, var(--rim) 35%, var(--card)); box-shadow: inset 0 1px 0 var(--rim); }
 .payment-input-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 72px; }
@@ -1073,6 +1080,7 @@ textarea { background-color: var(--input-bg); }
   .payment-calculator::before { content: ""; position: absolute; top: 8px; left: calc(50% - 18px); width: 36px; height: 4px; border-radius: 999px; background: var(--border); }
   .payment-calculator-heading { padding: 20px 20px 18px; }
   .payment-calculator-body { padding: 0 20px 20px; }
+  .edit-payment-dialog > form { max-height: calc(94dvh - 14px); }
   .payment-total-panel { padding: 18px 20px max(18px, env(safe-area-inset-bottom)); }
   .payment-input-row { gap: 8px; }
   .payment-input-row label { gap: 8px; }

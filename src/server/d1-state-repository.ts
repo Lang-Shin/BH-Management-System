@@ -14,6 +14,8 @@ import { ensureInitialRateBaseline } from '@/domain/calculations/rate-baseline'
 import { prepareCollection, prepareRentPrepaymentCollection } from '@/domain/calculations/payment-collection'
 import { moveOutBlockers, validateTenantDraft } from '@/domain/calculations/tenant-management'
 import { approveRoomChangeRequest } from '@/domain/calculations/room-change-requests'
+import { prepareUnifiedCorrection } from '@/domain/calculations/transaction-correction'
+import { approvePrepaidRefund, completePrepaidRefund, preparePrepaidRefundProposal, reversePrepaidRefund } from '@/domain/calculations/prepaid-rent-refund'
 import type { CollectionInput, CollectionResult } from '@/domain/calculations/payment-collection'
 
 export interface CommandOutcome {
@@ -25,6 +27,21 @@ export interface CommandOutcome {
 interface StateRow {
   data_json: string
   revision: number
+}
+
+function correctionErrorMessage(reason: string): string {
+  switch (reason) {
+    case 'OVER_ALLOCATION': return 'A corrected allocation is more than the target bill or rent period still allows.'
+    case 'PARTIAL_RENT': return 'Rent periods and move-in categories must remain fully allocated or be removed.'
+    case 'DUPLICATE_TARGET': return 'Each corrected allocation must use a different bill or rent period.'
+    case 'REASON_REQUIRED': return 'Enter a correction reason with at least three characters.'
+    case 'INVALID_SETTLEMENT': return 'Confirm the actual money exchange or choose the recorded-amount correction option.'
+    case 'LATER_DEPENDENT_READING': return 'A later settled electricity reading depends on this interval. Review it before changing the reading.'
+    case 'PAYMENT_NOT_FOUND': return 'This transaction is no longer recorded. Refresh and review the latest transaction.'
+    case 'DUPLICATE_CORRECTION': return 'This transaction already changed. Refresh and review the latest corrected transaction.'
+    case 'UNALLOCATED_PAYMENT': return 'This transaction contains unallocated money and must be reviewed before correction.'
+    default: return `The correction was rejected: ${reason}. Refresh and review the current records.`
+  }
 }
 
 interface IdempotencyRow {
@@ -119,6 +136,9 @@ export class D1StateRepository {
   }
 
   async command(rawAction: PrototypeAction, actor: Actor, idempotencyKey: string, requestId: string, serverDate: string): Promise<CommandOutcome> {
+    if (rawAction.type === 'payment/corrected' || rawAction.type.startsWith('prepaidRefund/')) {
+      await this.requireFinancialAdministrator(actor)
+    }
     if (!idempotencyKey || idempotencyKey.length < 8 || idempotencyKey.length > 200) {
       throw new ApiError(400, 'IDEMPOTENCY_KEY_REQUIRED', 'Provide an Idempotency-Key header with 8 to 200 characters.')
     }
@@ -154,6 +174,29 @@ export class D1StateRepository {
         const message = approval.errors.general ?? approval.errors.roomId ?? approval.errors.startDate ?? approval.errors.reason ?? 'The room transfer could not be saved. Refresh and review the current records.'
         throw new ApiError(422, message.startsWith('Transfer blocked:') ? 'ROOM_FINANCIAL_BLOCKED' : 'TRANSFER_BLOCKED', message)
       }
+    } else if (action.type === 'payment/corrected'
+      && (action.lines !== undefined || action.reverseAll || action.correctedMethod !== undefined || action.retainedAllocationIds !== undefined)) {
+      const result = prepareUnifiedCorrection(current.data, {
+        paymentId: action.paymentId, reason: action.reason, correctedAt: action.correctedAt,
+        lines: action.lines, reverseAll: action.reverseAll, correctedMethod: action.correctedMethod,
+        retainedAllocationIds: action.retainedAllocationIds, expectedReceiptId: action.expectedReceiptId,
+        expectedReceiptRevision: action.expectedReceiptRevision,
+        correctedElectricityReadingMilliKwh: action.correctedElectricityReadingMilliKwh,
+        settlementStatus: action.settlementStatus, moneyExchangeConfirmed: action.moneyExchangeConfirmed,
+      })
+      if (!result.ok) throw new ApiError(422, result.reason, correctionErrorMessage(result.reason))
+    } else if (action.type === 'prepaidRefund/proposed') {
+      const result = preparePrepaidRefundProposal(current.data, action)
+      if (!result.ok) throw new ApiError(422, result.error, [result.error, ...(result.blockers ?? [])].join(' '))
+    } else if (action.type === 'prepaidRefund/approved') {
+      const result = approvePrepaidRefund(current.data, action)
+      if (!result.ok) throw new ApiError(422, result.error, [result.error, ...(result.blockers ?? [])].join(' '))
+    } else if (action.type === 'prepaidRefund/completed') {
+      const result = completePrepaidRefund(current.data, action)
+      if (!result.ok) throw new ApiError(422, result.error, [result.error, ...(result.blockers ?? [])].join(' '))
+    } else if (action.type === 'prepaidRefund/reversed') {
+      const result = reversePrepaidRefund(current.data, action)
+      if (!result.ok) throw new ApiError(422, result.error, [result.error, ...(result.blockers ?? [])].join(' '))
     }
     let collection: { input: CollectionInput; result: Extract<CollectionResult, { ok: true }> } | null = null
     if (action.type === 'payment/collected') {
@@ -168,6 +211,21 @@ export class D1StateRepository {
       collection = prepared.prepared
     }
     const next = collection ? collection.result.data : prototypeReducer(current.data, action)
+    if (action.type === 'payment/corrected' && next !== current.data) {
+      const oldAuditIds = new Set(current.data.auditEvents.map(event => event.id))
+      const oldPaymentIds = new Set(current.data.payments.map(payment => payment.id))
+      const oldChargeIds = new Set(current.data.charges.map(charge => charge.id))
+      const oldReadingIds = new Set(current.data.meterReadings.map(reading => reading.id))
+      next.auditEvents = next.auditEvents.map(event => oldAuditIds.has(event.id) ? event : { ...event, actorId: actor.id })
+      next.payments = next.payments.map(payment => oldPaymentIds.has(payment.id) || !payment.correction ? payment
+        : { ...payment, correction: { ...payment.correction, authorizedBy: actor.id } })
+      next.charges = next.charges.map(charge => oldChargeIds.has(charge.id) || !charge.correction ? charge
+        : { ...charge, correction: { ...charge.correction, authorizedBy: actor.id } })
+      next.meterReadings = next.meterReadings.map(reading => oldReadingIds.has(reading.id) || !reading.correction ? reading
+        : { ...reading, confirmedBy: actor.id, correction: { ...reading.correction, authorizedBy: actor.id } })
+      next.paymentCorrections = next.paymentCorrections.map(correction => correction.originalPaymentId === action.paymentId
+        ? { ...correction, correctedBy: actor.id } : correction)
+    }
     if ((action.type === 'payment/collected' || action.type === 'rent/prepaymentRecorded') && next !== current.data) {
       const priorAuditIds = new Set(current.data.auditEvents.map(event => event.id))
       next.auditEvents = next.auditEvents.map(event =>
@@ -339,8 +397,23 @@ export class D1StateRepository {
       .bind(this.workspaceId, key).first<IdempotencyRow>()
   }
 
+  private async requireFinancialAdministrator(actor: Actor): Promise<void> {
+    const membership = await this.db.prepare(`SELECT m.role, u.status
+      FROM workspace_memberships m JOIN users u ON u.id = m.user_id
+      WHERE m.workspace_id = ? AND (u.id = ? OR u.email = ?)`)
+      .bind(this.workspaceId, actor.id, actor.email ?? actor.id).first<{ role: string; status: string }>()
+    if (membership?.status === 'ACTIVE' && (membership.role === 'OWNER' || membership.role === 'ADMIN')) return
+    // Loopback development and the explicitly configured staging token are administrative test identities.
+    // An explicitly provisioned TENANT/VIEWER/disabled identity never receives this fallback.
+    if (!membership && actor.source === 'DEV' && (actor.id === 'local-dev' || actor.id === 'dev-token')) return
+    throw new ApiError(403, 'FINANCIAL_ADMIN_REQUIRED', 'Only an active workspace owner or administrator may correct transactions or authorize refunds.')
+  }
+
   private projectionStatements(data: PrototypeAppState): D1PreparedStatement[] {
     const statements: D1PreparedStatement[] = [
+      this.db.prepare('DELETE FROM prepaid_rent_refund_allocations WHERE workspace_id = ?').bind(this.workspaceId),
+      this.db.prepare('DELETE FROM prepaid_rent_refunds WHERE workspace_id = ?').bind(this.workspaceId),
+      this.db.prepare('DELETE FROM payment_corrections WHERE workspace_id = ?').bind(this.workspaceId),
       this.db.prepare('DELETE FROM rent_prepayment_periods WHERE workspace_id = ?').bind(this.workspaceId),
       this.db.prepare('DELETE FROM rent_prepayments WHERE workspace_id = ?').bind(this.workspaceId),
       this.db.prepare('DELETE FROM financial_review_cases WHERE workspace_id = ?').bind(this.workspaceId),
@@ -404,11 +477,45 @@ export class D1StateRepository {
     for (const obligation of data.moveInObligations) {
       const depositCharge = data.charges.find(charge => charge.id === obligation.depositChargeId)
       if (!depositCharge || depositCharge.category !== 'SECURITY_DEPOSIT') continue
+      const depositPaid = data.paymentAllocations.filter(allocation => allocation.chargeId === depositCharge.id
+        && allocation.state === 'ACTIVE' && data.payments.some(payment => payment.id === allocation.paymentId && payment.state === 'RECORDED'))
+        .reduce((total, allocation) => total + allocation.amountCents, 0)
       statements.push(this.db.prepare(`INSERT INTO security_deposit_holdings
         (id, workspace_id, tenant_id, origin_cycle_id, origin_room_id, original_amount_cents, status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, 'HELD', ?)`)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
         .bind(`deposit-holding-${obligation.id}`, this.workspaceId, depositCharge.tenantId, obligation.occupancyCycleId,
-          obligation.roomId, obligation.depositRequiredCents, obligation.createdAt))
+          obligation.roomId, obligation.depositRequiredCents, depositPaid >= obligation.depositRequiredCents ? 'HELD' : 'REVIEW', obligation.createdAt))
+    }
+    for (const correction of data.paymentCorrections) {
+      statements.push(this.db.prepare(`INSERT INTO payment_corrections
+        (id, workspace_id, original_payment_id, corrected_payment_id, original_receipt_id, corrected_receipt_id,
+         corrected_at, corrected_by, reason, original_amount_cents, corrected_amount_cents, difference_cents,
+         settlement_status, settlement_amount_cents, original_categories_json, corrected_categories_json,
+         audit_event_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(correction.id, this.workspaceId, correction.originalPaymentId, correction.correctedPaymentId,
+          correction.originalReceiptId, correction.correctedReceiptId, correction.correctedAt, correction.correctedBy,
+          correction.reason, correction.originalAmountCents, correction.correctedAmountCents, correction.differenceCents,
+          correction.settlementStatus, correction.settlementAmountCents, JSON.stringify(correction.originalCategories),
+          JSON.stringify(correction.correctedCategories), correction.auditEventId, correction.correctedAt))
+    }
+    for (const refund of data.prepaidRentRefunds ?? []) {
+      statements.push(this.db.prepare(`INSERT INTO prepaid_rent_refunds
+        (id, workspace_id, status, tenant_id, room_id, occupancy_cycle_id, move_out_date, amount_cents, reason,
+         recorded_by, recorded_at, approved_at, approved_by, refunded_on, completed_by, reversed_at, reversed_by,
+         reversal_reason, entitlement_review_required, audit_event_id, last_audit_event_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(refund.id, this.workspaceId, refund.status, refund.tenantId, refund.roomId, refund.occupancyCycleId,
+          refund.moveOutDate, refund.amountCents, refund.reason, refund.recordedBy, refund.recordedAt, refund.approvedAt,
+          refund.approvedBy, refund.refundedOn, refund.completedBy, refund.reversedAt, refund.reversedBy,
+          refund.reversalReason, refund.entitlementReviewRequired ? 1 : 0, refund.auditEventId, refund.lastAuditEventId))
+      for (const allocation of refund.allocations) {
+        statements.push(this.db.prepare(`INSERT INTO prepaid_rent_refund_allocations
+          (workspace_id, prepaid_rent_refund_id, payment_allocation_id, payment_id, receipt_id, rent_obligation_id, rental_period_id, amount_cents)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+          .bind(this.workspaceId, refund.id, allocation.paymentAllocationId, allocation.paymentId, allocation.receiptId,
+            allocation.rentObligationId, allocation.rentalPeriodId, allocation.amountCents))
+      }
     }
     return statements
   }

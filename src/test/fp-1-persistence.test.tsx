@@ -57,7 +57,7 @@ describe('single-source prototype persistence', () => {
     expect(await screen.findByLabelText('Preview tenant')).toHaveValue(tenantId)
     expect(within(await screen.findByRole('region', { name: 'Room overview' })).getByRole('heading', { name: 'Room 900' })).toBeInTheDocument()
     expect(savedData().rooms.filter((room: { name: string }) => room.name === '900')).toHaveLength(1)
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).version).toBe(17)
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).version).toBe(18)
   }, 30000)
 
   it('clears records through the shared provider and removes stale demo selection', async () => {
@@ -79,7 +79,7 @@ describe('single-source prototype persistence', () => {
     await waitFor(() => expect(savedData().tenants).toEqual([]))
     expect(savedData().rooms).toHaveLength(16)
     expect(savedData().rooms.some((room: { id: string }) => room.id === 'room-custom')).toBe(true)
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).version).toBe(17)
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).version).toBe(18)
     expect(localStorage.getItem(TENANT_DEMO_STORAGE_KEY)).toBeNull()
 
     await user.click(within(nav).getByRole('link', { name: 'Rooms' }))

@@ -8,7 +8,8 @@ const text = (v: unknown): v is string => typeof v === 'string' && v.length <= 1
 const id = (v: unknown): v is string => text(v) && v.length > 0
 const money = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0
 const positive = (v: unknown): v is number => money(v) && v > 0
-const nullableText = (v: unknown) => v === null || text(v)
+const longText = (v: unknown): v is string => typeof v === 'string' && v.length <= 20_000
+const nullableText = (v: unknown) => v === null || longText(v)
 const oneOf = (v: unknown, values: readonly string[]) => typeof v === 'string' && values.includes(v)
 const correction = (v: unknown) => v === null || (isRecord(v) && id(v.supersedesId) && id(v.auditEventId) && id(v.authorizedBy))
 
@@ -61,12 +62,12 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
       ? r.tenantId === null && r.method === null && id(r.roomId) && id(r.occupancyCycleId)
       : id(r.tenantId) && (r.method === 'cash' || r.method === 'bank-transfer')
         && (r.roomId === null || id(r.roomId)) && (r.occupancyCycleId === null || id(r.occupancyCycleId)))
-    && positive(r.amountCents) && oneOf(r.state, ['RECORDED', 'VOIDED']) && correction(r.correction))) return false
+    && money(r.amountCents) && oneOf(r.state, ['RECORDED', 'VOIDED']) && correction(r.correction))) return false
   if (!rows(value, 'paymentAllocations', r => id(r.paymentId) && id(r.chargeId) && positive(r.amountCents)
     && date(r.allocatedOn) && (r.creditId === null || id(r.creditId)) && oneOf(r.state, ['ACTIVE', 'REVERSED'])
     && (r.reversalAuditEventId === null || id(r.reversalAuditEventId)))) return false
   if (!rows(value, 'tenantCredits', r => id(r.tenantId) && id(r.sourcePaymentId) && positive(r.amountCents) && date(r.createdOn))) return false
-  if (!rows(value, 'receipts', r => id(r.paymentId) && id(r.receiptNumber) && date(r.issuedOn) && positive(r.amountCents)
+  if (!rows(value, 'receipts', r => id(r.paymentId) && id(r.receiptNumber) && date(r.issuedOn) && money(r.amountCents)
     && oneOf(r.state, ['ISSUED', 'VOIDED', 'SUPERSEDED']) && Array.isArray(r.allocationIds) && r.allocationIds.length <= 1000 && r.allocationIds.every(id)
     && Number.isSafeInteger(r.revision) && (r.revision as number) >= 1 && (r.supersedesReceiptId === null || id(r.supersedesReceiptId)))) return false
   if (!rows(value, 'paymentCorrections', r => id(r.originalPaymentId) && id(r.correctedPaymentId) && id(r.originalReceiptId)
@@ -128,6 +129,22 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     && text(r.reason) && r.reason.length >= 3 && r.reason.length <= 500
     && Number.isSafeInteger(r.policyVersion) && (r.policyVersion as number) > 0
     && Number.isSafeInteger(r.refundWindowDays) && (r.refundWindowDays as number) >= 0 && id(r.auditEventId))) return false
+  if (value.prepaidRentRefunds !== undefined && !rows(value, 'prepaidRentRefunds', r =>
+    oneOf(r.status, ['PROPOSED', 'APPROVED', 'COMPLETED', 'REVERSED']) && id(r.tenantId) && id(r.roomId)
+    && id(r.occupancyCycleId) && date(r.moveOutDate) && positive(r.amountCents) && text(r.reason)
+    && r.reason.length >= 3 && r.reason.length <= 500 && id(r.recordedBy) && date(r.recordedAt)
+    && (r.approvedAt === null || date(r.approvedAt)) && (r.approvedBy === null || id(r.approvedBy))
+    && (r.refundedOn === null || date(r.refundedOn)) && (r.completedBy === null || id(r.completedBy))
+    && (r.reversedAt === null || date(r.reversedAt)) && (r.reversedBy === null || id(r.reversedBy))
+    && (r.reversalReason === null || (text(r.reversalReason) && r.reversalReason.length <= 500))
+    && typeof r.entitlementReviewRequired === 'boolean' && id(r.auditEventId) && id(r.lastAuditEventId)
+    && Array.isArray(r.allocations) && r.allocations.length > 0 && r.allocations.every(allocation => isRecord(allocation)
+      && id(allocation.paymentAllocationId) && id(allocation.paymentId) && (allocation.receiptId === null || id(allocation.receiptId))
+      && id(allocation.rentObligationId) && id(allocation.rentalPeriodId) && positive(allocation.amountCents))
+    && (r.status === 'PROPOSED' ? r.approvedAt === null && r.refundedOn === null && r.reversedAt === null
+      : r.status === 'APPROVED' ? r.approvedAt !== null && r.refundedOn === null && r.reversedAt === null
+        : r.status === 'COMPLETED' ? r.approvedAt !== null && r.refundedOn !== null && r.reversedAt === null
+          : r.reversedAt !== null && r.reversalReason !== null))) return false
   if (!isRecord(value.moveInPolicy)
     || !Number.isSafeInteger(value.moveInPolicy.version) || (value.moveInPolicy.version as number) < 1
     || !oneOf(value.moveInPolicy.advanceApplication, ['FIRST_MONTH', 'LAST_MONTH', 'MANUAL'])
@@ -138,8 +155,8 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     || value.moveInPolicy.moveOutSettlement !== 'MANUAL_REVIEW'
     || !Number.isSafeInteger(value.moveInPolicy.shortStayAdvanceRefundDays) || (value.moveInPolicy.shortStayAdvanceRefundDays as number) < 0) return false
   if (!rows(value, 'auditEvents', r => id(r.actorId) && date(r.occurredOn) && id(r.entityId) && text(r.reason)
-    && oneOf(r.action, ['DEMO_SEEDED', 'READING_CORRECTED', 'CHARGE_CORRECTED', 'PAYMENT_CORRECTED', 'ALLOCATION_REVERSED', 'ELECTRICITY_PAYMENT_RECORDED', 'ROOM_PAYMENT_RECORDED', 'MOVE_IN_PAYMENT_RECORDED', 'MOVE_IN_POLICY_UPDATED', 'METER_INITIALIZED', 'ROOM_CHANGE_REQUESTED', 'ROOM_CHANGE_CANCELLED', 'ROOM_CHANGE_APPROVED', 'ROOM_CHANGE_REJECTED', 'ROOM_CHANGE_EXPIRED', 'ROOM_CHANGE_RESERVATION_CANCELLED', 'ROOM_CHANGE_RESCHEDULED', 'ADVANCE_REFUNDED', 'ADVANCE_APPLIED', 'ADVANCE_APPLICATION_REVERSED', 'RENT_PREPAYMENT_RECORDED', 'FINANCIAL_REVIEW_OPENED', 'WORKSPACE_RESET', 'RENT_PERIODS_ENSURED'])
-    && oneOf(r.entityType, ['PROTOTYPE', 'METER_READING', 'CHARGE', 'PAYMENT', 'PAYMENT_ALLOCATION', 'ROOM_CHANGE_REQUEST', 'RENT_OBLIGATION', 'ADVANCE_APPLICATION', 'RENT_PREPAYMENT', 'FINANCIAL_REVIEW_CASE'])
+    && oneOf(r.action, ['DEMO_SEEDED', 'READING_CORRECTED', 'CHARGE_CORRECTED', 'PAYMENT_CORRECTED', 'ALLOCATION_REVERSED', 'ELECTRICITY_PAYMENT_RECORDED', 'ROOM_PAYMENT_RECORDED', 'MOVE_IN_PAYMENT_RECORDED', 'MOVE_IN_POLICY_UPDATED', 'METER_INITIALIZED', 'ROOM_CHANGE_REQUESTED', 'ROOM_CHANGE_CANCELLED', 'ROOM_CHANGE_APPROVED', 'ROOM_CHANGE_REJECTED', 'ROOM_CHANGE_EXPIRED', 'ROOM_CHANGE_RESERVATION_CANCELLED', 'ROOM_CHANGE_RESCHEDULED', 'ADVANCE_REFUNDED', 'ADVANCE_APPLIED', 'ADVANCE_APPLICATION_REVERSED', 'RENT_PREPAYMENT_RECORDED', 'PREPAID_RENT_REFUND_PROPOSED', 'PREPAID_RENT_REFUND_APPROVED', 'PREPAID_RENT_REFUND_COMPLETED', 'PREPAID_RENT_REFUND_REVERSED', 'FINANCIAL_REVIEW_OPENED', 'WORKSPACE_RESET', 'RENT_PERIODS_ENSURED'])
+    && oneOf(r.entityType, ['PROTOTYPE', 'METER_READING', 'CHARGE', 'PAYMENT', 'PAYMENT_ALLOCATION', 'ROOM_CHANGE_REQUEST', 'RENT_OBLIGATION', 'ADVANCE_APPLICATION', 'RENT_PREPAYMENT', 'PREPAID_RENT_REFUND', 'FINANCIAL_REVIEW_CASE'])
     && nullableText(r.beforeSnapshot) && nullableText(r.afterSnapshot))) return false
 
   // Each collection and its discriminated field shapes have been checked above.
@@ -169,6 +186,7 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     data.paymentCorrections, data.auditEvents, data.occupancyCycles, data.moveInObligations, data.roomChangeRequests, data.advanceRefunds,
     data.rentalPeriods, data.rentObligations, data.advanceApplications, data.rentPrepayments, data.financialReviewCases]
     .some(items => new Set(items.map(item => item.id)).size !== items.length)) return false
+  if ((data.prepaidRentRefunds ?? []).some((refund, index, refunds) => refunds.findIndex(item => item.id === refund.id) !== index)) return false
   if (new Set(data.electricityRates.map(rate => rate.effectiveFrom)).size !== data.electricityRates.length
     || new Set(data.roomRentRates.map(rate => `${rate.categoryId}:${rate.effectiveFrom}`)).size !== data.roomRentRates.length
     || new Set(data.waterRates.map(rate => rate.effectiveFrom)).size !== data.waterRates.length
@@ -356,6 +374,7 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     return Number.isSafeInteger(total) && total <= obligation.amountCents && (applied === 0 || total === obligation.amountCents)
   })) return false
   if (!data.rentPrepayments.every(prepayment => {
+    if ((prepayment.state ?? 'ACTIVE') === 'SUPERSEDED') return true
     const payment = data.payments.find(item => item.id === prepayment.paymentId)
     const obligationIds = new Set(data.rentObligations
       .filter(obligation => prepayment.rentalPeriodIds.includes(obligation.rentalPeriodId))
@@ -422,5 +441,6 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     || (a.entityType === 'RENT_OBLIGATION' && data.rentObligations.some(r => r.id === a.entityId))
     || (a.entityType === 'ADVANCE_APPLICATION' && data.advanceApplications.some(r => r.id === a.entityId))
     || (a.entityType === 'RENT_PREPAYMENT' && data.rentPrepayments.some(r => r.id === a.entityId))
+    || (a.entityType === 'PREPAID_RENT_REFUND' && (data.prepaidRentRefunds ?? []).some(r => r.id === a.entityId))
     || (a.entityType === 'FINANCIAL_REVIEW_CASE' && data.financialReviewCases.some(r => r.id === a.entityId)))
 }

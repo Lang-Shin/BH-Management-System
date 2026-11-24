@@ -38,6 +38,10 @@ const changeLabels: Record<AuditEvent['action'], string> = {
   ADVANCE_APPLIED: 'Advance applied to first rent period',
   ADVANCE_APPLICATION_REVERSED: 'Advance application reversed',
   RENT_PREPAYMENT_RECORDED: 'Multi-month rent prepayment recorded',
+  PREPAID_RENT_REFUND_PROPOSED: 'Prepaid rent refund proposed',
+  PREPAID_RENT_REFUND_APPROVED: 'Prepaid rent refund approved',
+  PREPAID_RENT_REFUND_COMPLETED: 'Prepaid rent refund completed',
+  PREPAID_RENT_REFUND_REVERSED: 'Prepaid rent refund reversed',
   FINANCIAL_REVIEW_OPENED: 'Financial review opened',
   WORKSPACE_RESET: 'Test workspace records cleared',
   RENT_PERIODS_ENSURED: 'Rent periods generated through the current date',
@@ -85,7 +89,9 @@ export default function Reports() {
       { key: 'applied', label: 'Paid for these bills', align: 'right', render: p => formatMoney(p.summary.applied) },
       { key: 'balance', label: 'Known still to pay', align: 'right', render: p => formatMoney(p.summary.outstanding) },
       { key: 'unresolved', label: 'Electricity awaiting reading', align: 'right', render: p => p.summary.unresolved > 0 ? `${p.summary.unresolved} bill${p.summary.unresolved === 1 ? '' : 's'}` : 'NONE' },
-      { key: 'received', label: 'Money received', align: 'right', render: p => formatMoney(p.summary.received) },
+      { key: 'received', label: 'Gross cash received', align: 'right', render: p => formatMoney(p.summary.received) },
+      { key: 'refunds', label: 'Prepaid refunds paid', align: 'right', render: p => formatMoney(p.summary.refundPaid) },
+      { key: 'net', label: 'Net cash received', align: 'right', render: p => <span className="font-semibold">{formatMoney(p.summary.netReceived)}</span> },
     ]} /></section>
     <section className="mt-8" aria-labelledby="room-report-title">
       <h2 id="room-report-title" className="text-xl font-semibold">Room financial summary</h2>

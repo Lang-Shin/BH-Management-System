@@ -5,9 +5,30 @@ import { useAnimatedDialogClose } from '@/components/ui/use-animated-dialog-clos
 import { StatusBadge } from './status-badge'
 import type { Payment, PrototypeAppState } from '@/domain/types/models'
 import { correctionSettlementText, isLegacyPendingCorrection } from '@/domain/calculations/payment-correction'
+import { buildUnifiedCorrectionQuote } from '@/domain/calculations/transaction-correction'
 import { paymentRooms } from '@/domain/calculations/room-finance'
 import { formatDate, formatMoney } from '@/lib/format'
+import { CATEGORY_LABELS } from '@/lib/labels'
 import { TransactionPaidLines } from './transaction-paid-lines'
+
+function correctionUnavailableText(payment: Payment, data: PrototypeAppState, asOf: string): string | null {
+  if (payment.state !== 'RECORDED') return 'Voided transactions cannot be corrected.'
+  const quote = buildUnifiedCorrectionQuote(data, { paymentId: payment.id, reason: '', correctedAt: asOf })
+  if (!('quoteError' in quote)) return null
+  if (quote.quoteError === 'UNALLOCATED_PAYMENT' && data.tenantCredits.some(credit => credit.sourcePaymentId === payment.id)) {
+    return 'Advance payments have no bill categories to correct.'
+  }
+  switch (quote.quoteError) {
+    case 'PAYMENT_NOT_FOUND': return 'Only recorded transactions can be corrected.'
+    case 'RECEIPT_NOT_FOUND': return 'The latest receipt is not available for correction.'
+    case 'DUPLICATE_CORRECTION': return 'This transaction already has a correction. Review the latest transaction history.'
+    case 'UNALLOCATED_PAYMENT': return 'This transaction includes unallocated money, so it cannot be corrected safely from this dialog.'
+    case 'NO_TARGET': return 'This transaction has no bill or rent allocation to correct.'
+    case 'INVALID_DATE': return 'The transaction date does not allow a correction.'
+    case 'REFUND_EXISTS': return 'This payment has a refund record or refund review. Review that refund before correcting the payment.'
+    default: return 'This transaction is not eligible for correction.'
+  }
+}
 
 export function TransactionDialog({ data, payment, asOf, onClose, onReturnFocus, onEditPayment, title = 'Transaction Details', description = 'Payment information for the selected room.' }: {
   data: PrototypeAppState
@@ -24,17 +45,13 @@ export function TransactionDialog({ data, payment, asOf, onClose, onReturnFocus,
   const receipt = [...data.receipts].filter(item => item.paymentId === payment.id).sort((a, b) => b.revision - a.revision)[0]?.receiptNumber
   const advance = data.tenantCredits.some(credit => credit.sourcePaymentId === payment.id)
   const correction = data.paymentCorrections.find(item => item.correctedPaymentId === payment.id || item.originalPaymentId === payment.id)
-  const allocatedCents = data.paymentAllocations.filter(allocation => allocation.paymentId === payment.id && allocation.state === 'ACTIVE' && allocation.allocatedOn <= asOf)
-    .reduce((sum, allocation) => sum + allocation.amountCents, 0)
-  const editUnavailableReason = !onEditPayment ? null
-    : payment.state !== 'RECORDED' ? 'Voided payments cannot be edited.'
-      : context.allocations.some(allocation => data.rentObligations.some(rent => rent.id === allocation.chargeId))
-        ? 'This itemized transaction contains anniversary rent. An authorized ledger correction is required; utility-only edits cannot safely reverse it.'
-      : correction ? 'This is a revised transaction. Review it in Correction History; a transaction can only be corrected once.'
-        : context.allocations.length === 0 ? (advance ? 'Advance payments have no bill categories to correct.' : 'This transaction has no bill allocations to correct.')
-          : allocatedCents !== payment.amountCents ? 'This transaction includes unallocated money, so it cannot be corrected safely from this dialog.'
-            : data.paymentCorrections.some(item => item.originalPaymentId === payment.id) ? 'This transaction has already been corrected.'
-              : null
+  const editUnavailableReason = !onEditPayment ? null : correctionUnavailableText(payment, data, asOf)
+  const originalAllocations = correction
+    ? data.paymentAllocations.filter(allocation => allocation.paymentId === correction.originalPaymentId)
+    : []
+  const correctedAllocations = correction
+    ? data.paymentAllocations.filter(allocation => allocation.paymentId === correction.correctedPaymentId && allocation.state === 'ACTIVE')
+    : []
   const { open, requestClose, onOpenChange, onAnimationEnd } = useAnimatedDialogClose(onClose)
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
@@ -66,8 +83,25 @@ export function TransactionDialog({ data, payment, asOf, onClose, onReturnFocus,
           <div><dt className="text-muted-foreground">Corrected bill total</dt><dd className="font-semibold">{formatMoney(correction.correctedAmountCents)}</dd></div>
           <div><dt className="text-muted-foreground">Difference</dt><dd className="font-semibold">{formatMoney(Math.abs(correction.differenceCents))}</dd></div>
           <div><dt className="text-muted-foreground">Money handling</dt><dd className={isLegacyPendingCorrection(correction.settlementStatus) ? 'font-semibold text-amber-900' : 'font-semibold'}>{correctionSettlementText(correction)}</dd></div>
+          <div><dt className="text-muted-foreground">Corrected by</dt><dd className="font-semibold">{correction.correctedBy}</dd></div>
+          <div><dt className="text-muted-foreground">Correction date</dt><dd className="font-semibold">{formatDate(correction.correctedAt)}</dd></div>
+          <div><dt className="text-muted-foreground">Receipt link</dt><dd className="break-all font-semibold">{correction.originalReceiptId} to {correction.correctedReceiptId}</dd></div>
           <div className="sm:col-span-2"><dt className="text-muted-foreground">Reason</dt><dd className="font-semibold">{correction.reason}</dd></div>
         </dl>
+        <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+          <div><h3 className="font-semibold">Original allocations</h3>{originalAllocations.length > 0 ? <ul className="mt-2 space-y-1">{originalAllocations.map(allocation => {
+            const charge = data.charges.find(item => item.id === allocation.chargeId)
+            const rent = data.rentObligations.find(item => item.id === allocation.chargeId)
+            const period = rent ? data.rentalPeriods.find(item => item.id === rent.rentalPeriodId) : undefined
+            return <li key={allocation.id} className="flex flex-wrap justify-between gap-2"><span>{rent ? 'Rent' : charge ? CATEGORY_LABELS[charge.category] : 'Bill'}{period ? ` - ${period.startDate} to ${period.endDateExclusive}` : ''}{allocation.state === 'REVERSED' ? ' (reversed)' : ''}</span><span className="font-semibold tabular-nums">{formatMoney(allocation.amountCents)}</span></li>
+          })}</ul> : <p className="mt-2 text-muted-foreground">No allocations.</p>}</div>
+          <div><h3 className="font-semibold">Corrected allocations</h3>{correctedAllocations.length > 0 ? <ul className="mt-2 space-y-1">{correctedAllocations.map(allocation => {
+            const charge = data.charges.find(item => item.id === allocation.chargeId)
+            const rent = data.rentObligations.find(item => item.id === allocation.chargeId)
+            const period = rent ? data.rentalPeriods.find(item => item.id === rent.rentalPeriodId) : undefined
+            return <li key={allocation.id} className="flex flex-wrap justify-between gap-2"><span>{rent ? 'Rent' : charge ? CATEGORY_LABELS[charge.category] : 'Bill'}{period ? ` - ${period.startDate} to ${period.endDateExclusive}` : ''}</span><span className="font-semibold tabular-nums">{formatMoney(allocation.amountCents)}</span></li>
+          })}</ul> : <p className="mt-2 font-semibold text-amber-900">Full reversal. No cash remains allocated by the replacement record.</p>}</div>
+        </div>
       </section>}
 
       <section aria-labelledby="transaction-paid-title">
@@ -78,7 +112,7 @@ export function TransactionDialog({ data, payment, asOf, onClose, onReturnFocus,
       <p className="break-all text-xs text-muted-foreground">Payment ID: {payment.id}</p>
       <DialogFooter className="transaction-dialog-footer">
         {editUnavailableReason && <p className="transaction-edit-unavailable">{editUnavailableReason}</p>}
-        {onEditPayment && !editUnavailableReason && <Button variant="outline" onClick={event => onEditPayment(payment, event.currentTarget)}>Edit Payment</Button>}
+        {onEditPayment && !editUnavailableReason && <Button variant="outline" onClick={event => onEditPayment(payment, event.currentTarget)}>Correct Transaction</Button>}
         <Button onFocus={event => event.currentTarget.scrollIntoView?.({ block: 'nearest' })} onClick={requestClose}>Done</Button>
       </DialogFooter>
     </DialogContent>

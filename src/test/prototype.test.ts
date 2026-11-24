@@ -12,7 +12,7 @@ describe('shared fictional financial model', () => {
     const data = createDemoData()
     expect(isPrototypeData(data)).toBe(true)
     expect(selectSummary(data, DEMO_DATE, DEMO_PERIOD)).toEqual({ tenants: 7, totalRooms: 15, occupiedRooms: 4, reservedRooms: 0, availableRooms: 10, maintenanceRooms: 1,
-      billed: 1_522_500, applied: 1_152_500, received: 2_011_100, outstanding: 370_000, unresolved: 2, credit: 50_000, overdue: 0, paid: 12, partial: 0, unpaid: 3 })
+      billed: 1_522_500, applied: 1_152_500, received: 2_011_100, refundPaid: 0, netReceived: 2_011_100, outstanding: 370_000, unresolved: 2, credit: 50_000, overdue: 0, paid: 12, partial: 0, unpaid: 3 })
     const received = data.payments.reduce((sum, p) => sum + p.amountCents, 0)
     const allocated = data.paymentAllocations.reduce((sum, a) => sum + a.amountCents, 0)
     expect(received - allocated).toBe(50_000)
@@ -125,7 +125,7 @@ describe('prototype reducer and persistence', () => {
     expect(changed.tenants[0]?.notes).toBe('Sample reminder')
     expect(await localStorageRepository.save(changed)).toBeNull()
     expect((await localStorageRepository.load()).data).toEqual(changed)
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 17)
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('version', 18)
   })
 
   it('protects occupied rooms and preserves historical assignments during maintenance toggles', () => {

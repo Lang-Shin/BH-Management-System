@@ -11,6 +11,7 @@ import { usePrototype } from '@/hooks/use-prototype'
 import { useTenantDemo } from '@/app/providers/tenant-demo'
 import { formatDate, formatMoney, previousCalendarDate } from '@/lib/format'
 import { receiptsForPeriod, selectTenantReceipts, type TenantReceiptView } from './tenant-receipts'
+import { prepaidRefundSourceReceiptNumbers } from '@/domain/calculations/prepaid-rent-refund'
 
 const receiptStatusLabels: Record<Receipt['state'], string> = {
   ISSUED: 'Issued',
@@ -99,6 +100,7 @@ export default function TenantPayments() {
   const visible = period ? receiptsForPeriod(receipts, period.id) : []
   const effective = visible.filter(item => item.effective)
   const history = visible.filter(item => !item.effective)
+  const refunds = (data.prepaidRentRefunds ?? []).filter(refund => refund.tenantId === tenantId)
 
   return <>
     <PageHeader title="My Payments & Receipts" description="Receipts issued for your recorded payments at Halili BH." />
@@ -127,5 +129,16 @@ export default function TenantPayments() {
       <p className="mt-2 text-xs text-muted-foreground">Superseded receipts are kept unchanged for reference; they are not counted as current receipts.</p>
       <div className="mt-4 grid gap-5 xl:grid-cols-2">{history.map(view => <ReceiptCard key={view.receipt.id} view={view} historical />)}</div>
     </details>}
+    {refunds.length > 0 && <section className="mt-8" aria-labelledby="tenant-refunds-title">
+      <h2 id="tenant-refunds-title" className="text-xl font-semibold">Prepaid rent refunds</h2>
+      <p className="mt-1 text-sm text-muted-foreground">Only completed refunds represent money returned. Proposed and approved refunds are still being reviewed.</p>
+      <ul className="mt-4 grid gap-3">
+        {refunds.map(refund => <li key={refund.id} className="rounded-xl border bg-card p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">Room {data.rooms.find(room => room.id === refund.roomId)?.name ?? refund.roomId}</p><p className="text-sm text-muted-foreground">Move-out {formatDate(refund.moveOutDate)}</p></div><span className="font-semibold tabular-nums">{formatMoney(refund.amountCents)}</span></div>
+          <p className="mt-2 text-sm"><strong>Status:</strong> {refund.status === 'COMPLETED' ? `Refunded on ${formatDate(refund.refundedOn ?? refund.recordedAt)}` : refund.status === 'APPROVED' ? 'Approved - cash not yet recorded as returned' : refund.status === 'PROPOSED' ? 'Proposed - awaiting approval' : 'Reversed'}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Original receipt{prepaidRefundSourceReceiptNumbers(data, refund).length === 1 ? '' : 's'}: {prepaidRefundSourceReceiptNumbers(data, refund).join(', ') || 'No receipt'}</p>
+        </li>)}
+      </ul>
+    </section>}
   </>
 }

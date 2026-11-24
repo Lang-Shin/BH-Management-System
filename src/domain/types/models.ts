@@ -228,6 +228,10 @@ export interface RentPrepayment {
   rateLockedOn: string
   createdAt: string
   reviewState: 'NONE' | 'TRANSFER_REVIEW'
+  /** Corrections and completed refunds supersede the record instead of rewriting it. */
+  state?: 'ACTIVE' | 'SUPERSEDED'
+  supersedesPrepaymentId?: string | null
+  supersededByPrepaymentId?: string | null
 }
 
 export type FinancialReviewType =
@@ -280,6 +284,42 @@ export interface AdvanceRefund {
   policyVersion: number
   refundWindowDays: number
   auditEventId: string
+}
+
+export type PrepaidRentRefundStatus = 'PROPOSED' | 'APPROVED' | 'COMPLETED' | 'REVERSED'
+
+export interface PrepaidRentRefundAllocation {
+  paymentAllocationId: string
+  paymentId: string
+  receiptId: string | null
+  rentObligationId: string
+  rentalPeriodId: string
+  amountCents: number
+}
+
+/** A prepaid-rent cash outflow record. Only COMPLETED refunds represent money returned. */
+export interface PrepaidRentRefund {
+  id: string
+  status: PrepaidRentRefundStatus
+  tenantId: string
+  roomId: string
+  occupancyCycleId: string
+  moveOutDate: string
+  amountCents: number
+  reason: string
+  recordedBy: string
+  recordedAt: string
+  approvedAt: string | null
+  approvedBy: string | null
+  refundedOn: string | null
+  completedBy: string | null
+  reversedAt: string | null
+  reversedBy: string | null
+  reversalReason: string | null
+  allocations: PrepaidRentRefundAllocation[]
+  entitlementReviewRequired: boolean
+  auditEventId: string
+  lastAuditEventId: string
 }
 
 export type DepositDisposition = 'NON_REFUNDABLE' | 'MANUAL_REVIEW'
@@ -407,8 +447,8 @@ export interface AuditEvent {
   id: string
   actorId: string
   occurredOn: string
-  action: 'DEMO_SEEDED' | 'READING_CORRECTED' | 'CHARGE_CORRECTED' | 'PAYMENT_CORRECTED' | 'ALLOCATION_REVERSED' | 'ELECTRICITY_PAYMENT_RECORDED' | 'ROOM_PAYMENT_RECORDED' | 'MOVE_IN_PAYMENT_RECORDED' | 'MOVE_IN_POLICY_UPDATED' | 'METER_INITIALIZED' | 'ROOM_CHANGE_REQUESTED' | 'ROOM_CHANGE_CANCELLED' | 'ROOM_CHANGE_APPROVED' | 'ROOM_CHANGE_REJECTED' | 'ROOM_CHANGE_EXPIRED' | 'ROOM_CHANGE_RESERVATION_CANCELLED' | 'ROOM_CHANGE_RESCHEDULED' | 'ADVANCE_REFUNDED' | 'ADVANCE_APPLIED' | 'ADVANCE_APPLICATION_REVERSED' | 'RENT_PREPAYMENT_RECORDED' | 'FINANCIAL_REVIEW_OPENED' | 'WORKSPACE_RESET' | 'RENT_PERIODS_ENSURED'
-  entityType: 'PROTOTYPE' | 'METER_READING' | 'CHARGE' | 'PAYMENT' | 'PAYMENT_ALLOCATION' | 'ROOM_CHANGE_REQUEST' | 'RENT_OBLIGATION' | 'ADVANCE_APPLICATION' | 'RENT_PREPAYMENT' | 'FINANCIAL_REVIEW_CASE'
+  action: 'DEMO_SEEDED' | 'READING_CORRECTED' | 'CHARGE_CORRECTED' | 'PAYMENT_CORRECTED' | 'ALLOCATION_REVERSED' | 'ELECTRICITY_PAYMENT_RECORDED' | 'ROOM_PAYMENT_RECORDED' | 'MOVE_IN_PAYMENT_RECORDED' | 'MOVE_IN_POLICY_UPDATED' | 'METER_INITIALIZED' | 'ROOM_CHANGE_REQUESTED' | 'ROOM_CHANGE_CANCELLED' | 'ROOM_CHANGE_APPROVED' | 'ROOM_CHANGE_REJECTED' | 'ROOM_CHANGE_EXPIRED' | 'ROOM_CHANGE_RESERVATION_CANCELLED' | 'ROOM_CHANGE_RESCHEDULED' | 'ADVANCE_REFUNDED' | 'ADVANCE_APPLIED' | 'ADVANCE_APPLICATION_REVERSED' | 'RENT_PREPAYMENT_RECORDED' | 'PREPAID_RENT_REFUND_PROPOSED' | 'PREPAID_RENT_REFUND_APPROVED' | 'PREPAID_RENT_REFUND_COMPLETED' | 'PREPAID_RENT_REFUND_REVERSED' | 'FINANCIAL_REVIEW_OPENED' | 'WORKSPACE_RESET' | 'RENT_PERIODS_ENSURED'
+  entityType: 'PROTOTYPE' | 'METER_READING' | 'CHARGE' | 'PAYMENT' | 'PAYMENT_ALLOCATION' | 'ROOM_CHANGE_REQUEST' | 'RENT_OBLIGATION' | 'ADVANCE_APPLICATION' | 'RENT_PREPAYMENT' | 'PREPAID_RENT_REFUND' | 'FINANCIAL_REVIEW_CASE'
   entityId: string
   reason: string
   /** Serialized before/after snapshots preserve a future correction trail. */
@@ -444,6 +484,8 @@ export interface PrototypeAppState {
   rentObligations: RentObligation[]
   advanceApplications: AdvanceApplication[]
   rentPrepayments: RentPrepayment[]
+  /** Optional for version-17 snapshots and older D1 rows; normalized by writers that use it. */
+  prepaidRentRefunds?: PrepaidRentRefund[]
   financialReviewCases: FinancialReviewCase[]
 }
 

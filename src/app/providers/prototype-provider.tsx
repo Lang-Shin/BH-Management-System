@@ -50,6 +50,7 @@ export function PrototypeProvider({ children, repository, now }: { children: Rea
   const syncGeneration = useRef(0)
   const failedCommand = useRef<{ action: PrototypeAction; key: string } | null>(null)
   const confirmedRevision = useRef<number | null>(null)
+  const refreshInFlight = useRef(false)
 
   useEffect(() => {
     let cancelled = false
@@ -236,17 +237,37 @@ export function PrototypeProvider({ children, repository, now }: { children: Rea
   }, [sendServerAction, serverRepository])
 
   const refreshFromServer = useCallback(() => {
-    if (!serverRepository || pendingActions.current.length > 0) return
+    if (!serverRepository || pendingActions.current.length > 0 || refreshInFlight.current) return
+    const generation = syncGeneration.current
+    const revisionAtStart = confirmedRevision.current
+    refreshInFlight.current = true
     setCommandError(null)
     serverRepository.load().then(snapshot => {
+      // A focus refresh must never overwrite a command that completed while it was loading.
+      if (generation !== syncGeneration.current || pendingActions.current.length > 0
+        || confirmedRevision.current !== revisionAtStart
+        || (snapshot.revision !== undefined && confirmedRevision.current !== null && snapshot.revision < confirmedRevision.current)) return
       confirmedData.current = snapshot.data
       confirmedRevision.current = snapshot.revision ?? confirmedRevision.current
       setStorageWarning(snapshot.warning)
       reduce({ type: 'data/serverSynced', data: snapshot.data })
     }).catch(error => {
+      if (generation !== syncGeneration.current || pendingActions.current.length > 0) return
       setCommandError(error instanceof Error ? error.message : 'The records could not be refreshed.')
-    })
+    }).finally(() => { refreshInFlight.current = false })
   }, [serverRepository])
+
+  useEffect(() => {
+    if (!ready || !serverRepository) return
+    const onFocus = () => refreshFromServer()
+    const onVisible = () => { if (document.visibilityState === 'visible') refreshFromServer() }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [ready, serverRepository, refreshFromServer])
 
   if (loadFailed) return <div className="p-6"><ErrorState title="Your records could not be opened" onRetry={() => window.location.reload()} /></div>
   if (!ready) return <div className="p-6"><LoadingState /></div>

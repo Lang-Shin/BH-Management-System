@@ -3,7 +3,7 @@ import { initialRoomRentRates, initialWashingRates, initialWaterRates } from '@/
 import { DEFAULT_MOVE_IN_POLICY } from '@/domain/calculations/move-in-policy'
 import { isPrototypeData, isRecord } from '@/domain/validation/prototype-data'
 
-export const STORAGE_SCHEMA_VERSION = 17
+export const STORAGE_SCHEMA_VERSION = 18
 
 type ParseResult =
   | { ok: true; data: PrototypeAppState }
@@ -117,7 +117,7 @@ function withMoveInState(value: unknown, fromVersion: 7 | 8 | 9 | 10): unknown |
  */
 function withAnniversaryState(value: unknown, fromVersion: number): unknown {
   if (!isRecord(value)) return value
-  if (fromVersion === STORAGE_SCHEMA_VERSION) return value
+  if (fromVersion >= 17) return value
   const cycles = (Array.isArray(value.occupancyCycles) ? value.occupancyCycles : []).map(cycle => {
     if (!isRecord(cycle)) return cycle
     const validSchedule = cycle.rentSchedule === 'ANNIVERSARY' || cycle.rentSchedule === 'LEGACY_CALENDAR'
@@ -175,8 +175,18 @@ function withAnniversaryState(value: unknown, fromVersion: number): unknown {
   }
 }
 
+function withPrepaidRentRefundState(value: unknown): unknown {
+  if (!isRecord(value)) return value
+  return {
+    ...value,
+    prepaidRentRefunds: Array.isArray(value.prepaidRentRefunds) ? value.prepaidRentRefunds : [],
+    rentPrepayments: (Array.isArray(value.rentPrepayments) ? value.rentPrepayments : []).map(prepayment =>
+      isRecord(prepayment) && prepayment.state === undefined ? { ...prepayment, state: 'ACTIVE' } : prepayment),
+  }
+}
+
 function finish(value: unknown, fromVersion: number): ParseResult {
-  const migrated = withAnniversaryState(value, fromVersion)
+  const migrated = withPrepaidRentRefundState(withAnniversaryState(value, fromVersion))
   return isPrototypeData(migrated) ? { ok: true, data: migrated } : { ok: false, reason: 'INVALID_DATA' }
 }
 
@@ -189,6 +199,8 @@ export function parsePrototypeSnapshot(raw: string): ParseResult {
     return { ok: false, reason: 'MALFORMED_JSON' }
   }
   if (!isRecord(parsed)) return { ok: false, reason: 'INVALID_DATA' }
+  // Version 18 adds audited prepaid-rent refunds and prepayment supersession.
+  if (parsed.version === 17) return finish(parsed.data, 17)
   // Version 17 adds anniversary rent and first-period advance settlement.
   if (parsed.version === 16) return finish(withAdvanceRefundState(parsed.data), 16)
   if (parsed.version === 15) return finish(withAdvanceRefundState(parsed.data), 15)

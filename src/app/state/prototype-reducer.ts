@@ -16,6 +16,8 @@ import { approveRoomChangeRequest, cancelApprovedRoomChangeRequest, cancelRoomCh
 import { createRoom, deleteRoom, updateRoom } from '@/domain/calculations/room-management'
 import { createTenant, deleteTenant, moveOutBlockers, moveOutTenant, updateTenant } from '@/domain/calculations/tenant-management'
 import { prepareShortStayAdvanceRefund } from '@/domain/calculations/advance-refund'
+import { prepareUnifiedCorrection } from '@/domain/calculations/transaction-correction'
+import { approvePrepaidRefund, completePrepaidRefund, preparePrepaidRefundProposal, reversePrepaidRefund } from '@/domain/calculations/prepaid-rent-refund'
 import { openFinancialReviewCase } from '@/domain/calculations/rent-schedule'
 
 export function prototypeReducer(state: PrototypeData, action: StateAction): PrototypeData {
@@ -134,12 +136,39 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
       return result.ok ? result.data : state
     }
     case 'payment/corrected': {
+      if (action.lines !== undefined || action.reverseAll || action.correctedMethod !== undefined || action.retainedAllocationIds !== undefined) {
+        const result = prepareUnifiedCorrection(state, {
+          paymentId: action.paymentId, reason: action.reason, correctedAt: action.correctedAt,
+          lines: action.lines, reverseAll: action.reverseAll, correctedMethod: action.correctedMethod,
+          retainedAllocationIds: action.retainedAllocationIds, expectedReceiptId: action.expectedReceiptId,
+          expectedReceiptRevision: action.expectedReceiptRevision,
+          correctedElectricityReadingMilliKwh: action.correctedElectricityReadingMilliKwh,
+          settlementStatus: action.settlementStatus, moneyExchangeConfirmed: action.moneyExchangeConfirmed,
+        })
+        return result.ok ? result.data : state
+      }
       const result = preparePaymentCorrection(state, {
         paymentId: action.paymentId, selectedCategories: action.selectedCategories,
         correctedElectricityReadingMilliKwh: action.correctedElectricityReadingMilliKwh,
         reason: action.reason, settlementStatus: action.settlementStatus,
         moneyExchangeConfirmed: action.moneyExchangeConfirmed, correctedAt: action.correctedAt,
       })
+      return result.ok ? result.data : state
+    }
+    case 'prepaidRefund/proposed': {
+      const result = preparePrepaidRefundProposal(state, { tenantId: action.tenantId, moveOutDate: action.moveOutDate, reason: action.reason, asOf: action.asOf })
+      return result.ok ? result.data : state
+    }
+    case 'prepaidRefund/approved': {
+      const result = approvePrepaidRefund(state, { refundId: action.refundId, asOf: action.asOf, reason: action.reason, entitlementConfirmed: action.entitlementConfirmed })
+      return result.ok ? result.data : state
+    }
+    case 'prepaidRefund/completed': {
+      const result = completePrepaidRefund(state, { refundId: action.refundId, refundedOn: action.refundedOn, asOf: action.asOf, reason: action.reason })
+      return result.ok ? result.data : state
+    }
+    case 'prepaidRefund/reversed': {
+      const result = reversePrepaidRefund(state, { refundId: action.refundId, asOf: action.asOf, reason: action.reason })
       return result.ok ? result.data : state
     }
     case 'moveIn/paymentRecorded': {
