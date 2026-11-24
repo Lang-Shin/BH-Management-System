@@ -294,6 +294,10 @@ body { background: var(--wallpaper) fixed, var(--background); min-height: 100dvh
   box-shadow: var(--glass-rims), 0 8px 24px -18px #00000040;
 }
 
+.mobile-header-title { min-width: 0; }
+.mobile-header-actions { flex: none; }
+.mobile-header-brand { margin-bottom: 0.125rem; line-height: 1.1; }
+
 /* Buttons: capsule controls; press scales like the kit's Clicked state. */
 [data-slot="button"] {
   transition: background-color 180ms ease, color 180ms ease, box-shadow 180ms ease, transform 120ms ease, opacity 180ms ease;
@@ -571,7 +575,48 @@ textarea { background-color: var(--input-bg); }
   animation: route-enter var(--route-duration) var(--route-ease) backwards;
 }
 
-.page-title { animation: title-enter 260ms var(--route-ease) backwards; }
+.page-title {
+  min-width: 0;
+  max-width: 100%;
+  font-size: clamp(1.25rem, 6.5vw, 1.5rem);
+  font-weight: 400;
+  line-height: 1.15;
+  overflow-wrap: break-word;
+  animation: title-enter 260ms var(--route-ease) backwards;
+}
+.header-title-frame {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+}
+.header-title-frame > * {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+.header-title-reserve {
+  visibility: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+.header-title-live {
+  display: block;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+.header-typewriter-caret {
+  display: inline-block;
+  width: 2px;
+  height: 0.85em;
+  margin-left: 3px;
+  vertical-align: -0.06em;
+  background: currentColor;
+  animation: typewriter-caret 1s step-end infinite;
+}
+@keyframes typewriter-caret {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
 
 /* Reserve the final value's width, expose it to assistive technology, and animate
    only generated visual text so intermediate values never enter live regions. */
@@ -627,19 +672,8 @@ textarea { background-color: var(--input-bg); }
 .dashboard-return:focus-visible > span { transform: scale(1.14); }
 .dashboard-return:active > span { transform: scale(1.08); }
 
-.header-typewriter { min-height: 1.2em; line-height: 1.2; }
-.header-typewriter-caret {
-  display: inline-block;
-  width: 2px;
-  height: 0.85em;
-  margin-left: 3px;
-  vertical-align: -0.06em;
-  background: currentColor;
-  animation: typewriter-caret 1s step-end infinite;
-}
-@keyframes typewriter-caret {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+@media (width >= 40rem) {
+  .page-title { font-size: 1.875rem; }
 }
 
 /* Shell: content floats on the wallpaper; the sidebar is an inset Liquid Glass panel. */
