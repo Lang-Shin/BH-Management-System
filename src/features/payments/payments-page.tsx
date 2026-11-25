@@ -20,7 +20,6 @@ export default function Payments() {
 
   return <>
     <PageHeader title="Payments & Receipts" description="See who paid, when they paid, and what the payment was for." />
-    <PreviewNotice>Electricity payments are recorded from Billing or a room pending-payments view. Other payment workflows remain separate.</PreviewNotice>
     <section className="mb-7 grid gap-5 xl:grid-cols-4" aria-label="Payments overview">
       <StatCard label="Money received" value={formatMoney(summary.received)} detail={`Gross collections in November; ${formatMoney(summary.refundPaid)} completed prepaid refunds are shown separately.`} icon={Wallet} />
       <StatCard label="Move-in deposits held" value={formatMoney(moveIn.depositCollectedCents)} detail={`${data.moveInPolicy.depositDisposition === 'NON_REFUNDABLE' ? 'Non-refundable' : 'Refundable with manual review'} under current policy; plus ${formatMoney(moveIn.advanceCollectedCents)} advance collected.`} icon={ShieldCheck} />
