@@ -21,13 +21,15 @@ export function RoomSummary({ summary }: { summary: ReturnType<typeof selectRoom
         const share = summary.totalRooms > 0 ? value / summary.totalRooms * 100 : 0
         return <div key={label} role="group" aria-label={label} className="room-metric" style={{ '--metric-color': color, '--metric-delay': `${index * 60}ms` } as CSSProperties}>
           <div className="flex items-center justify-between gap-3">
-            <span className="room-metric-icon"><Icon className="size-5" aria-hidden="true" /></span>
-            <span className="rounded-full border bg-card/80 px-2.5 py-1 text-xs font-semibold tabular-nums"><AnimatedNumber value={`${share.toFixed(0)}%`} /></span>
+            <h3 className="min-w-0 text-sm leading-snug font-semibold text-muted-foreground">{label}</h3>
+            <span className="room-metric-icon shrink-0"><Icon className="size-[18px]" aria-hidden="true" /></span>
           </div>
-          <h3 className="mt-4 text-sm font-medium text-muted-foreground">{label}</h3>
-          <p className="mt-1 flex items-baseline gap-2"><strong className="text-4xl leading-tight font-bold tracking-tight tabular-nums"><AnimatedNumber value={value} /></strong><span className="text-xs text-muted-foreground">of <AnimatedNumber value={summary.totalRooms} /> rooms</span></p>
-          <div aria-hidden="true" className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted"><div className="room-metric-fill h-full rounded-full" style={{ width: `${share}%` }} /></div>
-          <p className="mt-3 text-xs text-muted-foreground">{detail}</p>
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5"><strong className="text-2xl font-bold tracking-tight tabular-nums"><AnimatedNumber value={value} /></strong><span className="text-xs text-muted-foreground">of <AnimatedNumber value={summary.totalRooms} /> rooms</span></p>
+            <span className="shrink-0 rounded-full border bg-card/80 px-2.5 py-1 text-xs font-semibold tabular-nums"><AnimatedNumber value={`${share.toFixed(0)}%`} /></span>
+          </div>
+          <div aria-hidden="true" className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted"><div className="room-metric-fill h-full rounded-full" style={{ width: `${share}%` }} /></div>
+          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{detail}</p>
         </div>
       })}
     </div>
