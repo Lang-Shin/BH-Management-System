@@ -30,7 +30,6 @@ export default function Tenants() {
 
   return <>
     <PageHeader title="Tenants" description="Find a tenant, check their room, or see what they still need to pay." action={<AddTenantDialog onSaved={setNotice} />} />
-    <PreviewNotice>Add or edit tenants, record a safe room transfer, or move a tenant out while preserving historical bills and receipts.</PreviewNotice>
     {notice ? <p role="status" className="tenant-management-notice">{notice}</p> : <p role="status" className="sr-only" />}
     <RoomChangeRequestsPanel onNotice={setNotice} />
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4"><div className="w-full sm:max-w-md"><label htmlFor="tenant-search" className="mb-2 block text-base font-semibold">Find a tenant</label><div className="relative"><Search className="pointer-events-none absolute top-4 left-4 size-5 text-muted-foreground" aria-hidden="true" /><Input id="tenant-search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Type a name or room number" className="h-14 bg-card pl-12 text-base" type="search" /></div></div><p className="text-sm text-muted-foreground" role="status">Showing <AnimatedNumber value={tenants.length} /> of <AnimatedNumber value={activeTenants.length} /> tenants</p></div>
