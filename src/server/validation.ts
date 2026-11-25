@@ -86,7 +86,7 @@ const actionTypes = new Set<PrototypeAction['type']>([
   'moveIn/policyUpdated', 'roomChange/requested', 'roomChange/cancelled', 'roomChange/approved',
   'roomChange/rejected', 'roomChange/reservationCancelled', 'roomChange/reservationRescheduled',
   'prepaidRefund/proposed', 'prepaidRefund/approved', 'prepaidRefund/completed', 'prepaidRefund/reversed',
-  'occupancy/dateChanged',
+  'financialReview/resolved', 'occupancy/dateChanged',
 ])
 
 /** Runtime allow-list for the typed client action union. Unknown actions never reach the reducer. */
@@ -291,6 +291,12 @@ export function parseAction(value: unknown): PrototypeAction {
       if (!isId(action.refundId) || !isIsoDate(action.asOf) || !isText(action.reason, 500)
         || action.reason.trim().length < 3) invalid('The prepaid refund reversal is invalid.')
       return action as unknown as PrototypeAction
+    case 'financialReview/resolved':
+      if (!isId(action.reviewId) || !isText(action.reason, 500) || action.reason.trim().length < 3
+        || typeof action.acknowledged !== 'boolean' || !optionalIso(action.asOf)) {
+        invalid('The financial review resolution is invalid.')
+      }
+      return { type: action.type, reviewId: action.reviewId, reason: action.reason, acknowledged: action.acknowledged, ...(action.asOf ? { asOf: action.asOf as string } : {}) }
     case 'occupancy/dateChanged':
       if (!isIsoDate(action.asOf)) invalid('The occupancy date is invalid.')
       return action as unknown as PrototypeAction
@@ -321,6 +327,7 @@ export function withServerDate(action: PrototypeAction, serverDate: string): Pro
     case 'moveIn/policyUpdated': return { ...action, asOf: serverDate }
     case 'rates/scheduledChange': return { ...action, asOf: serverDate }
     case 'rates/utilityChange': return { ...action, asOf: serverDate }
+    case 'financialReview/resolved': return { ...action, asOf: serverDate }
     case 'occupancy/dateChanged': return { ...action, asOf: serverDate }
     default: return action
   }

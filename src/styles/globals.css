@@ -1739,8 +1739,24 @@ li:nth-child(n + 5) > .notification-item { animation-delay: 120ms; }
 .room-change-timeline strong { color: var(--label); font-size: 12px; }
 .room-change-timeline span { overflow-wrap: anywhere; }
 .room-change-billing-review { margin-bottom: 24px; padding: 14px 16px; border: 1px solid color-mix(in srgb, #9a6400 24%, var(--border)); border-radius: 14px; background: color-mix(in srgb, #9a6400 5%, var(--card)); font-size: 13px; line-height: 1.55; }
-.room-change-billing-review > p { margin-top: 4px; color: var(--muted-foreground); }
+.room-change-billing-review > p, .room-change-billing-review > div > div > p { margin-top: 4px; color: var(--muted-foreground); }
 .room-change-billing-review ul { display: grid; gap: 4px; margin-top: 8px; padding-left: 18px; }
+.room-change-review-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.room-change-review-item > span:first-child { min-width: 0; }
+.room-change-review-dismissed { flex: none; color: var(--muted-foreground); font-size: 11px; font-weight: 750; text-transform: uppercase; letter-spacing: 0.04em; }
+.financial-review-summary { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 24px; padding: 12px 14px; border: 1px solid color-mix(in srgb, #9a6400 24%, var(--border)); border-radius: 14px; background: color-mix(in srgb, #9a6400 5%, var(--card)); font-size: 13px; line-height: 1.5; }
+.financial-review-summary-icon { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 999px; background: color-mix(in srgb, #9a6400 12%, var(--card)); color: color-mix(in srgb, #9a6400 80%, var(--tint)); }
+.financial-review-summary-icon svg { width: 18px; height: 18px; }
+.financial-review-summary p + p { margin-top: 2px; color: var(--muted-foreground); }
+.financial-review-list { display: grid; gap: 12px; }
+.financial-review-item { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-2); font-size: 13px; line-height: 1.55; }
+.financial-review-item h3 { font-size: 15px; font-weight: 750; }
+.financial-review-item > p { color: var(--muted-foreground); }
+.financial-review-blocker { padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--destructive) 25%, var(--border)); border-radius: 9px; background: color-mix(in srgb, var(--destructive) 5%, var(--card)); color: var(--destructive) !important; }
+.financial-review-item [data-slot="button"] { justify-self: start; }
+.financial-review-open { padding: 3px 8px; border-radius: 999px; background: color-mix(in srgb, #9a6400 10%, var(--card)); color: color-mix(in srgb, #9a6400 80%, var(--tint)); font-size: 10px; font-weight: 800; letter-spacing: 0.06em; }
+@media (max-width: 39.999rem) { .financial-review-summary { align-items: stretch; flex-direction: column; } .financial-review-summary [data-slot="button"] { align-self: flex-start; } }
+.room-management-notice p { min-width: 0; }
 
 /* Room change dialog: constrain the scroll container and every form row to the viewport. */
 .room-change-dialog[data-slot="dialog-content"] {

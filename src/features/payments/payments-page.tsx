@@ -1,5 +1,5 @@
 import { Wallet, Banknote, CircleDollarSign, ShieldCheck } from 'lucide-react'
-import { PageHeader, PreviewNotice, StatCard } from '@/components/shared/page'
+import { PageHeader, StatCard } from '@/components/shared/page'
 import { PaginatedDataTable } from '@/components/shared/table-pagination'
 import { usePrototype } from '@/hooks/use-prototype'
 import { useOccupancyDate } from '@/hooks/use-occupancy-date'

@@ -1,5 +1,5 @@
 import { useRef, useState, type CSSProperties } from 'react'
-import { DoorOpen } from 'lucide-react'
+import { DoorOpen, X } from 'lucide-react'
 import { PageHeader } from '@/components/shared/page'
 import { EmptyState } from '@/components/shared/states'
 import { StatusBadge } from '@/components/shared/status-badge'
@@ -9,11 +9,13 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { usePrototype } from '@/hooks/use-prototype'
 import { useOccupancyDate } from '@/hooks/use-occupancy-date'
+import { useDismissedNotices } from '@/hooks/use-dismissed-notices'
 import { roomOccupancy, roomOccupants, selectRoomSummary, type RoomOccupancy } from '@/domain/calculations/summary'
 import { futureRoomReservations } from '@/domain/calculations/room-capacity'
 import { formatDate, formatMoney } from '@/lib/format'
 import { roomMonthlyRentCents } from '@/domain/calculations/billing-rates'
 import { roomCategoryLabel } from '@/lib/room-rates'
+import { legacyRoomLayoutRooms } from '@/domain/calculations/room-management'
 import { AddRoomDialog } from './add-room-dialog'
 import { RoomDetailsDialog } from './room-details-dialog'
 import { RoomFiltersMenu, type RoomFilter } from './room-filters-menu'
@@ -30,14 +32,18 @@ export default function Rooms() {
   const summary = selectRoomSummary(data, occupancyDate)
   const rooms = data.rooms.filter(room => filter === 'ALL' || roomOccupancy(data, room, occupancyDate) === filter)
   const selectedRoom = data.rooms.find(room => room.id === selectedRoomId)
-  const hasLegacyRoomNumbers = data.rooms.some(room => /^(10[1-9]|11[0-5])$/.test(room.name))
+  const { dismiss, isDismissed } = useDismissedNotices()
+  const legacyRooms = legacyRoomLayoutRooms(data)
+  const legacyWarningKey = `rooms-legacy-layout:${legacyRooms.map(room => `${room.id}:${room.name}`).sort().join('|')}`
+  const showLegacyWarning = legacyRooms.length > 0 && !isDismissed(legacyWarningKey)
 
   return <>
     <PageHeader title="Rooms" description="A room is occupied when someone rents it, even if some beds are unused." action={<AddRoomDialog onSaved={setNotice} />} />
     <RoomSummary summary={summary} />
-    {hasLegacyRoomNumbers && <p role="note" className="room-management-notice mb-6">
-      Some saved room numbers match the earlier layout (101–115). They have not been mapped to actual rooms: an owner-approved correspondence is required. Tenant assignments and financial records are retained.
-    </p>}
+    {showLegacyWarning && <div role="note" className="room-management-notice mb-6 flex items-start justify-between gap-3">
+      <p>Some saved room numbers match the earlier layout (101-115). They have not been mapped to actual rooms: an owner-approved correspondence is required. Tenant assignments and financial records are retained.</p>
+      <Button type="button" variant="ghost" size="sm" className="shrink-0" onClick={() => dismiss(legacyWarningKey)}><X aria-hidden="true" />Dismiss</Button>
+    </div>}
     <div className="mb-6 flex flex-wrap items-center justify-between gap-4"><RoomFiltersMenu value={filter} onChange={setFilter} /><p role="status" className="text-sm text-muted-foreground">Showing <AnimatedNumber value={rooms.length} /> of <AnimatedNumber value={data.rooms.length} /> rooms</p></div>
     {notice ? <p role="status" className="room-management-notice">{notice}</p> : <p role="status" className="sr-only" />}
     {rooms.length === 0 ? <div key={filter} className="room-filter-empty"><EmptyState title="No rooms here" description="There are no rooms with this status." action={<Button variant="outline" onClick={() => setFilter('ALL')}>Show all rooms</Button>} /></div> : <div key={filter} className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">{rooms.map((room, index) => {

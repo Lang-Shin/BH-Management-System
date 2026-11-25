@@ -137,7 +137,8 @@ export class D1StateRepository {
 
   async command(rawAction: PrototypeAction, actor: Actor, idempotencyKey: string, requestId: string, serverDate: string): Promise<CommandOutcome> {
     if (rawAction.type === 'payment/corrected' || rawAction.type.startsWith('prepaidRefund/')
-      || rawAction.type === 'rates/scheduledChange' || rawAction.type === 'rates/utilityChange' || rawAction.type === 'rates/planned') {
+      || rawAction.type === 'rates/scheduledChange' || rawAction.type === 'rates/utilityChange' || rawAction.type === 'rates/planned'
+      || rawAction.type === 'financialReview/resolved') {
       await this.requireFinancialAdministrator(actor)
     }
     if (!idempotencyKey || idempotencyKey.length < 8 || idempotencyKey.length > 200) {
@@ -233,6 +234,7 @@ export class D1StateRepository {
         !priorAuditIds.has(event.id) && event.actorId === 'landlord' ? { ...event, actorId: actor.id } : event)
     }
     let rateAuditEvents: AuditEvent[] = []
+    const financialReviewAuditEvents: AuditEvent[] = []
     if ((action.type === 'rates/scheduledChange' || action.type === 'rates/utilityChange') && next !== current.data) {
       const priorAuditIds = new Set(current.data.auditEvents.map(event => event.id))
       const priorRates = new Map([...current.data.roomRentRates, ...current.data.electricityRates, ...current.data.waterRates, ...current.data.washingRates]
@@ -254,6 +256,17 @@ export class D1StateRepository {
       next.electricityRates = stampActor(next.electricityRates)
       next.waterRates = stampActor(next.waterRates)
       next.washingRates = stampActor(next.washingRates)
+    }
+    if (action.type === 'financialReview/resolved' && next !== current.data) {
+      const priorAuditIds = new Set(current.data.auditEvents.map(event => event.id))
+      next.auditEvents = next.auditEvents.map(event =>
+        !priorAuditIds.has(event.id) && event.actorId === 'landlord' ? { ...event, actorId: actor.id } : event)
+      const resolvedEvents = next.auditEvents.filter(event => !priorAuditIds.has(event.id)
+        && event.entityType === 'FINANCIAL_REVIEW_CASE' && event.action === 'FINANCIAL_REVIEW_RESOLVED')
+      financialReviewAuditEvents.push(...resolvedEvents)
+      const resolvedIds = new Set(resolvedEvents.map(event => event.entityId))
+      next.financialReviewCases = next.financialReviewCases.map(review =>
+        resolvedIds.has(review.id) && review.status === 'RESOLVED' ? { ...review, resolvedBy: actor.id } : review)
     }
     if (next === current.data) {
       if (action.type === 'occupancy/dateChanged') {
@@ -285,7 +298,7 @@ export class D1StateRepository {
       this.db.prepare("UPDATE workspace_operations SET status = 'COMPLETED', completed_at = ? WHERE id = ?")
         .bind(now, `command-${requestId}`),
     ]
-    for (const event of rateAuditEvents) {
+    for (const event of [...rateAuditEvents, ...financialReviewAuditEvents]) {
       statements.push(this.db.prepare(`INSERT INTO audit_events
         (id, workspace_id, actor_id, actor_source, action, entity_type, entity_id, reason, occurred_on, request_id, idempotency_key, before_json, after_json, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)

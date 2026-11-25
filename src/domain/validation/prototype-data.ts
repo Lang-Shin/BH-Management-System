@@ -47,7 +47,8 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     && oneOf(r.status, ['ACTIVE', 'MOVED_OUT']) && text(r.notes) && r.notes.length <= 500)) return false
   if (!rows(value, 'rooms', r => id(r.name) && positive(r.floor) && positive(r.capacity)
     && oneOf(r.kind, ['PRIVATE', 'SHARED']) && oneOf(r.status, ['available', 'maintenance'])
-    && oneOf(r.categoryId, ['RATE_3500', 'RATE_4000', 'RATE_5000']) && typeof r.washingMachineEnabled === 'boolean')) return false
+    && oneOf(r.categoryId, ['RATE_3500', 'RATE_4000', 'RATE_5000']) && typeof r.washingMachineEnabled === 'boolean'
+    && (r.origin === undefined || oneOf(r.origin, ['STANDARD', 'LEGACY_IMPORT', 'USER_CREATED'])))) return false
   if (!rows(value, 'roomAssignments', r => id(r.tenantId) && id(r.roomId) && date(r.startDate)
     && (r.endDate === null || date(r.endDate)) && positive(r.agreedRentCents))) return false
   if (!rows(value, 'electricityMeters', r => id(r.label) && (r.serialNumber === null || id(r.serialNumber))
@@ -108,7 +109,8 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     && (r.rentSchedule === 'ANNIVERSARY'
       ? date(r.rentAnchorDate) && Number.isSafeInteger(r.rentAnchorDay) && (r.rentAnchorDay as number) >= 1 && (r.rentAnchorDay as number) <= 31
       : r.rentAnchorDate === null && r.rentAnchorDay === null)
-    && oneOf(r.cycleOrigin, ['NEW_MOVE_IN', 'TRANSFER', 'LEGACY', 'SAME_DAY_REPLACEMENT']))) return false
+    && oneOf(r.cycleOrigin, ['NEW_MOVE_IN', 'TRANSFER', 'LEGACY', 'SAME_DAY_REPLACEMENT'])
+    && (r.transferSourceAssignmentId === undefined || r.transferSourceAssignmentId === null || id(r.transferSourceAssignmentId)))) return false
   if (!rows(value, 'rentalPeriods', r => id(r.occupancyCycleId) && id(r.roomId) && positive(r.sequence)
     && date(r.startDate) && date(r.endDateExclusive) && r.startDate < r.endDateExclusive && date(r.dueDate)
     && oneOf(r.status, ['OPEN', 'CLOSED']) && oneOf(r.origin, ['ANNIVERSARY', 'LEGACY_CALENDAR']))) return false
@@ -129,7 +131,9 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     && id(r.roomId) && (r.occupancyCycleId === null || id(r.occupancyCycleId))
     && (r.tenantId === null || id(r.tenantId)) && (r.rentalPeriodId === null || id(r.rentalPeriodId))
     && oneOf(r.status, ['OPEN', 'RESOLVED', 'DISMISSED']) && text(r.note) && r.note.length <= 500
-    && date(r.createdAt) && (r.resolvedAt === null || date(r.resolvedAt)))) return false
+    && date(r.createdAt) && (r.resolvedAt === null || date(r.resolvedAt))
+    && (r.resolvedBy === undefined || r.resolvedBy === null || id(r.resolvedBy))
+    && (r.resolutionReason === undefined || r.resolutionReason === null || (text(r.resolutionReason) && r.resolutionReason.length >= 3 && r.resolutionReason.length <= 500)))) return false
   if (!rows(value, 'moveInObligations', r => id(r.occupancyCycleId) && id(r.roomId)
     && positive(r.agreedMonthlyRentCents) && positive(r.advanceRequiredCents) && positive(r.depositRequiredCents)
     && id(r.advanceChargeId) && id(r.depositChargeId) && Number.isSafeInteger(r.policyVersion) && (r.policyVersion as number) > 0
@@ -179,7 +183,7 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     || value.moveInPolicy.moveOutSettlement !== 'MANUAL_REVIEW'
     || !Number.isSafeInteger(value.moveInPolicy.shortStayAdvanceRefundDays) || (value.moveInPolicy.shortStayAdvanceRefundDays as number) < 0) return false
   if (!rows(value, 'auditEvents', r => id(r.actorId) && date(r.occurredOn) && id(r.entityId) && text(r.reason)
-    && oneOf(r.action, ['DEMO_SEEDED', 'READING_CORRECTED', 'CHARGE_CORRECTED', 'PAYMENT_CORRECTED', 'ALLOCATION_REVERSED', 'ELECTRICITY_PAYMENT_RECORDED', 'ROOM_PAYMENT_RECORDED', 'MOVE_IN_PAYMENT_RECORDED', 'MOVE_IN_POLICY_UPDATED', 'METER_INITIALIZED', 'ROOM_CHANGE_REQUESTED', 'ROOM_CHANGE_CANCELLED', 'ROOM_CHANGE_APPROVED', 'ROOM_CHANGE_REJECTED', 'ROOM_CHANGE_EXPIRED', 'ROOM_CHANGE_RESERVATION_CANCELLED', 'ROOM_CHANGE_RESCHEDULED', 'ADVANCE_REFUNDED', 'ADVANCE_APPLIED', 'ADVANCE_APPLICATION_REVERSED', 'RENT_PREPAYMENT_RECORDED', 'PREPAID_RENT_REFUND_PROPOSED', 'PREPAID_RENT_REFUND_APPROVED', 'PREPAID_RENT_REFUND_COMPLETED', 'PREPAID_RENT_REFUND_REVERSED', 'FINANCIAL_REVIEW_OPENED', 'WORKSPACE_RESET', 'RENT_PERIODS_ENSURED', 'RENT_RATE_SCHEDULED', 'RENT_RATE_EDITED', 'RENT_RATE_CANCELED', 'UTILITY_RATE_SCHEDULED', 'UTILITY_RATE_EDITED', 'UTILITY_RATE_CANCELED'])
+    && oneOf(r.action, ['DEMO_SEEDED', 'READING_CORRECTED', 'CHARGE_CORRECTED', 'PAYMENT_CORRECTED', 'ALLOCATION_REVERSED', 'ELECTRICITY_PAYMENT_RECORDED', 'ROOM_PAYMENT_RECORDED', 'MOVE_IN_PAYMENT_RECORDED', 'MOVE_IN_POLICY_UPDATED', 'METER_INITIALIZED', 'ROOM_CHANGE_REQUESTED', 'ROOM_CHANGE_CANCELLED', 'ROOM_CHANGE_APPROVED', 'ROOM_CHANGE_REJECTED', 'ROOM_CHANGE_EXPIRED', 'ROOM_CHANGE_RESERVATION_CANCELLED', 'ROOM_CHANGE_RESCHEDULED', 'ADVANCE_REFUNDED', 'ADVANCE_APPLIED', 'ADVANCE_APPLICATION_REVERSED', 'RENT_PREPAYMENT_RECORDED', 'PREPAID_RENT_REFUND_PROPOSED', 'PREPAID_RENT_REFUND_APPROVED', 'PREPAID_RENT_REFUND_COMPLETED', 'PREPAID_RENT_REFUND_REVERSED', 'FINANCIAL_REVIEW_OPENED', 'FINANCIAL_REVIEW_RESOLVED', 'WORKSPACE_RESET', 'RENT_PERIODS_ENSURED', 'RENT_RATE_SCHEDULED', 'RENT_RATE_EDITED', 'RENT_RATE_CANCELED', 'UTILITY_RATE_SCHEDULED', 'UTILITY_RATE_EDITED', 'UTILITY_RATE_CANCELED'])
     && oneOf(r.entityType, ['PROTOTYPE', 'METER_READING', 'CHARGE', 'PAYMENT', 'PAYMENT_ALLOCATION', 'ROOM_CHANGE_REQUEST', 'RENT_OBLIGATION', 'ADVANCE_APPLICATION', 'RENT_PREPAYMENT', 'PREPAID_RENT_REFUND', 'FINANCIAL_REVIEW_CASE', 'RENT_RATE', 'UTILITY_RATE'])
     && nullableText(r.beforeSnapshot) && nullableText(r.afterSnapshot))) return false
 

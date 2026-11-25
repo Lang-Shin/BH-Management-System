@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Search } from 'lucide-react'
-import { PageHeader, PreviewNotice } from '@/components/shared/page'
+import { PageHeader } from '@/components/shared/page'
 import { AnimatedNumber } from '@/components/shared/animated-number'
 import { PaginatedDataTable } from '@/components/shared/table-pagination'
 import { StatusBadge } from '@/components/shared/status-badge'

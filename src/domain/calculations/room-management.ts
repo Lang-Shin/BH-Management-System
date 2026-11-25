@@ -32,6 +32,18 @@ function roomLabel(name: string): string {
   return name.trim()
 }
 
+const LEGACY_LAYOUT_NAME = /^(10[1-9]|11[0-5])$/
+const LEGACY_NUMERIC_ROOM_ID = /^room-\d+$/
+
+/** Only confirmed or strongly inferred imported layout rooms qualify for the mapping warning. */
+export function legacyRoomLayoutRooms(data: PrototypeAppState): Room[] {
+  return data.rooms.filter(room => {
+    if (room.origin === 'USER_CREATED' || room.origin === 'STANDARD') return false
+    if (!LEGACY_LAYOUT_NAME.test(room.name)) return false
+    return room.origin === 'LEGACY_IMPORT' || (room.origin === undefined && LEGACY_NUMERIC_ROOM_ID.test(room.id))
+  })
+}
+
 function roomMeterIds(data: PrototypeAppState, room: Room): Set<string> {
   return new Set(metersForRoom(data, room.id).map(meter => meter.id))
 }
@@ -128,7 +140,7 @@ export function createRoom(data: PrototypeAppState, draft: RoomDraft, asOf: stri
   if (Object.keys(errors).length > 0) return { ok: false, errors }
   const room: Room = {
     id: newRoomId(data), name: roomLabel(draft.name), floor: 1, capacity: draft.capacity!,
-    kind: draft.kind, status: draft.status, categoryId: draft.categoryId!, washingMachineEnabled: false,
+    kind: draft.kind, status: draft.status, categoryId: draft.categoryId!, origin: 'USER_CREATED', washingMachineEnabled: false,
   }
   return { ok: true, data: { ...data, rooms: [...data.rooms, room] }, room }
 }

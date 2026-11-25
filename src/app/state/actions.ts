@@ -59,6 +59,7 @@ export type PrototypeAction =
   | { type: 'roomChange/rejected'; requestId: string; reason: string; decidedAt: string }
   | { type: 'roomChange/reservationCancelled'; requestId: string; reason: string; asOf: string }
   | { type: 'roomChange/reservationRescheduled'; requestId: string; effectiveDate: string; reason: string; asOf: string }
+  | { type: 'financialReview/resolved'; reviewId: string; reason: string; acknowledged: boolean; asOf?: string }
   | { type: 'occupancy/dateChanged'; asOf: string }
 
 export type StateAction = PrototypeAction

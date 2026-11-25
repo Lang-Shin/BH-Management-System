@@ -26,6 +26,8 @@ export interface Room {
   kind: 'PRIVATE' | 'SHARED'
   status: 'available' | 'maintenance'
   categoryId: RoomCategoryId
+  /** Provenance for compatibility warnings; absent on older snapshots. */
+  origin?: 'STANDARD' | 'LEGACY_IMPORT' | 'USER_CREATED'
   /** Current/future subscription; issued washing charges remain historical snapshots. */
   washingMachineEnabled: boolean
 }
@@ -191,6 +193,8 @@ export interface OccupancyCycle {
   rentAnchorDate: string | null
   rentAnchorDay: number | null
   cycleOrigin: OccupancyCycleOrigin
+  /** Source assignment when this cycle was created by an internal transfer. */
+  transferSourceAssignmentId?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -275,6 +279,8 @@ export interface FinancialReviewCase {
   note: string
   createdAt: string
   resolvedAt: string | null
+  resolvedBy?: string | null
+  resolutionReason?: string | null
 }
 
 /** One room-level advance/deposit requirement per occupancy cycle. */
@@ -470,7 +476,7 @@ export interface AuditEvent {
   id: string
   actorId: string
   occurredOn: string
-  action: 'DEMO_SEEDED' | 'READING_CORRECTED' | 'CHARGE_CORRECTED' | 'PAYMENT_CORRECTED' | 'ALLOCATION_REVERSED' | 'ELECTRICITY_PAYMENT_RECORDED' | 'ROOM_PAYMENT_RECORDED' | 'MOVE_IN_PAYMENT_RECORDED' | 'MOVE_IN_POLICY_UPDATED' | 'METER_INITIALIZED' | 'ROOM_CHANGE_REQUESTED' | 'ROOM_CHANGE_CANCELLED' | 'ROOM_CHANGE_APPROVED' | 'ROOM_CHANGE_REJECTED' | 'ROOM_CHANGE_EXPIRED' | 'ROOM_CHANGE_RESERVATION_CANCELLED' | 'ROOM_CHANGE_RESCHEDULED' | 'ADVANCE_REFUNDED' | 'ADVANCE_APPLIED' | 'ADVANCE_APPLICATION_REVERSED' | 'RENT_PREPAYMENT_RECORDED' | 'PREPAID_RENT_REFUND_PROPOSED' | 'PREPAID_RENT_REFUND_APPROVED' | 'PREPAID_RENT_REFUND_COMPLETED' | 'PREPAID_RENT_REFUND_REVERSED' | 'FINANCIAL_REVIEW_OPENED' | 'WORKSPACE_RESET' | 'RENT_PERIODS_ENSURED' | 'RENT_RATE_SCHEDULED' | 'RENT_RATE_EDITED' | 'RENT_RATE_CANCELED' | 'UTILITY_RATE_SCHEDULED' | 'UTILITY_RATE_EDITED' | 'UTILITY_RATE_CANCELED'
+  action: 'DEMO_SEEDED' | 'READING_CORRECTED' | 'CHARGE_CORRECTED' | 'PAYMENT_CORRECTED' | 'ALLOCATION_REVERSED' | 'ELECTRICITY_PAYMENT_RECORDED' | 'ROOM_PAYMENT_RECORDED' | 'MOVE_IN_PAYMENT_RECORDED' | 'MOVE_IN_POLICY_UPDATED' | 'METER_INITIALIZED' | 'ROOM_CHANGE_REQUESTED' | 'ROOM_CHANGE_CANCELLED' | 'ROOM_CHANGE_APPROVED' | 'ROOM_CHANGE_REJECTED' | 'ROOM_CHANGE_EXPIRED' | 'ROOM_CHANGE_RESERVATION_CANCELLED' | 'ROOM_CHANGE_RESCHEDULED' | 'ADVANCE_REFUNDED' | 'ADVANCE_APPLIED' | 'ADVANCE_APPLICATION_REVERSED' | 'RENT_PREPAYMENT_RECORDED' | 'PREPAID_RENT_REFUND_PROPOSED' | 'PREPAID_RENT_REFUND_APPROVED' | 'PREPAID_RENT_REFUND_COMPLETED' | 'PREPAID_RENT_REFUND_REVERSED' | 'FINANCIAL_REVIEW_OPENED' | 'FINANCIAL_REVIEW_RESOLVED' | 'WORKSPACE_RESET' | 'RENT_PERIODS_ENSURED' | 'RENT_RATE_SCHEDULED' | 'RENT_RATE_EDITED' | 'RENT_RATE_CANCELED' | 'UTILITY_RATE_SCHEDULED' | 'UTILITY_RATE_EDITED' | 'UTILITY_RATE_CANCELED'
   entityType: 'PROTOTYPE' | 'METER_READING' | 'CHARGE' | 'PAYMENT' | 'PAYMENT_ALLOCATION' | 'ROOM_CHANGE_REQUEST' | 'RENT_OBLIGATION' | 'ADVANCE_APPLICATION' | 'RENT_PREPAYMENT' | 'PREPAID_RENT_REFUND' | 'FINANCIAL_REVIEW_CASE' | 'RENT_RATE' | 'UTILITY_RATE'
   entityId: string
   reason: string

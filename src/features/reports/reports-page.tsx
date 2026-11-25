@@ -6,7 +6,7 @@ import { roomHasPending, selectRoomFinance } from '@/domain/calculations/room-fi
 import { ROOM_PAYMENT_STATUS_LABELS } from '@/lib/labels'
 import { roomReportCsv } from './room-report'
 import { PendingPaymentsDialog } from '@/features/dashboard/pending-payments-dialog'
-import { PageHeader, PreviewNotice, StatCard } from '@/components/shared/page'
+import { PageHeader, StatCard } from '@/components/shared/page'
 import { AnimatedNumber } from '@/components/shared/animated-number'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PaginatedDataTable } from '@/components/shared/table-pagination'
@@ -43,6 +43,7 @@ const changeLabels: Record<AuditEvent['action'], string> = {
   PREPAID_RENT_REFUND_COMPLETED: 'Prepaid rent refund completed',
   PREPAID_RENT_REFUND_REVERSED: 'Prepaid rent refund reversed',
   FINANCIAL_REVIEW_OPENED: 'Financial review opened',
+  FINANCIAL_REVIEW_RESOLVED: 'Financial review resolved',
   WORKSPACE_RESET: 'Test workspace records cleared',
   RENT_PERIODS_ENSURED: 'Rent periods generated through the current date',
   RENT_RATE_SCHEDULED: 'Future rent rate scheduled',
@@ -63,7 +64,6 @@ export default function Reports() {
   const roomRows = selectRoomFinance(data, occupancyDate, roomPeriod)
   const allRoomRows = selectRoomFinance(data, occupancyDate)
   const pendingRoom = pendingRoomId ? allRoomRows.find(room => room.id === pendingRoomId) : undefined
-  const roomTotals = selectSummary(data, occupancyDate, roomPeriod)
   const summary = selectSummary(data, occupancyDate, currentBillingPeriodId(data, occupancyDate))
   const periods = billingPeriods.map(period => ({ ...period, summary: selectSummary(data, occupancyDate, period.id) }))
   const currentRate = activeElectricityRate(data, occupancyDate)

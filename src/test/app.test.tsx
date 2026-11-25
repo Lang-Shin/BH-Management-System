@@ -382,7 +382,6 @@ describe('admin workspace integration', () => {
     const fullySettled = within(report).getByRole('row', { name: /Room 1/ })
     expect(fullySettled).toHaveTextContent('NONE')
     expect(within(fullySettled).queryByRole('button')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Room report reconciliation')).toHaveTextContent('billed ₱15,225.00 · applied ₱11,525.00 · known outstanding ₱3,700.00 · 2 electricity bills awaiting a meter reading')
     expect(screen.getByRole('table', { name: 'Monthly summary' })).toHaveTextContent('Electricity awaiting reading')
     expect(screen.getByRole('button', { name: 'Download room CSV' })).toBeInTheDocument()
     expect(screen.getByText('Monthly rent').closest('div')).toHaveTextContent('₱3,500.00 (8 rooms) · ₱4,000.00 (6 rooms) · ₱5,000.00 (1 room)')
@@ -396,7 +395,6 @@ describe('admin workspace integration', () => {
     expect(settledRoom).toHaveTextContent('Paid')
     expect(settledRoom).toHaveTextContent('NONE')
     expect(within(settledRoom).queryByRole('button')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Room report reconciliation')).toHaveTextContent('billed ₱19,142.00 · applied ₱8,086.00 · known outstanding ₱11,056.00')
 
     await user.click(within(report).getByRole('button', { name: 'View Details for Room 4' }))
     const dialog = screen.getByRole('dialog', { name: 'Room 4 · Pending Payments' })
@@ -490,7 +488,6 @@ describe('admin workspace integration', () => {
     expect(within(overview).getByRole('heading', { name: 'Total billed' }).closest('[data-slot="card"]')).toHaveTextContent('₱15,550.00')
     expect(within(overview).getByRole('heading', { name: 'Total collected' }).closest('[data-slot="card"]')).toHaveTextContent('₱15,550.00')
     await user.click(within(nav).getByRole('link', { name: 'Reports & Settings' }))
-    expect(await screen.findByLabelText('Room report reconciliation')).toHaveTextContent('billed ₱15,550.00 · applied ₱15,550.00 · known outstanding ₱0.00 · 1 electricity bill awaiting a meter reading')
   })
 
   it('searches, filters, and paginates the transaction workspace with the real payment data', async () => {

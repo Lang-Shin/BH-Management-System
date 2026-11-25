@@ -8,6 +8,7 @@ import { PrototypeProvider } from '@/app/providers/prototype-provider'
 import { TENANT_DEMO_STORAGE_KEY } from '@/app/providers/tenant-demo'
 import { createDemoData, DEMO_DATE, OCCUPANCY_DATE } from '@/data/fixtures/demo'
 import { localStorageRepository, STORAGE_KEY } from '@/data/repositories/local-storage-repository'
+import { DISMISSED_NOTICES_STORAGE_KEY } from '@/hooks/use-dismissed-notices'
 import { approveRoomChangeRequest, submitRoomChangeRequest } from '@/domain/calculations/room-change-requests'
 import { prepareMoveInPayment } from '@/domain/calculations/move-in'
 import { prototypeReducer } from '@/app/state/prototype-reducer'
@@ -105,15 +106,60 @@ describe('tenant room change request UI', () => {
 })
 
 describe('billing room change review flag', () => {
-  it('shows approved mid-period transfers without posting rent or proration', async () => {
+  it('shows and dismisses approved mid-period transfer notes without changing records', async () => {
+    const user = userEvent.setup()
     const first = submitRoomChangeRequest(createDemoData(), { tenantId: 'tenant-1', requestedRoomId: 'room-13', requestedStartDate: DEMO_DATE, reason: 'Need more space' }, DEMO_DATE)
     if (!first.ok) throw new Error('request failed')
     const approved = approveRoomChangeRequest(first.data, first.request.id, { effectiveDate: DEMO_DATE, note: 'Approved after review', billingReviewAcknowledged: true, decidedAt: DEMO_DATE })
     if (!approved.ok) throw new Error('approval failed')
     await localStorageRepository.save(approved.data)
-    renderApp('/billing')
+    const before = JSON.stringify(approved.data.charges)
+    const beforePayments = JSON.stringify(approved.data.payments)
+    const view = renderApp('/billing')
     expect(await screen.findByText('Room change billing review')).toBeInTheDocument()
     expect(screen.getByText(/Alex Rivera: Room 1.*Room 06.*effective Nov 13, 2026/)).toBeInTheDocument()
+    const notice = screen.getByText('Room change billing review').closest('.room-change-billing-review')!
+    await user.click(within(notice as HTMLElement).getByRole('button', { name: /Dismiss transfer note for Alex Rivera/ }))
+    expect(await screen.findByRole('button', { name: 'View transfer notes (1)' })).toBeInTheDocument()
+    const dismissedIds = JSON.parse(localStorage.getItem(DISMISSED_NOTICES_STORAGE_KEY) ?? '{}').ids as string[]
+    expect(dismissedIds).toContain(`billing-room-change:period-nov:${first.request.id}`)
+    expect(JSON.stringify(stored().charges)).toBe(before)
+    expect(JSON.stringify(stored().payments)).toBe(beforePayments)
+
+    view.unmount()
+    renderApp('/billing')
+    expect(await screen.findByRole('button', { name: 'View transfer notes (1)' })).toBeInTheDocument()
+    expect(screen.queryByText('Room change billing review')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'View transfer notes (1)' }))
+    expect(screen.getByText('Room change billing review')).toBeInTheDocument()
+  })
+
+  it('dismisses unrelated transfer notes independently', async () => {
+    const user = userEvent.setup()
+    const base = createDemoData()
+    const first = submitRoomChangeRequest(base, { tenantId: 'tenant-1', requestedRoomId: 'room-13', requestedStartDate: DEMO_DATE, reason: 'Need more space' }, DEMO_DATE)
+    if (!first.ok) throw new Error('first request failed')
+    const firstApproved = approveRoomChangeRequest(first.data, first.request.id, { effectiveDate: DEMO_DATE, note: 'Approved', billingReviewAcknowledged: true, decidedAt: DEMO_DATE })
+    if (!firstApproved.ok) throw new Error('first approval failed')
+    const withTenant = prototypeReducer(firstApproved.data, { type: 'tenant/created', asOf: DEMO_DATE, draft: {
+      name: 'Second Transfer Tenant', email: 'second.transfer@example.com', phone: '', address: '', notes: '', roomId: 'room-14', moveInDate: DEMO_DATE,
+    } })
+    const secondTenant = withTenant.tenants.find(tenant => tenant.email === 'second.transfer@example.com')!
+    const secondObligation = withTenant.moveInObligations.find(item => item.roomId === 'room-14')!
+    const paidSecond = prepareMoveInPayment(withTenant, { obligationId: secondObligation.id, categories: ['ADVANCE', 'SECURITY_DEPOSIT'], paidOn: DEMO_DATE })
+    if (!paidSecond.ok) throw new Error(paidSecond.reason)
+    const second = submitRoomChangeRequest(paidSecond.data, { tenantId: secondTenant.id, requestedRoomId: 'room-15', requestedStartDate: '2026-11-14', reason: 'Need different space' }, DEMO_DATE)
+    if (!second.ok) throw new Error('second request failed')
+    const secondApproved = approveRoomChangeRequest(second.data, second.request.id, { effectiveDate: '2026-11-14', note: 'Approved', billingReviewAcknowledged: true, decidedAt: DEMO_DATE })
+    if (!secondApproved.ok) throw new Error('second approval failed')
+    await localStorageRepository.save(secondApproved.data)
+    renderApp('/billing')
+    await screen.findByText('Room change billing review')
+    await user.click(screen.getByRole('button', { name: /Dismiss transfer note for Alex Rivera/ }))
+    expect(screen.queryByRole('button', { name: /Dismiss transfer note for Alex Rivera/ })).not.toBeInTheDocument()
+    expect(screen.getByText(/Second Transfer Tenant: Room 07/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'View dismissed (1)' }))
+    expect(screen.getAllByText('Dismissed')).toHaveLength(1)
   })
 })
 

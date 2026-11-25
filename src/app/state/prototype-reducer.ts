@@ -21,6 +21,7 @@ import { prepareShortStayAdvanceRefund } from '@/domain/calculations/advance-ref
 import { prepareUnifiedCorrection } from '@/domain/calculations/transaction-correction'
 import { approvePrepaidRefund, completePrepaidRefund, preparePrepaidRefundProposal, reversePrepaidRefund } from '@/domain/calculations/prepaid-rent-refund'
 import { openFinancialReviewCase } from '@/domain/calculations/rent-schedule'
+import { resolveFinancialReview } from '@/domain/calculations/financial-review-resolution'
 
 export function prototypeReducer(state: PrototypeData, action: StateAction): PrototypeData {
   switch (action.type) {
@@ -237,6 +238,13 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
     }
     case 'roomChange/reservationRescheduled': {
       const result = rescheduleApprovedRoomChangeRequest(state, action.requestId, action.effectiveDate, action.reason, action.asOf)
+      return result.ok ? result.data : state
+    }
+    case 'financialReview/resolved': {
+      const result = resolveFinancialReview(state, {
+        reviewId: action.reviewId, reason: action.reason, acknowledged: action.acknowledged,
+        asOf: action.asOf ?? DEFAULT_ACTION_DATE,
+      })
       return result.ok ? result.data : state
     }
     case 'occupancy/dateChanged':

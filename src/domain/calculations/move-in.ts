@@ -109,6 +109,7 @@ export function reconcileOccupancy(
           id: `cycle-${room.id}-${startedAt}`, roomId: room.id, startedAt, endedAt: null, status: 'ACTIVE',
           rentSchedule: 'ANNIVERSARY', rentAnchorDate, rentAnchorDay: anchorDay,
           cycleOrigin: options.createMoveInObligations ? 'NEW_MOVE_IN' : 'TRANSFER',
+          transferSourceAssignmentId: transfer?.sourceAssignment.id ?? null,
           createdAt: asOf, updatedAt: asOf,
         }
         createdCycle = true
@@ -127,7 +128,9 @@ export function reconcileOccupancy(
         } else if (createdCycle && cycle.rentSchedule === 'ANNIVERSARY') {
           data = ensureFirstRentalPeriod(data, cycle, 'REGULAR')
         }
-        if (existingCycle && (transfer.sourceHasPaidOrPrepaidCoverage
+        const cycleCreatedByThisTransfer = Boolean(transfer && existingCycle
+          && existingCycle.transferSourceAssignmentId === transfer.sourceAssignment.id)
+        if (existingCycle && !cycleCreatedByThisTransfer && (transfer.sourceHasPaidOrPrepaidCoverage
           || (existingCycle.rentSchedule === 'ANNIVERSARY' && transfer.sourceCycle?.rentAnchorDate
             && existingCycle.rentAnchorDate !== transfer.sourceCycle.rentAnchorDate))) {
           const destinationPeriod = rentalPeriodsForCycle(data, existingCycle.id)
