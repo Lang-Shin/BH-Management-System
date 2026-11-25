@@ -84,7 +84,6 @@ export default function Reports() {
 
   return <>
     <PageHeader title="Reports & Settings" description="See your monthly totals and find the house settings." />
-    <PreviewNotice>Reports are derived from the records in this workspace. Empty months display zero totals.</PreviewNotice>
     <section className="grid gap-5 xl:grid-cols-3" aria-label="Monthly money overview">
       <StatCard label="Money received" value={formatMoney(summary.received)} detail="All payments received in November." icon={Wallet} />
       <StatCard label="Already paid" value={formatMoney(summary.applied)} detail="Paid toward November’s bills." icon={ReceiptText} />
@@ -102,7 +101,6 @@ export default function Reports() {
     ]} /></section>
     <section className="mt-8" aria-labelledby="room-report-title">
       <h2 id="room-report-title" className="text-xl font-semibold">Room financial summary</h2>
-      <p className="mt-2 text-sm text-muted-foreground">Individual charges grouped by historical room context, not joint liability. Total billed, total paid, and payment status describe the selected report month. Electricity without a current reading is unresolved and has no peso amount. Pending Payment checks every unpaid or unresolved billing period for the room. Unallocated advances are not counted as bill payments.</p>
       <div className="my-5 flex flex-wrap items-end justify-between gap-4"><div><label htmlFor="room-report-period" className="mb-2 block text-sm font-semibold">Report month</label><select id="room-report-period" value={roomPeriod} onChange={event => setRoomPeriod(event.target.value)} className="min-h-12 max-w-full rounded-lg border bg-card px-3">{billingPeriods.map(period => <option key={period.id} value={period.id}>{period.label}</option>)}</select></div><Button variant="outline" onClick={downloadRoomReport}><Download aria-hidden="true" />Download room CSV</Button></div>
       <PaginatedDataTable rows={roomRows} resetKey={roomPeriod} recordLabel="rooms" caption="Room financial summary" columns={[
         { key: 'room', label: 'Room', render: row => <span className="font-semibold">{row.context.label}</span> },
@@ -116,7 +114,6 @@ export default function Reports() {
         } },
         { key: 'status', label: 'Payment status', render: row => <StatusBadge status={ROOM_PAYMENT_STATUS_LABELS[row.paymentStatus]} /> },
       ]} />
-      <p className="mt-4 text-sm" aria-label="Room report reconciliation">All room/context totals: billed {formatMoney(roomTotals.billed)} · applied {formatMoney(roomTotals.applied)} · known outstanding {formatMoney(roomTotals.outstanding)}{roomTotals.unresolved > 0 ? ` · ${roomTotals.unresolved} electricity ${roomTotals.unresolved === 1 ? 'bill' : 'bills'} awaiting a meter reading (amount not included)` : ''}. Includes any room-needs-review rows. Total billed excludes uncalculated electricity. Pending Payment uses all unpaid or unresolved billing periods, while the other columns describe {data.billingPeriods.find(period => period.id === roomPeriod)?.label ?? 'the selected month'}. Cash received is reported separately in Monthly summary.</p>
       {pendingRoom && <PendingPaymentsDialog key={pendingRoom.id} data={data} room={pendingRoom} asOf={occupancyDate} onClose={() => setPendingRoomId(null)} onReturnFocus={() => pendingTrigger.current?.focus()} />}
     </section>
     <Card className="mt-8 shadow-none"><CardHeader><CardTitle>House settings</CardTitle><CardDescription>Rates and the advance policy are managed in Billing. Other settings remain view-only.</CardDescription></CardHeader><CardContent><dl className="grid gap-6 text-base sm:grid-cols-2">{([
