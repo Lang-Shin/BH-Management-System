@@ -1,5 +1,6 @@
 import type { ChargeCategory, CorrectionSettlementStatus, DepositDisposition, PrototypeData } from '@/domain/types/models'
 import type { RatePlan } from '@/domain/calculations/billing-rates'
+import type { RentRateChangeIntent } from '@/domain/calculations/rent-rate-management'
 import type { RoomDraft } from '@/domain/calculations/room-management'
 import type { TenantDraft } from '@/domain/calculations/tenant-management'
 import type { MeterInitializationInput } from '@/domain/calculations/meter-initialization'
@@ -15,6 +16,16 @@ export type PrototypeAction =
   | { type: 'tenant/movedOut'; tenantId: string; asOf?: string; refundAdvance?: { refundedOn: string; reason: string } }
   | { type: 'tenant/deleted'; tenantId: string; asOf?: string }
   | { type: 'rates/planned'; plan: RatePlan }
+  | {
+      type: 'rates/scheduledChange'
+      intent: RentRateChangeIntent
+      categoryId: 'RATE_3500' | 'RATE_4000' | 'RATE_5000'
+      amountCents?: number
+      reason?: string
+      expectedRateId?: string
+      expectedRateRevision?: number
+      asOf?: string
+    }
   | { type: 'room/created'; draft: RoomDraft; asOf?: string }
   | { type: 'room/updated'; roomId: string; draft: RoomDraft; asOf?: string }
   | { type: 'room/deleted'; roomId: string; asOf?: string }

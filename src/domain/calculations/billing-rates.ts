@@ -87,12 +87,17 @@ export function scheduledWashingRate(data: PrototypeAppState, asOf: string): Uti
   return earliestFuture(data.washingRates, asOf)
 }
 
+/** Canceled and replaced schedules remain in history but are never eligible to become active. */
+export function eligibleRoomRentRate(rate: RoomRentRate): boolean {
+  return !rate.canceledOn && !rate.supersededOn
+}
+
 export function activeRoomRentRate(data: PrototypeAppState, categoryId: RoomCategoryId, asOf: string): RoomRentRate | undefined {
-  return latestEffective(data.roomRentRates.filter(rate => rate.categoryId === categoryId), asOf)
+  return latestEffective(data.roomRentRates.filter(rate => rate.categoryId === categoryId && eligibleRoomRentRate(rate)), asOf)
 }
 
 export function scheduledRoomRentRate(data: PrototypeAppState, categoryId: RoomCategoryId, asOf: string): RoomRentRate | undefined {
-  return earliestFuture(data.roomRentRates.filter(rate => rate.categoryId === categoryId), asOf)
+  return earliestFuture(data.roomRentRates.filter(rate => rate.categoryId === categoryId && eligibleRoomRentRate(rate)), asOf)
 }
 
 export function activeRoomRentRates(data: PrototypeAppState, asOf: string): RoomRentRate[] {
@@ -176,11 +181,11 @@ export function planRateChange(data: PrototypeAppState, input: RatePlanInput, as
         errors.general = 'A rent-rate category has no active configuration. The change cannot be scheduled safely.'
         return { ok: false, errors }
       }
-      const scheduled = data.roomRentRates.find(rate => rate.categoryId === categoryId && rate.effectiveFrom === effectiveFrom)
+      const scheduled = data.roomRentRates.find(rate => rate.categoryId === categoryId && rate.effectiveFrom === effectiveFrom && eligibleRoomRentRate(rate))
       const previousEffective = scheduled?.monthlyRentCents ?? active.monthlyRentCents
       const newAmount = input.values[categoryId]
       if (scheduled && newAmount === active.monthlyRentCents) {
-        errors[categoryId] = 'Enter a different future amount. Canceling a scheduled change is not available in this prototype.'
+        errors[categoryId] = 'Enter a different future amount.'
       } else if (newAmount !== previousEffective) {
         changes.push({
           key: categoryId,
@@ -212,7 +217,7 @@ export function planRateChange(data: PrototypeAppState, input: RatePlanInput, as
     ? input.kind === 'ELECTRICITY' ? (scheduled as ElectricityRate).rateCentsPerKwh : (scheduled as UtilityRate).rateCents
     : null
   if (scheduledCents !== null && input.amountCents === currentCents) {
-    return { ok: false, errors: { amount: 'Enter a different future amount. Canceling a scheduled change is not available in this prototype.' } }
+    return { ok: false, errors: { amount: 'Enter a different future amount.' } }
   }
   if (input.amountCents === (scheduledCents ?? currentCents)) return { ok: false, errors: { general: 'No rate change to review.' } }
 
@@ -240,7 +245,7 @@ export function applyRateChange(data: PrototypeAppState, plan: RatePlan): Protot
     let roomRentRates = data.roomRentRates
     for (const categoryId of ROOM_RATE_CATEGORY_IDS) {
       const active = activeRoomRentRate(data, categoryId, plan.recordedOn)
-      const scheduled = data.roomRentRates.find(rate => rate.categoryId === categoryId && rate.effectiveFrom === plan.effectiveFrom)
+      const scheduled = data.roomRentRates.find(rate => rate.categoryId === categoryId && rate.effectiveFrom === plan.effectiveFrom && eligibleRoomRentRate(rate))
       const target = scheduled?.monthlyRentCents ?? active?.monthlyRentCents
       if (!active || plan.values[categoryId] === target) continue
       if (scheduled) {

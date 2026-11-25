@@ -1,4 +1,4 @@
-﻿import { useRef, useState, type ReactNode } from 'react'
+﻿import { useCallback, useState, type ReactNode } from 'react'
 import { ChevronRight, Droplets, House, Pencil, WashingMachine, Zap, type LucideIcon } from 'lucide-react'
 import { Dialog, DialogTrigger } from '@/components/ui/dialog'
 import { usePrototype } from '@/hooks/use-prototype'
@@ -17,19 +17,19 @@ function RateCard({ title, icon: Icon, value, unit, detail, scheduled, renderDia
   unit: string
   detail: string
   scheduled?: string
-  renderDialog: (key: number) => ReactNode
+  renderDialog: (key: number, close: () => void) => ReactNode
 }) {
   const [open, setOpen] = useState(false)
   const [dialogVersion, setDialogVersion] = useState(0)
-  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const closeDialog = useCallback(() => setOpen(false), [])
   function changeOpen(nextOpen: boolean) {
     if (nextOpen) setDialogVersion(version => version + 1)
-    setOpen(nextOpen)
-    if (!nextOpen) window.setTimeout(() => triggerRef.current?.focus(), 0)
+    if (nextOpen) setOpen(true)
+    else closeDialog()
   }
   return <Dialog open={open} onOpenChange={changeOpen}>
     <DialogTrigger asChild>
-      <button ref={triggerRef} type="button" className="billing-rate-card">
+      <button type="button" className="billing-rate-card">
         <span className="billing-rate-card-top">
           <span className="billing-rate-icon"><Icon aria-hidden="true" /></span>
           <span className="billing-rate-edit"><Pencil aria-hidden="true" />Edit rate<ChevronRight aria-hidden="true" /></span>
@@ -41,7 +41,7 @@ function RateCard({ title, icon: Icon, value, unit, detail, scheduled, renderDia
         {scheduled && <span className="billing-rate-scheduled">{scheduled}</span>}
       </button>
     </DialogTrigger>
-    {renderDialog(dialogVersion)}
+    {renderDialog(dialogVersion, closeDialog)}
   </Dialog>
 }
 
@@ -64,7 +64,7 @@ export function BillingRatesSection() {
     : undefined
 
   function dialog(kind: 'RENT' | 'ELECTRICITY' | 'WATER' | 'WASHING_MACHINE', title: string) {
-    return (key: number) => <BillingRateDialog key={key} kind={kind} title={title} onSaved={setNotice} />
+    return (key: number, close: () => void) => <BillingRateDialog key={key} kind={kind} title={title} onSaved={setNotice} onClose={close} />
   }
 
   return <section className="mt-8" aria-labelledby="billing-rates-title">

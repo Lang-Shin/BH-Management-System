@@ -15,8 +15,8 @@ import { usePrototype } from '@/hooks/use-prototype'
 import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { selectSummary } from '@/domain/calculations/summary'
 import { calendarBillingPeriods, currentBillingPeriodId } from '@/domain/calculations/billing-periods'
-import { formatDate, formatMoney } from '@/lib/format'
-import { activeElectricityRate, activeRoomRentRate, activeWashingRate, activeWaterRate, ROOM_RATE_CATEGORY_IDS } from '@/domain/calculations/billing-rates'
+import { formatDate, formatMoney, formatMonthYear } from '@/lib/format'
+import { activeElectricityRate, activeRoomRentRate, activeWashingRate, activeWaterRate, ROOM_RATE_CATEGORY_IDS, scheduledRoomRentRates } from '@/domain/calculations/billing-rates'
 import type { AuditEvent } from '@/domain/types/models'
 
 const changeLabels: Record<AuditEvent['action'], string> = {
@@ -45,6 +45,9 @@ const changeLabels: Record<AuditEvent['action'], string> = {
   FINANCIAL_REVIEW_OPENED: 'Financial review opened',
   WORKSPACE_RESET: 'Test workspace records cleared',
   RENT_PERIODS_ENSURED: 'Rent periods generated through the current date',
+  RENT_RATE_SCHEDULED: 'Future rent rate scheduled',
+  RENT_RATE_EDITED: 'Pending rent rate replaced',
+  RENT_RATE_CANCELED: 'Scheduled rent rate canceled',
 }
 
 export default function Reports() {
@@ -64,6 +67,7 @@ export default function Reports() {
   const waterRate = activeWaterRate(data, occupancyDate)
   const washingRate = activeWashingRate(data, occupancyDate)
   const roomRates = ROOM_RATE_CATEGORY_IDS.map(categoryId => ({ categoryId, rate: activeRoomRentRate(data, categoryId, occupancyDate), roomCount: data.rooms.filter(room => room.categoryId === categoryId).length })).filter(item => item.rate)
+  const futureRoomRates = scheduledRoomRentRates(data, occupancyDate)
 
   function downloadRoomReport() {
     const blob = new Blob(['\uFEFF', roomReportCsv(data, occupancyDate, roomPeriod)], { type: 'text/csv;charset=utf-8;' })
@@ -114,7 +118,7 @@ export default function Reports() {
     </section>
     <Card className="mt-8 shadow-none"><CardHeader><CardTitle>House settings</CardTitle><CardDescription>Rates and the advance policy are managed in Billing. Other settings remain view-only.</CardDescription></CardHeader><CardContent><dl className="grid gap-6 text-base sm:grid-cols-2">{([
       ['Currency', 'Philippine peso (₱)'],
-      ['Monthly rent', roomRates.map(item => `${formatMoney(item.rate!.monthlyRentCents)} (${item.roomCount} ${item.roomCount === 1 ? 'room' : 'rooms'})`).join(' · ')],
+      ['Monthly rent', <><span>{roomRates.map(item => `${formatMoney(item.rate!.monthlyRentCents)} (${item.roomCount} ${item.roomCount === 1 ? 'room' : 'rooms'})`).join(' \u00b7 ')}</span>{futureRoomRates.length > 0 && <span className="mt-1 block text-xs text-muted-foreground">Scheduled {formatMonthYear(futureRoomRates[0]!.effectiveFrom)}: {futureRoomRates.map(rate => `${formatMoney(rate.monthlyRentCents)} (${data.rooms.filter(room => room.categoryId === rate.categoryId).length} rooms)`).join(' \u00b7 ')}</span>}</>],
       ['When rent is due', 'To be confirmed'],
       ['Electricity price', currentRate ? <><AnimatedNumber value={formatMoney(currentRate.rateCentsPerKwh)} /> per kWh, starting {formatDate(currentRate.effectiveFrom)}</> : 'No price set'],
       ['Sharing the electricity bill', 'Who uses each meter and how to share the bill still need to be agreed'],

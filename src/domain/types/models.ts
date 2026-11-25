@@ -87,6 +87,23 @@ export interface RoomRentRate {
   monthlyRentCents: number
   effectiveFrom: string
   recordedOn: string
+  /** Version identity for a category/effective-date schedule. Older snapshots default to 1. */
+  revision?: number
+  /** Administrator identity captured by the server for new changes. */
+  recordedBy?: string
+  /** Reason for the schedule or edit that created this version. */
+  reason?: string
+  /** Direct predecessor when an administrator edits a pending schedule. */
+  supersedesRateId?: string
+  /** A superseded record stays in history but can never become effective. */
+  supersededOn?: string
+  supersededBy?: string
+  supersededReason?: string
+  supersededByRateId?: string
+  /** A canceled record stays in history but can never become effective. */
+  canceledOn?: string
+  canceledBy?: string
+  cancelReason?: string
 }
 
 export interface UtilityRate {
@@ -447,8 +464,8 @@ export interface AuditEvent {
   id: string
   actorId: string
   occurredOn: string
-  action: 'DEMO_SEEDED' | 'READING_CORRECTED' | 'CHARGE_CORRECTED' | 'PAYMENT_CORRECTED' | 'ALLOCATION_REVERSED' | 'ELECTRICITY_PAYMENT_RECORDED' | 'ROOM_PAYMENT_RECORDED' | 'MOVE_IN_PAYMENT_RECORDED' | 'MOVE_IN_POLICY_UPDATED' | 'METER_INITIALIZED' | 'ROOM_CHANGE_REQUESTED' | 'ROOM_CHANGE_CANCELLED' | 'ROOM_CHANGE_APPROVED' | 'ROOM_CHANGE_REJECTED' | 'ROOM_CHANGE_EXPIRED' | 'ROOM_CHANGE_RESERVATION_CANCELLED' | 'ROOM_CHANGE_RESCHEDULED' | 'ADVANCE_REFUNDED' | 'ADVANCE_APPLIED' | 'ADVANCE_APPLICATION_REVERSED' | 'RENT_PREPAYMENT_RECORDED' | 'PREPAID_RENT_REFUND_PROPOSED' | 'PREPAID_RENT_REFUND_APPROVED' | 'PREPAID_RENT_REFUND_COMPLETED' | 'PREPAID_RENT_REFUND_REVERSED' | 'FINANCIAL_REVIEW_OPENED' | 'WORKSPACE_RESET' | 'RENT_PERIODS_ENSURED'
-  entityType: 'PROTOTYPE' | 'METER_READING' | 'CHARGE' | 'PAYMENT' | 'PAYMENT_ALLOCATION' | 'ROOM_CHANGE_REQUEST' | 'RENT_OBLIGATION' | 'ADVANCE_APPLICATION' | 'RENT_PREPAYMENT' | 'PREPAID_RENT_REFUND' | 'FINANCIAL_REVIEW_CASE'
+  action: 'DEMO_SEEDED' | 'READING_CORRECTED' | 'CHARGE_CORRECTED' | 'PAYMENT_CORRECTED' | 'ALLOCATION_REVERSED' | 'ELECTRICITY_PAYMENT_RECORDED' | 'ROOM_PAYMENT_RECORDED' | 'MOVE_IN_PAYMENT_RECORDED' | 'MOVE_IN_POLICY_UPDATED' | 'METER_INITIALIZED' | 'ROOM_CHANGE_REQUESTED' | 'ROOM_CHANGE_CANCELLED' | 'ROOM_CHANGE_APPROVED' | 'ROOM_CHANGE_REJECTED' | 'ROOM_CHANGE_EXPIRED' | 'ROOM_CHANGE_RESERVATION_CANCELLED' | 'ROOM_CHANGE_RESCHEDULED' | 'ADVANCE_REFUNDED' | 'ADVANCE_APPLIED' | 'ADVANCE_APPLICATION_REVERSED' | 'RENT_PREPAYMENT_RECORDED' | 'PREPAID_RENT_REFUND_PROPOSED' | 'PREPAID_RENT_REFUND_APPROVED' | 'PREPAID_RENT_REFUND_COMPLETED' | 'PREPAID_RENT_REFUND_REVERSED' | 'FINANCIAL_REVIEW_OPENED' | 'WORKSPACE_RESET' | 'RENT_PERIODS_ENSURED' | 'RENT_RATE_SCHEDULED' | 'RENT_RATE_EDITED' | 'RENT_RATE_CANCELED'
+  entityType: 'PROTOTYPE' | 'METER_READING' | 'CHARGE' | 'PAYMENT' | 'PAYMENT_ALLOCATION' | 'ROOM_CHANGE_REQUEST' | 'RENT_OBLIGATION' | 'ADVANCE_APPLICATION' | 'RENT_PREPAYMENT' | 'PREPAID_RENT_REFUND' | 'FINANCIAL_REVIEW_CASE' | 'RENT_RATE'
   entityId: string
   reason: string
   /** Serialized before/after snapshots preserve a future correction trail. */

@@ -12,6 +12,7 @@ import {
 import { formatDate, formatMoney, formatMonthYear } from '@/lib/format'
 import { roomCategoryLabel } from '@/lib/room-rates'
 import type { RoomCategoryId } from '@/domain/types/models'
+import { RentRateManager } from './rent-rate-manager'
 
 type RateCategory = 'RENT' | 'ELECTRICITY' | 'WATER' | 'WASHING_MACHINE'
 
@@ -36,8 +37,13 @@ function utilityCents(rate: { rateCentsPerKwh: number } | { rateCents: number } 
   return rate ? ('rateCentsPerKwh' in rate ? rate.rateCentsPerKwh : rate.rateCents) : undefined
 }
 
-export function BillingRateDialog({ kind, title, onSaved }: { kind: RateCategory; title: string; onSaved: (message: string) => void }) {
-  const { data, dispatch } = usePrototype()
+export function BillingRateDialog({ kind, title, onSaved, onClose }: { kind: RateCategory; title: string; onSaved: (message: string) => void; onClose: () => void }) {
+  if (kind === 'RENT') return <RentRateManager onSaved={onSaved} onClose={onClose} />
+  return <UtilityRateDialog kind={kind} title={title} onSaved={onSaved} onClose={onClose} />
+}
+
+function UtilityRateDialog({ kind, title, onSaved, onClose }: { kind: RateCategory; title: string; onSaved: (message: string) => void; onClose: () => void }) {
+  const { data, commitAction } = usePrototype()
   const occupancyDate = useOccupancyDate()
   const effectiveFrom = nextRateEffectiveFrom(data, occupancyDate)
   const activeRentRates = ROOM_RATE_CATEGORY_IDS.map(categoryId => ({ categoryId, rate: activeRoomRentRate(data, categoryId, occupancyDate) }))
@@ -60,6 +66,7 @@ export function BillingRateDialog({ kind, title, onSaved }: { kind: RateCategory
   const [mode, setMode] = useState<'edit' | 'review'>('edit')
   const [plan, setPlan] = useState<RatePlan | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState(false)
   const submitting = useRef(false)
   const hasScheduled = kind === 'RENT' ? scheduledRentRates.length > 0 : Boolean(scheduledUtility)
 
@@ -111,11 +118,19 @@ export function BillingRateDialog({ kind, title, onSaved }: { kind: RateCategory
     setMode('review')
   }
 
-  function confirm() {
+  async function confirm() {
     if (!plan || submitting.current) return
     submitting.current = true
-    dispatch({ type: 'rates/planned', plan })
+    setSaving(true)
+    const accepted = await commitAction({ type: 'rates/planned', plan })
+    setSaving(false)
+    if (!accepted) {
+      submitting.current = false
+      setErrors({ general: 'The server did not confirm this rate change. Review the current records and try again.' })
+      return
+    }
     onSaved(`Billing rates for ${formatMonthYear(plan.effectiveFrom)} were scheduled. Existing bills and receipts were not changed.`)
+    onClose()
   }
 
   function rateHistoryAmount(rate: typeof history[number]): string {
@@ -187,7 +202,7 @@ export function BillingRateDialog({ kind, title, onSaved }: { kind: RateCategory
         </dl>
         <p className="billing-rate-protection"><ShieldCheck aria-hidden="true" />This only changes future rate configuration. Existing bills, receipts, payments, and settled electricity readings remain unchanged.</p>
       </section>
-      <DialogFooter className="mt-5"><Button variant="outline" onClick={() => { setMode('edit'); setPlan(null) }}><ArrowLeft aria-hidden="true" />Back</Button><DialogClose asChild><Button onClick={confirm}>Confirm Changes</Button></DialogClose></DialogFooter>
+      <DialogFooter className="mt-5"><Button variant="outline" onClick={() => { setMode('edit'); setPlan(null) }} disabled={saving}><ArrowLeft aria-hidden="true" />Back</Button><Button type="button" onClick={confirm} disabled={saving} aria-busy={saving}>{saving ? 'Saving?' : 'Confirm Changes'}</Button></DialogFooter>
     </>}
   </DialogContent>
 }

@@ -2,7 +2,7 @@ import { createEmptyData } from '@/data/fixtures/empty'
 import { isPrototypeData } from '@/domain/validation/prototype-data'
 import { prototypeReducer } from '@/app/state/prototype-reducer'
 import type { PrototypeAction } from '@/app/state/actions'
-import type { PrototypeAppState } from '@/domain/types/models'
+import type { AuditEvent, PrototypeAppState } from '@/domain/types/models'
 import type { Actor } from './env'
 import { ApiError, sha256 } from './http'
 import { withServerDate } from './validation'
@@ -136,7 +136,8 @@ export class D1StateRepository {
   }
 
   async command(rawAction: PrototypeAction, actor: Actor, idempotencyKey: string, requestId: string, serverDate: string): Promise<CommandOutcome> {
-    if (rawAction.type === 'payment/corrected' || rawAction.type.startsWith('prepaidRefund/')) {
+    if (rawAction.type === 'payment/corrected' || rawAction.type.startsWith('prepaidRefund/')
+      || rawAction.type === 'rates/scheduledChange' || rawAction.type === 'rates/planned') {
       await this.requireFinancialAdministrator(actor)
     }
     if (!idempotencyKey || idempotencyKey.length < 8 || idempotencyKey.length > 200) {
@@ -231,6 +232,23 @@ export class D1StateRepository {
       next.auditEvents = next.auditEvents.map(event =>
         !priorAuditIds.has(event.id) && event.actorId === 'landlord' ? { ...event, actorId: actor.id } : event)
     }
+    let rateAuditEvents: AuditEvent[] = []
+    if (action.type === 'rates/scheduledChange' && next !== current.data) {
+      const priorAuditIds = new Set(current.data.auditEvents.map(event => event.id))
+      const priorRates = new Map(current.data.roomRentRates.map(rate => [rate.id, rate]))
+      next.auditEvents = next.auditEvents.map(event =>
+        !priorAuditIds.has(event.id) && event.actorId === 'landlord' ? { ...event, actorId: actor.id } : event)
+      rateAuditEvents = next.auditEvents.filter(event => !priorAuditIds.has(event.id) && event.entityType === 'RENT_RATE')
+      next.roomRentRates = next.roomRentRates.map(rate => {
+        const prior = priorRates.get(rate.id)
+        if (!prior) return { ...rate, recordedBy: actor.id }
+        return {
+          ...rate,
+          ...(rate.canceledOn && !prior.canceledOn ? { canceledBy: actor.id } : {}),
+          ...(rate.supersededOn && !prior.supersededOn ? { supersededBy: actor.id } : {}),
+        }
+      })
+    }
     if (next === current.data) {
       if (action.type === 'occupancy/dateChanged') {
         return { data: current.data, revision: current.revision, replayed: false }
@@ -261,6 +279,13 @@ export class D1StateRepository {
       this.db.prepare("UPDATE workspace_operations SET status = 'COMPLETED', completed_at = ? WHERE id = ?")
         .bind(now, `command-${requestId}`),
     ]
+    for (const event of rateAuditEvents) {
+      statements.push(this.db.prepare(`INSERT INTO audit_events
+        (id, workspace_id, actor_id, actor_source, action, entity_type, entity_id, reason, occurred_on, request_id, idempotency_key, before_json, after_json, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(event.id, this.workspaceId, actor.id, actor.source, event.action, event.entityType, event.entityId,
+          event.reason, event.occurredOn, requestId, idempotencyKey, event.beforeSnapshot, event.afterSnapshot, now))
+    }
     if (collection) {
       const receipt = next.receipts.find(item => item.id === collection!.result.receiptId)!
       statements.push(this.db.prepare(`INSERT INTO cash_collections
@@ -406,7 +431,7 @@ export class D1StateRepository {
     // Loopback development and the explicitly configured staging token are administrative test identities.
     // An explicitly provisioned TENANT/VIEWER/disabled identity never receives this fallback.
     if (!membership && actor.source === 'DEV' && (actor.id === 'local-dev' || actor.id === 'dev-token')) return
-    throw new ApiError(403, 'FINANCIAL_ADMIN_REQUIRED', 'Only an active workspace owner or administrator may correct transactions or authorize refunds.')
+    throw new ApiError(403, 'FINANCIAL_ADMIN_REQUIRED', 'Only an active workspace owner or administrator may change rates or authorize financial records.')
   }
 
   private projectionStatements(data: PrototypeAppState): D1PreparedStatement[] {

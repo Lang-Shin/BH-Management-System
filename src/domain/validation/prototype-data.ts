@@ -39,8 +39,23 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
   if (!rows(value, 'electricityBillObligations', r => id(r.roomId) && id(r.tenantId) && id(r.billingPeriodId)
     && id(r.meterId) && id(r.previousReadingId) && date(r.createdAt) && date(r.dueDate) && r.state === 'AWAITING_READING')) return false
   if (!rows(value, 'electricityRates', r => positive(r.rateCentsPerKwh) && date(r.effectiveFrom) && date(r.recordedOn) && text(r.label))) return false
-  if (!rows(value, 'roomRentRates', r => oneOf(r.categoryId, ['RATE_3500', 'RATE_4000', 'RATE_5000'])
-    && positive(r.monthlyRentCents) && date(r.effectiveFrom) && date(r.recordedOn))) return false
+  if (!rows(value, 'roomRentRates', r => {
+    const validReason = (reason: unknown) => text(reason) && reason.length >= 3 && reason.length <= 500
+    const canceled = r.canceledOn !== undefined || r.canceledBy !== undefined || r.cancelReason !== undefined
+    const superseded = r.supersededOn !== undefined || r.supersededBy !== undefined
+      || r.supersededReason !== undefined || r.supersededByRateId !== undefined
+    return oneOf(r.categoryId, ['RATE_3500', 'RATE_4000', 'RATE_5000'])
+      && positive(r.monthlyRentCents) && date(r.effectiveFrom) && date(r.recordedOn)
+      && (r.revision === undefined || (Number.isSafeInteger(r.revision) && (r.revision as number) >= 1))
+      && (r.recordedBy === undefined || id(r.recordedBy))
+      && (r.reason === undefined || validReason(r.reason))
+      && (r.supersedesRateId === undefined || id(r.supersedesRateId))
+      && (!canceled || (date(r.canceledOn) && id(r.canceledBy) && validReason(r.cancelReason)
+        && r.canceledOn <= r.effectiveFrom))
+      && (!superseded || (date(r.supersededOn) && id(r.supersededBy) && validReason(r.supersededReason)
+        && id(r.supersededByRateId) && r.supersededOn <= r.effectiveFrom))
+      && !(canceled && superseded)
+  })) return false
   if (!rows(value, 'waterRates', r => positive(r.rateCents) && date(r.effectiveFrom) && date(r.recordedOn))) return false
   if (!rows(value, 'washingRates', r => positive(r.rateCents) && date(r.effectiveFrom) && date(r.recordedOn))) return false
   if (!rows(value, 'billingPeriods', r => id(r.label) && date(r.startDate) && date(r.endDate) && oneOf(r.status, ['OPEN', 'CLOSED']))) return false
@@ -155,8 +170,8 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     || value.moveInPolicy.moveOutSettlement !== 'MANUAL_REVIEW'
     || !Number.isSafeInteger(value.moveInPolicy.shortStayAdvanceRefundDays) || (value.moveInPolicy.shortStayAdvanceRefundDays as number) < 0) return false
   if (!rows(value, 'auditEvents', r => id(r.actorId) && date(r.occurredOn) && id(r.entityId) && text(r.reason)
-    && oneOf(r.action, ['DEMO_SEEDED', 'READING_CORRECTED', 'CHARGE_CORRECTED', 'PAYMENT_CORRECTED', 'ALLOCATION_REVERSED', 'ELECTRICITY_PAYMENT_RECORDED', 'ROOM_PAYMENT_RECORDED', 'MOVE_IN_PAYMENT_RECORDED', 'MOVE_IN_POLICY_UPDATED', 'METER_INITIALIZED', 'ROOM_CHANGE_REQUESTED', 'ROOM_CHANGE_CANCELLED', 'ROOM_CHANGE_APPROVED', 'ROOM_CHANGE_REJECTED', 'ROOM_CHANGE_EXPIRED', 'ROOM_CHANGE_RESERVATION_CANCELLED', 'ROOM_CHANGE_RESCHEDULED', 'ADVANCE_REFUNDED', 'ADVANCE_APPLIED', 'ADVANCE_APPLICATION_REVERSED', 'RENT_PREPAYMENT_RECORDED', 'PREPAID_RENT_REFUND_PROPOSED', 'PREPAID_RENT_REFUND_APPROVED', 'PREPAID_RENT_REFUND_COMPLETED', 'PREPAID_RENT_REFUND_REVERSED', 'FINANCIAL_REVIEW_OPENED', 'WORKSPACE_RESET', 'RENT_PERIODS_ENSURED'])
-    && oneOf(r.entityType, ['PROTOTYPE', 'METER_READING', 'CHARGE', 'PAYMENT', 'PAYMENT_ALLOCATION', 'ROOM_CHANGE_REQUEST', 'RENT_OBLIGATION', 'ADVANCE_APPLICATION', 'RENT_PREPAYMENT', 'PREPAID_RENT_REFUND', 'FINANCIAL_REVIEW_CASE'])
+    && oneOf(r.action, ['DEMO_SEEDED', 'READING_CORRECTED', 'CHARGE_CORRECTED', 'PAYMENT_CORRECTED', 'ALLOCATION_REVERSED', 'ELECTRICITY_PAYMENT_RECORDED', 'ROOM_PAYMENT_RECORDED', 'MOVE_IN_PAYMENT_RECORDED', 'MOVE_IN_POLICY_UPDATED', 'METER_INITIALIZED', 'ROOM_CHANGE_REQUESTED', 'ROOM_CHANGE_CANCELLED', 'ROOM_CHANGE_APPROVED', 'ROOM_CHANGE_REJECTED', 'ROOM_CHANGE_EXPIRED', 'ROOM_CHANGE_RESERVATION_CANCELLED', 'ROOM_CHANGE_RESCHEDULED', 'ADVANCE_REFUNDED', 'ADVANCE_APPLIED', 'ADVANCE_APPLICATION_REVERSED', 'RENT_PREPAYMENT_RECORDED', 'PREPAID_RENT_REFUND_PROPOSED', 'PREPAID_RENT_REFUND_APPROVED', 'PREPAID_RENT_REFUND_COMPLETED', 'PREPAID_RENT_REFUND_REVERSED', 'FINANCIAL_REVIEW_OPENED', 'WORKSPACE_RESET', 'RENT_PERIODS_ENSURED', 'RENT_RATE_SCHEDULED', 'RENT_RATE_EDITED', 'RENT_RATE_CANCELED'])
+    && oneOf(r.entityType, ['PROTOTYPE', 'METER_READING', 'CHARGE', 'PAYMENT', 'PAYMENT_ALLOCATION', 'ROOM_CHANGE_REQUEST', 'RENT_OBLIGATION', 'ADVANCE_APPLICATION', 'RENT_PREPAYMENT', 'PREPAID_RENT_REFUND', 'FINANCIAL_REVIEW_CASE', 'RENT_RATE'])
     && nullableText(r.beforeSnapshot) && nullableText(r.afterSnapshot))) return false
 
   // Each collection and its discriminated field shapes have been checked above.
@@ -188,9 +203,13 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     .some(items => new Set(items.map(item => item.id)).size !== items.length)) return false
   if ((data.prepaidRentRefunds ?? []).some((refund, index, refunds) => refunds.findIndex(item => item.id === refund.id) !== index)) return false
   if (new Set(data.electricityRates.map(rate => rate.effectiveFrom)).size !== data.electricityRates.length
-    || new Set(data.roomRentRates.map(rate => `${rate.categoryId}:${rate.effectiveFrom}`)).size !== data.roomRentRates.length
+    || new Set(data.roomRentRates.filter(rate => !rate.canceledOn && !rate.supersededOn)
+      .map(rate => `${rate.categoryId}:${rate.effectiveFrom}`)).size
+      !== data.roomRentRates.filter(rate => !rate.canceledOn && !rate.supersededOn).length
     || new Set(data.waterRates.map(rate => rate.effectiveFrom)).size !== data.waterRates.length
     || new Set(data.washingRates.map(rate => rate.effectiveFrom)).size !== data.washingRates.length) return false
+  if (!data.roomRentRates.every(rate => !rate.supersededByRateId
+    || data.roomRentRates.some(candidate => candidate.id === rate.supersededByRateId))) return false
   const rentCategoryIds = ['RATE_3500', 'RATE_4000', 'RATE_5000'] as const
   if (!rentCategoryIds.every(categoryId => data.roomRentRates.some(rate => rate.categoryId === categoryId))
     || data.electricityRates.length === 0 || data.waterRates.length === 0 || data.washingRates.length === 0) return false
@@ -442,5 +461,6 @@ export function isPrototypeData(value: unknown): value is PrototypeAppState {
     || (a.entityType === 'ADVANCE_APPLICATION' && data.advanceApplications.some(r => r.id === a.entityId))
     || (a.entityType === 'RENT_PREPAYMENT' && data.rentPrepayments.some(r => r.id === a.entityId))
     || (a.entityType === 'PREPAID_RENT_REFUND' && (data.prepaidRentRefunds ?? []).some(r => r.id === a.entityId))
+    || (a.entityType === 'RENT_RATE' && data.roomRentRates.some(r => r.id === a.entityId))
     || (a.entityType === 'FINANCIAL_REVIEW_CASE' && data.financialReviewCases.some(r => r.id === a.entityId)))
 }

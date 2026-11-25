@@ -80,7 +80,7 @@ function categoryArray(value: unknown): ChargeCategory[] {
 const actionTypes = new Set<PrototypeAction['type']>([
   'payment/collected',
   'tenant/noteUpdated', 'tenant/created', 'tenant/updated', 'tenant/movedOut', 'tenant/deleted',
-  'rates/planned', 'room/created', 'room/updated', 'room/deleted', 'room/statusToggled',
+  'rates/planned', 'rates/scheduledChange', 'room/created', 'room/updated', 'room/deleted', 'room/statusToggled',
   'room/washingMachineUpdated', 'electricity/paymentConfirmed', 'electricity/meterInitialized',
   'room/paymentConfirmed', 'payment/corrected', 'moveIn/paymentRecorded', 'rent/prepaymentRecorded',
   'moveIn/policyUpdated', 'roomChange/requested', 'roomChange/cancelled', 'roomChange/approved',
@@ -134,8 +134,33 @@ export function parseAction(value: unknown): PrototypeAction {
     case 'tenant/deleted':
       if (!isId(action.tenantId) || !optionalIso(action.asOf)) invalid('The tenant deletion is invalid.')
       return { type: action.type, tenantId: action.tenantId, ...(action.asOf ? { asOf: action.asOf as string } : {}) }
-    case 'rates/planned':
-      return { type: action.type, plan: ratePlan(action.plan) }
+    case 'rates/planned': {
+      const plan = ratePlan(action.plan)
+      if (plan.kind === 'RENT') invalid('Rent rate changes must use the category-specific scheduled rent-rate command.')
+      return { type: action.type, plan }
+    }
+    case 'rates/scheduledChange': {
+      if (!oneOf(action.intent, ['SCHEDULE', 'EDIT', 'CANCEL']) || !oneOf(action.categoryId, roomCategories)
+        || !optionalIso(action.asOf)) invalid('The scheduled rent rate change is invalid.')
+      if (action.intent !== 'CANCEL' && !isMoney(action.amountCents)) invalid('Enter a positive monthly rent amount.')
+      if (action.reason !== undefined && !isText(action.reason, 500)) invalid('The rate change reason is invalid.')
+      if (action.intent !== 'SCHEDULE' && (typeof action.reason !== 'string' || action.reason.trim().length < 3)) {
+        invalid('Enter a reason with at least 3 characters.')
+      }
+      if (action.expectedRateId !== undefined && !isId(action.expectedRateId)) invalid('The scheduled rate identifier is invalid.')
+      if (action.expectedRateRevision !== undefined
+        && (!Number.isSafeInteger(action.expectedRateRevision) || (action.expectedRateRevision as number) < 1)) {
+        invalid('The scheduled rate revision is invalid.')
+      }
+      return {
+        type: action.type, intent: action.intent, categoryId: action.categoryId,
+        ...(action.amountCents !== undefined ? { amountCents: action.amountCents } : {}),
+        ...(action.reason !== undefined ? { reason: action.reason } : {}),
+        ...(action.expectedRateId !== undefined ? { expectedRateId: action.expectedRateId } : {}),
+        ...(action.expectedRateRevision !== undefined ? { expectedRateRevision: action.expectedRateRevision } : {}),
+        ...(action.asOf ? { asOf: action.asOf as string } : {}),
+      } as unknown as PrototypeAction
+    }
     case 'room/created':
       if (!optionalIso(action.asOf)) invalid('The effective date is invalid.')
       return { type: action.type, draft: roomDraft(action.draft), ...(action.asOf ? { asOf: action.asOf as string } : {}) }
@@ -272,6 +297,7 @@ export function withServerDate(action: PrototypeAction, serverDate: string): Pro
     case 'prepaidRefund/completed': return { ...action, refundedOn: serverDate, asOf: serverDate }
     case 'prepaidRefund/reversed': return { ...action, asOf: serverDate }
     case 'moveIn/policyUpdated': return { ...action, asOf: serverDate }
+    case 'rates/scheduledChange': return { ...action, asOf: serverDate }
     case 'occupancy/dateChanged': return { ...action, asOf: serverDate }
     default: return action
   }

@@ -7,12 +7,38 @@ import { PrototypeProvider } from '@/app/providers/prototype-provider'
 import { localStorageRepository, STORAGE_KEY } from '@/data/repositories/local-storage-repository'
 import { createDemoData } from '@/data/fixtures/demo'
 
+const RATE_1 = 'Rate category 1 — Public CR'
+const RATE_2 = 'Rate category 2 — Private CR'
+
 function renderApp(route = '/') {
   return render(<PrototypeProvider repository={localStorageRepository}><MemoryRouter initialEntries={[route]}><AppRouter /></MemoryRouter></PrototypeProvider>)
 }
 
 function savedData() {
   return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}').data
+}
+
+async function openRentRates(user: ReturnType<typeof userEvent.setup>) {
+  const section = await screen.findByRole('region', { name: 'Billing Rates' })
+  await user.click(within(section).getByRole('button', { name: /Monthly Rent Rates/ }))
+  return screen.findByRole('dialog', { name: 'Edit Monthly Rent Rates' })
+}
+
+function categoryCard(dialog: HTMLElement, name: string) {
+  return within(dialog).getByRole('article', { name })
+}
+
+async function scheduleRate(user: ReturnType<typeof userEvent.setup>, categoryName: string, amount: string) {
+  const dialog = await openRentRates(user)
+  await user.click(within(categoryCard(dialog, categoryName)).getByRole('button', { name: 'Schedule Rate' }))
+  const form = await screen.findByRole('dialog', { name: 'Schedule Monthly Rent Rate' })
+  const input = within(form).getByLabelText('Monthly rate per room')
+  await user.clear(input)
+  await user.type(input, amount)
+  await user.click(within(form).getByRole('button', { name: 'Review Changes' }))
+  const review = await screen.findByRole('dialog', { name: 'Review Rate Change' })
+  await user.click(within(review).getByRole('button', { name: 'Confirm Changes' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 }
 
 beforeEach(() => {
@@ -50,53 +76,145 @@ describe('billing rates UI', { timeout: 20000 }, () => {
     }
   })
 
-  it('reviews and schedules a rent change while preserving room categories and historical records', async () => {
+  it('shows every rental category independently and schedules one without changing the current rate or historic records', async () => {
     const user = userEvent.setup()
     const original = createDemoData()
     renderApp('/billing')
-    const section = await screen.findByRole('region', { name: 'Billing Rates' })
-    await user.click(within(section).getByRole('button', { name: /Monthly Rent Rates/ }))
-    const dialog = await screen.findByRole('dialog', { name: 'Edit Monthly Rent Rates' })
-    const currentRate = within(dialog).getByRole('region', { name: 'Current rate' })
-    expect(currentRate).toHaveTextContent('Rate Category 1 · Public CR')
-    expect(currentRate).toHaveTextContent('Rate Category 2 · Private CR')
-    expect(currentRate).toHaveTextContent('Rate Category 3 · Private CR + Aircon')
-    expect(currentRate).not.toHaveTextContent('8 rooms')
-    expect(currentRate).not.toHaveTextContent('6 rooms')
-    expect(currentRate).not.toHaveTextContent('1 room')
-    expect(currentRate).toHaveTextContent('₱3,500.00/month')
-    expect(currentRate).toHaveTextContent('₱4,000.00/month')
-    expect(currentRate).toHaveTextContent('₱5,000.00/month')
-    const newRates = within(dialog).getByRole('region', { name: 'New monthly rates' })
-    expect(newRates).toHaveTextContent('Public CR')
-    expect(newRates).toHaveTextContent('Private CR + Aircon')
-    expect(dialog).toHaveTextContent('8 rooms')
-    expect(dialog).toHaveTextContent('6 rooms')
-    expect(dialog).toHaveTextContent('1 room')
-    expect(within(dialog).getByLabelText(/Rate category 1/)).toHaveValue('3500.00')
+    let dialog = await openRentRates(user)
+    const first = categoryCard(dialog, RATE_1)
+    expect(first).toHaveTextContent('8 rooms')
+    expect(first).toHaveTextContent('₱3,500.00/month')
+    expect(first).toHaveTextContent('No pending change')
+    expect(categoryCard(dialog, RATE_2)).toHaveTextContent('6 rooms')
+    expect(within(dialog).getByRole('article', { name: 'Rate category 3 — Private CR + Aircon' })).toHaveTextContent('1 room')
+    expect(within(dialog).getAllByRole('button', { name: 'Schedule Rate' })).toHaveLength(3)
+    expect(within(dialog).queryByRole('button', { name: 'Edit Rate' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Cancel Change' })).not.toBeInTheDocument()
 
-    await user.clear(within(dialog).getByLabelText(/Rate category 1/))
-    await user.type(within(dialog).getByLabelText(/Rate category 1/), '3600')
-    await user.click(within(dialog).getByRole('button', { name: 'Review Changes' }))
-    const review = await screen.findByRole('dialog', { name: 'Review Changes' })
+    await user.click(within(first).getByRole('button', { name: 'Schedule Rate' }))
+    const form = await screen.findByRole('dialog', { name: 'Schedule Monthly Rent Rate' })
+    const input = within(form).getByLabelText('Monthly rate per room')
+    expect(input).toHaveValue('3500.00')
+    await user.clear(input)
+    await user.type(input, '3800')
+    await user.click(within(form).getByRole('button', { name: 'Review Changes' }))
+    const review = await screen.findByRole('dialog', { name: 'Review Rate Change' })
     expect(review).toHaveTextContent('₱3,500.00')
-    expect(review).toHaveTextContent('₱3,600.00')
-    expect(review).toHaveTextContent('December 2026')
+    expect(review).toHaveTextContent('₱3,800.00')
+    expect(review).toHaveTextContent('Dec 1, 2026')
     await user.click(within(review).getByRole('button', { name: 'Confirm Changes' }))
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Review Changes' })).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 
-    const rentCard = within(section).getByRole('button', { name: /Monthly Rent Rates/ })
-    expect(rentCard).toHaveTextContent('₱3,500.00')
-    expect(rentCard).toHaveTextContent('Scheduled December 2026')
-    await waitFor(() => {
-      const saved = savedData()
-      expect(saved.roomRentRates).toHaveLength(4)
-      expect(saved.roomRentRates.find((rate: { categoryId: string; effectiveFrom: string }) => rate.categoryId === 'RATE_3500' && rate.effectiveFrom === '2026-12-01')).toMatchObject({ monthlyRentCents: 360_000 })
-      expect(saved.rooms.map((room: { id: string; categoryId: string }) => [room.id, room.categoryId])).toEqual(original.rooms.map(room => [room.id, room.categoryId]))
-      expect(saved.charges).toEqual(original.charges)
-      expect(saved.receipts).toEqual(original.receipts)
-      expect(saved.roomAssignments).toEqual(original.roomAssignments)
-    })
+    dialog = await openRentRates(user)
+    expect(categoryCard(dialog, RATE_1)).toHaveTextContent('Pending change')
+    expect(categoryCard(dialog, RATE_1)).toHaveTextContent('₱3,800.00/month')
+    expect(categoryCard(dialog, RATE_1)).toHaveTextContent('Dec 1, 2026')
+    expect(within(categoryCard(dialog, RATE_1)).getByRole('button', { name: 'Edit Rate' })).toBeInTheDocument()
+    expect(within(categoryCard(dialog, RATE_1)).getByRole('button', { name: 'Cancel Change' })).toBeInTheDocument()
+    expect(categoryCard(dialog, RATE_2)).toHaveTextContent('No pending change')
+    const saved = savedData()
+    expect(saved.roomRentRates.find((rate: { categoryId: string; effectiveFrom: string }) => rate.categoryId === 'RATE_3500' && rate.effectiveFrom === '2026-12-01')).toMatchObject({ monthlyRentCents: 380_000 })
+    expect(saved.charges).toEqual(original.charges)
+    expect(saved.receipts).toEqual(original.receipts)
+  })
+
+  it('edits a pending rate, preserves the effective date and superseded history, and persists after reload', async () => {
+    const user = userEvent.setup()
+    const app = renderApp('/billing')
+    await scheduleRate(user, RATE_1, '3800')
+    let dialog = await openRentRates(user)
+    await user.click(within(categoryCard(dialog, RATE_1)).getByRole('button', { name: 'Edit Rate' }))
+    const form = await screen.findByRole('dialog', { name: 'Edit Scheduled Rate' })
+    expect(within(form).getByLabelText('Monthly rate per room')).toHaveValue('3800.00')
+    await user.click(within(form).getByRole('button', { name: 'Review Changes' }))
+    expect(within(form).getByText(/at least 3 characters/)).toBeInTheDocument()
+    await user.clear(within(form).getByLabelText('Monthly rate per room'))
+    await user.type(within(form).getByLabelText('Monthly rate per room'), '3600')
+    await user.type(within(form).getByLabelText(/Reason/), 'Planned increase was too high')
+    await user.click(within(form).getByRole('button', { name: 'Review Changes' }))
+    const review = await screen.findByRole('dialog', { name: 'Review Rate Change' })
+    expect(review).toHaveTextContent('₱3,800.00')
+    expect(review).toHaveTextContent('₱3,600.00')
+    await user.click(within(review).getByRole('button', { name: 'Confirm Changes' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    const saved = savedData()
+    const scheduled = saved.roomRentRates.filter((rate: { categoryId: string; effectiveFrom: string }) => rate.categoryId === 'RATE_3500' && rate.effectiveFrom === '2026-12-01')
+    expect(scheduled).toHaveLength(2)
+    expect(scheduled.find((rate: { monthlyRentCents: number }) => rate.monthlyRentCents === 360_000)).toMatchObject({ supersedesRateId: expect.any(String), revision: 2 })
+    expect(scheduled.find((rate: { monthlyRentCents: number }) => rate.monthlyRentCents === 380_000)).toMatchObject({ supersededOn: '2026-11-13', supersededReason: 'Planned increase was too high' })
+
+    app.unmount()
+    renderApp('/billing')
+    dialog = await openRentRates(user)
+    expect(categoryCard(dialog, RATE_1)).toHaveTextContent('₱3,600.00/month')
+    await user.click(within(dialog).getByText('Rate history'))
+    expect(dialog).toHaveTextContent('Replaced')
+    expect(dialog).toHaveTextContent('Planned increase was too high')
+  })
+
+  it('requires a cancellation reason, cancels only one category, and preserves the canceled schedule in history', async () => {
+    const user = userEvent.setup()
+    const original = createDemoData()
+    renderApp('/billing')
+    await scheduleRate(user, RATE_1, '3800')
+    await scheduleRate(user, RATE_2, '4500')
+    let dialog = await openRentRates(user)
+    await user.click(within(categoryCard(dialog, RATE_1)).getByRole('button', { name: 'Cancel Change' }))
+    const cancel = await screen.findByRole('dialog', { name: 'Cancel Scheduled Rate Change' })
+    expect(cancel).toHaveTextContent('Canceling this scheduled rate change will retain the current rental rate.')
+    expect(cancel).toHaveTextContent('₱3,800.00/month')
+    expect(cancel).toHaveTextContent('8')
+    await user.click(within(cancel).getByRole('button', { name: 'Confirm Cancellation' }))
+    expect(within(cancel).getByText(/at least 3 characters/)).toBeInTheDocument()
+    await user.type(within(cancel).getByLabelText('Cancellation reason'), 'No rent increase this year')
+    await user.click(within(cancel).getByRole('button', { name: 'Confirm Cancellation' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    const saved = savedData()
+    const canceled = saved.roomRentRates.find((rate: { categoryId: string; monthlyRentCents: number }) => rate.categoryId === 'RATE_3500' && rate.monthlyRentCents === 380_000)
+    expect(canceled).toMatchObject({ cancelReason: 'No rent increase this year', canceledOn: '2026-11-13' })
+    expect(saved.roomRentRates.find((rate: { categoryId: string; effectiveFrom: string }) => rate.categoryId === 'RATE_4000' && rate.effectiveFrom === '2026-12-01')).toMatchObject({ monthlyRentCents: 450_000 })
+    expect(saved.payments).toEqual(original.payments)
+    expect(saved.receipts).toEqual(original.receipts)
+
+    dialog = await openRentRates(user)
+    expect(categoryCard(dialog, RATE_1)).toHaveTextContent('No pending change')
+    expect(categoryCard(dialog, RATE_2)).toHaveTextContent('₱4,500.00/month')
+    await user.click(within(dialog).getByText('Rate history'))
+    expect(dialog).toHaveTextContent('Canceled')
+    expect(dialog).toHaveTextContent('No rent increase this year')
+  })
+
+  it('treats an edit back to the current rate as a cancellation and rejects unchanged submissions', async () => {
+    const user = userEvent.setup()
+    renderApp('/billing')
+    let dialog = await openRentRates(user)
+    await user.click(within(categoryCard(dialog, RATE_1)).getByRole('button', { name: 'Schedule Rate' }))
+    let form = await screen.findByRole('dialog', { name: 'Schedule Monthly Rent Rate' })
+    await user.click(within(form).getByRole('button', { name: 'Review Changes' }))
+    expect(within(form).getByText('Enter a different future amount.')).toBeInTheDocument()
+    await user.clear(within(form).getByLabelText('Monthly rate per room'))
+    await user.type(within(form).getByLabelText('Monthly rate per room'), '3800')
+    await user.click(within(form).getByRole('button', { name: 'Review Changes' }))
+    await user.click(within(await screen.findByRole('dialog', { name: 'Review Rate Change' })).getByRole('button', { name: 'Confirm Changes' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    dialog = await openRentRates(user)
+    await user.click(within(categoryCard(dialog, RATE_1)).getByRole('button', { name: 'Edit Rate' }))
+    form = await screen.findByRole('dialog', { name: 'Edit Scheduled Rate' })
+    await user.click(within(form).getByRole('button', { name: 'Review Changes' }))
+    expect(within(form).getByText(/at least 3 characters/)).toBeInTheDocument()
+    await user.type(within(form).getByLabelText(/Reason/), 'Return to the current rent')
+    await user.clear(within(form).getByLabelText('Monthly rate per room'))
+    await user.type(within(form).getByLabelText('Monthly rate per room'), '3500')
+    await user.click(within(form).getByRole('button', { name: 'Review Changes' }))
+    const cancel = await screen.findByRole('dialog', { name: 'Cancel Scheduled Rate Change' })
+    expect(cancel).toHaveTextContent('will retain the current rental rate')
+    expect(within(cancel).getByLabelText('Cancellation reason')).toHaveValue('Return to the current rent')
+    await user.click(within(cancel).getByRole('button', { name: 'Confirm Cancellation' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(savedData().roomRentRates.some((rate: { categoryId: string; effectiveFrom: string; canceledOn?: string }) => rate.categoryId === 'RATE_3500' && rate.effectiveFrom === '2026-12-01' && rate.canceledOn)).toBe(true)
   })
 
   it('validates, reviews, schedules, persists, and exposes electricity rate history without changing the active rate', async () => {

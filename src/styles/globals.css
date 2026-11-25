@@ -1319,6 +1319,28 @@ textarea { background-color: var(--input-bg); }
 .billing-rate-review dd del { color: var(--muted-foreground); font-size: 14px; }
 .billing-rate-review dd strong { color: var(--label); font-size: 18px; }
 .billing-rate-review dd > small { width: 100%; color: var(--muted-foreground); font-size: 12px; }
+.billing-rate-manager-dialog { width: calc(100vw - 2rem); max-width: 42rem; }
+.billing-rate-manager-list { display: grid; gap: 12px; margin-top: 12px; }
+.billing-rate-manager-row { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--card); }
+.billing-rate-manager-heading { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.billing-rate-manager-heading h3 { font-size: 15px; font-weight: 750; }
+.billing-rate-manager-heading p { margin-top: 3px; color: var(--muted-foreground); font-size: 12px; }
+.billing-rate-pending { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border: 1px solid color-mix(in srgb, var(--red) 24%, var(--border)); border-radius: 999px; background: color-mix(in srgb, var(--red) 6%, var(--card)); color: color-mix(in srgb, var(--red) 72%, var(--tint)); font-size: 11px; font-weight: 750; }
+.billing-rate-pending svg { width: 14px; height: 14px; }
+.billing-rate-no-change { color: var(--muted-foreground); font-size: 11px; font-weight: 700; }
+.billing-rate-category-values { display: grid; gap: 8px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.billing-rate-category-values > div { min-width: 0; padding: 9px 10px; border-radius: 10px; background: color-mix(in srgb, var(--surface-2) 72%, var(--card)); }
+.billing-rate-category-values dt { color: var(--muted-foreground); font-size: 10px; font-weight: 750; letter-spacing: 0.04em; text-transform: uppercase; }
+.billing-rate-category-values dd { margin-top: 3px; font-size: 13px; font-weight: 750; overflow-wrap: anywhere; }
+.billing-rate-manager-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.billing-rate-manager-actions [data-slot="button"] { min-height: 40px; }
+.billing-rate-dialog-section textarea { min-height: 84px; width: 100%; resize: vertical; border: 1px solid var(--input); border-radius: 9px; background: var(--input-bg); padding: 10px 13px; color: var(--label); font: inherit; font-size: 14px; line-height: 1.5; outline: 0; }
+.billing-rate-dialog-section textarea:focus-visible { border-color: var(--focus); box-shadow: 0 0 0 3.5px var(--focus-halo); }
+.billing-rate-dialog-section textarea[aria-invalid="true"] { border-color: var(--destructive); }
+.billing-rate-cancel-icon { background: color-mix(in srgb, var(--destructive) 12%, transparent); color: var(--destructive); }
+.billing-rate-cancel-review > div:last-child { padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.billing-rate-cancel-footer { flex-wrap: wrap; }
+@media (max-width: 39.999rem) { .billing-rate-category-values { grid-template-columns: 1fr; } .billing-rate-manager-actions [data-slot="button"] { flex: 1 1 10rem; } }
 @media (min-width: 40rem) { .billing-rate-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 39.999rem) { .billing-rate-card { min-height: 0; } .billing-rate-value { font-size: 1.35rem; } }
 @media (prefers-reduced-motion: reduce) { .billing-rate-card { transition: none; } .billing-rate-card:hover { transform: none; } }
