@@ -33,7 +33,6 @@ export default function Billing() {
 
   return <>
     <PageHeader title="Billing" description="Check rent, electricity, water, and washing payments in one place." />
-    <PreviewNotice>Rent shows the anniversary period due in the selected month; electricity, water, and washing use the selected calendar month. Electricity bills are created only when you confirm a payment-time meter reading. Advance and security deposit remain separate room-level balances. Recorded payment corrections are available from Payments &amp; Receipts.</PreviewNotice>
     <div className="mb-6"><div className="max-w-full"><label htmlFor="billing-period" className="mb-2 block text-base font-semibold">Choose a month</label><select id="billing-period" value={periodId} onChange={e => { setPeriodId(e.target.value); setStatusFilter(null) }} className="min-h-14 max-w-full rounded-lg border bg-card px-4 py-3 text-base">{billingPeriods.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}</select></div></div>
     {billingReviews.length > 0 && <div className="room-change-billing-review" role="note">
       <strong>Room change billing review</strong>
