@@ -51,7 +51,6 @@ export function MoveInSection() {
       <div>
         <span className="move-in-eyebrow"><ShieldCheck aria-hidden="true" />Room-level</span>
         <h2 id="move-in-title" ref={headingRef} tabIndex={-1}>Move-in advance &amp; security deposit</h2>
-        <p>One advance and one deposit per room occupancy. The advance is the first anniversary period’s rent; the security deposit is {policy.depositDisposition === 'NON_REFUNDABLE' ? 'non-refundable' : 'refundable with manual review'} and remains separate.</p>
       </div>
       <div className="move-in-heading-actions">
         <div className="move-in-heading-total"><span>Still to collect</span><strong>{formatMoney(summary.outstandingCents)}</strong><small>{summary.paidObligations} of {summary.obligations} fully settled</small></div>
