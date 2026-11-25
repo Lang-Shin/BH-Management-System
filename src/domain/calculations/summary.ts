@@ -1,4 +1,5 @@
-import type { Charge, ChargeStatus, PrototypeAppState, Room, RoomAssignment, TenantCredit } from '@/domain/types/models'
+import type { Charge, ChargeStatus, PrototypeAppState, Room, TenantCredit } from '@/domain/types/models'
+import { activeAssignments } from './assignment-occupancy'
 import { electricityObligations } from './electricity-obligations'
 import { futureReservationCount } from './room-capacity'
 import { rentObligationPaidCents } from './rental-periods'
@@ -9,9 +10,7 @@ export function unresolvedElectricity(data: PrototypeAppState, asOf: string, per
     && (!periodId || item.billingPeriodId === periodId) && (!roomId || item.roomId === roomId))
 }
 
-export function activeAssignments(data: PrototypeAppState, asOf: string): RoomAssignment[] {
-  return data.roomAssignments.filter(a => a.startDate <= asOf && (a.endDate === null || a.endDate >= asOf))
-}
+export { activeAssignments }
 
 export function roomOccupants(data: PrototypeAppState, roomId: string, asOf: string) {
   const ids = new Set(activeAssignments(data, asOf).filter(a => a.roomId === roomId).map(a => a.tenantId))

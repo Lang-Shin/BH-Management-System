@@ -2,8 +2,10 @@ import { chargeBalance, creditRemaining, issuedCharges, roomOccupancy, unresolve
 import type { PrototypeAppState } from '@/domain/types/models'
 import { pendingRoomChangeRequests } from '@/domain/calculations/room-change-requests'
 import { formatMoney } from '@/lib/format'
+import { selectMoveInTransferReviews, selectMoveOutDepositReviews, selectRoomChangeBillingReviews } from './review-notifications'
 
-export type NotificationKind = 'overdue' | 'due-soon' | 'repair' | 'credit' | 'room-change'
+export type ReviewNotificationKind = 'move-in-transfer-review' | 'move-out-deposit-review' | 'room-change-billing-review'
+export type NotificationKind = 'overdue' | 'due-soon' | 'repair' | 'credit' | 'room-change' | ReviewNotificationKind
 
 export interface AppNotification {
   id: string
@@ -11,9 +13,10 @@ export interface AppNotification {
   title: string
   description: string
   href: string
+  review?: ReviewNotificationKind
 }
 
-const MAX_NOTIFICATIONS = 4
+const MAX_NOTIFICATIONS = 8
 const DUE_SOON_DAYS = 7
 
 function addDays(date: string, days: number): string {
@@ -46,6 +49,9 @@ export function selectNotifications(data: PrototypeAppState, asOf: string): AppN
     .filter(item => item.remaining > 0)
   const awaitingElectricity = unresolvedElectricity(data, asOf).length
   const roomChangeRequests = pendingRoomChangeRequests(data)
+  const moveInTransferReviews = selectMoveInTransferReviews(data)
+  const moveOutDepositReviews = selectMoveOutDepositReviews(data, asOf)
+  const roomChangeBillingReviews = selectRoomChangeBillingReviews(data, asOf)
 
   const notifications: AppNotification[] = []
 
@@ -90,6 +96,36 @@ export function selectNotifications(data: PrototypeAppState, asOf: string): AppN
       title: roomChangeRequests.length === 1 ? '1 tenant requested a room change' : `${roomChangeRequests.length} tenants requested room changes`,
       description: 'Review the request before changing any room assignment.',
       href: '/tenants',
+    })
+  }
+  if (moveInTransferReviews.length > 0) {
+    notifications.push({
+      id: `move-in-transfer-review:${moveInTransferReviews.map(item => `${item.cycle.id}:${item.previousRentCents}:${item.currentRentCents}`).join('|')}`,
+      kind: 'move-in-transfer-review',
+      title: moveInTransferReviews.length === 1 ? '1 move-in transfer rent review' : `${moveInTransferReviews.length} move-in transfer rent reviews`,
+      description: 'Review the rent differences manually. No advance or deposit top-up was posted.',
+      href: '/billing',
+      review: 'move-in-transfer-review',
+    })
+  }
+  if (moveOutDepositReviews.length > 0) {
+    notifications.push({
+      id: `move-out-deposit-review:${moveOutDepositReviews.map(item => `${item.view.obligation.id}:${item.view.depositPaidCents}:${item.view.totalRemainingCents}`).join('|')}`,
+      kind: 'move-out-deposit-review',
+      title: moveOutDepositReviews.length === 1 ? '1 move-out deposit record retained' : `${moveOutDepositReviews.length} move-out deposit records retained`,
+      description: 'Review the historical deposit and remaining balances. No automatic refund or forfeiture was posted.',
+      href: '/billing',
+      review: 'move-out-deposit-review',
+    })
+  }
+  if (roomChangeBillingReviews.length > 0) {
+    notifications.push({
+      id: `room-change-billing-review:${roomChangeBillingReviews.map(item => `${item.request.id}:${item.effectiveDate}`).join('|')}`,
+      kind: 'room-change-billing-review',
+      title: roomChangeBillingReviews.length === 1 ? '1 room change billing review pending' : `${roomChangeBillingReviews.length} room change billing reviews pending`,
+      description: 'Review room rent before each future transfer takes effect.',
+      href: '/billing',
+      review: 'room-change-billing-review',
     })
   }
   if (credits.length > 0) {

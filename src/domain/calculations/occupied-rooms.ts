@@ -1,4 +1,5 @@
 import type { PrototypeAppState, Room } from '@/domain/types/models'
+import { activeAssignments } from './summary'
 
 export interface OccupiedRoomSelection {
   rooms: Room[]
@@ -10,9 +11,7 @@ export interface OccupiedRoomSelection {
  * Cycle/status fields only corroborate or warn; they never substitute for an occupant.
  */
 export function occupiedRoomSelection(data: PrototypeAppState, asOf: string): OccupiedRoomSelection {
-  const activeAssignments = data.roomAssignments.filter(assignment => assignment.startDate <= asOf
-    && (assignment.endDate === null || assignment.endDate >= asOf))
-  const assignedRoomIds = new Set(activeAssignments.map(assignment => assignment.roomId))
+  const assignedRoomIds = new Set(activeAssignments(data, asOf).map(assignment => assignment.roomId))
   const activeCycleRoomIds = new Set(data.occupancyCycles.filter(cycle => cycle.status === 'ACTIVE').map(cycle => cycle.roomId))
   const warnings: string[] = []
 

@@ -6,7 +6,10 @@ import { AppRouter } from '@/app/router/app-router'
 import { PrototypeProvider } from '@/app/providers/prototype-provider'
 import { localStorageRepository, STORAGE_KEY } from '@/data/repositories/local-storage-repository'
 import { createDemoData, DEMO_DATE } from '@/data/fixtures/demo'
+import { prototypeReducer } from '@/app/state/prototype-reducer'
+import { prepareMoveInPayment } from '@/domain/calculations/move-in'
 import { previousCalendarDate } from '@/lib/format'
+import type { PrototypeAppState } from '@/domain/types/models'
 
 function renderApp(route = '/') {
   return render(<PrototypeProvider repository={localStorageRepository}><MemoryRouter initialEntries={[route]}><AppRouter /></MemoryRouter></PrototypeProvider>)
@@ -14,6 +17,29 @@ function renderApp(route = '/') {
 
 async function showAllTenants(user: ReturnType<typeof userEvent.setup>) {
   await user.selectOptions(await screen.findByLabelText('Rows per page for tenants'), '20')
+}
+
+function sameDaySharedRoomState(): PrototypeAppState {
+  let data = createDemoData()
+  const create = (name: string) => {
+    const next = prototypeReducer(data, {
+      type: 'tenant/created', asOf: DEMO_DATE,
+      draft: { name, email: `${name.toLowerCase().replaceAll(' ', '.')}@example.com`, phone: '', address: '', roomId: 'room-9', moveInDate: DEMO_DATE, notes: '' },
+    })
+    const tenant = next.tenants.find(item => !data.tenants.some(existing => existing.id === item.id))
+    if (!tenant) throw new Error(`${name} was not created`)
+    data = next
+    return tenant
+  }
+  create('Renzo Ballesteros')
+  const eduard = create('Eduard Jeus')
+  const obligation = data.moveInObligations.find(item => item.roomId === 'room-9' && item.status === 'OPEN')
+  if (!obligation) throw new Error('Room 01 move-in obligation is missing')
+  const paid = prepareMoveInPayment(data, { obligationId: obligation.id, categories: ['ADVANCE', 'SECURITY_DEPOSIT'], paidOn: DEMO_DATE })
+  if (!paid.ok) throw new Error(paid.reason)
+  data = prototypeReducer(paid.data, { type: 'tenant/movedOut', tenantId: eduard.id, asOf: DEMO_DATE })
+  if (data.tenants.find(tenant => tenant.id === eduard.id)?.status !== 'MOVED_OUT') throw new Error('Eduard did not move out')
+  return data
 }
 
 async function addTenant(user: ReturnType<typeof userEvent.setup>, { name, roomId }: { name: string; roomId?: string }) {
@@ -227,6 +253,54 @@ describe('tenant management UI', { timeout: 15000 }, () => {
     })
     await user.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('link', { name: 'Rooms' }))
     expect(await screen.findByRole('button', { name: 'Room 1 details' })).toHaveTextContent('Available · 0 current tenants')
+  })
+
+  it('releases a same-day move-out slot and hides the archived tenant from active room and tenant views', async () => {
+    const user = userEvent.setup()
+    expect(await localStorageRepository.save(sameDaySharedRoomState())).toBeNull()
+    renderApp('/rooms')
+
+    const roomCard = await screen.findByRole('button', { name: 'Room 01 details' })
+    expect(roomCard).toHaveTextContent('Occupied · 1 current tenant')
+    expect(roomCard).toHaveTextContent('Renzo Ballesteros')
+    expect(roomCard).not.toHaveTextContent('Eduard Jeus')
+
+    await user.click(roomCard)
+    const roomDialog = await screen.findByRole('dialog', { name: 'Room 01' })
+    expect(within(roomDialog).getByText('Current occupancy').closest('div')).toHaveTextContent('1 tenant')
+    expect(roomDialog).toHaveTextContent('Renzo Ballesteros')
+    expect(roomDialog).not.toHaveTextContent('Eduard Jeus')
+    await user.click(within(roomDialog).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    await user.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('link', { name: 'Tenants' }))
+    await showAllTenants(user)
+    expect(await screen.findByText('Renzo Ballesteros')).toBeInTheDocument()
+    expect(screen.queryByText('Eduard Jeus')).not.toBeInTheDocument()
+
+    await user.click(await screen.findByRole('button', { name: 'Add tenant' }))
+    const addDialog = await screen.findByRole('dialog', { name: 'Add a tenant' })
+    await user.type(within(addDialog).getByLabelText('Full name'), 'Replacement Tenant')
+    const roomSelect = within(addDialog).getByLabelText('Room assignment')
+    expect(within(roomSelect).getByRole('option', { name: /Room 01 · 1\/2 current/ })).toBeInTheDocument()
+    await user.selectOptions(roomSelect, 'room-9')
+    await user.click(within(addDialog).getByRole('button', { name: 'Add tenant' }))
+    const success = await screen.findByRole('dialog', { name: 'Tenant added successfully' })
+    await user.click(within(success).getByRole('button', { name: 'Got it' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null').data
+      const replacement = saved.tenants.find((tenant: { name: string }) => tenant.name === 'Replacement Tenant')
+      expect(saved.roomAssignments.find((assignment: { tenantId: string }) => assignment.tenantId === replacement.id)).toMatchObject({ roomId: 'room-9', startDate: DEMO_DATE, endDate: null })
+      expect(saved.tenants.find((tenant: { name: string }) => tenant.name === 'Eduard Jeus')).toMatchObject({ status: 'MOVED_OUT' })
+      expect(saved.roomAssignments.find((assignment: { tenantId: string }) => assignment.tenantId === saved.tenants.find((tenant: { name: string }) => tenant.name === 'Eduard Jeus').id)).toMatchObject({ endDate: DEMO_DATE })
+    })
+
+    await user.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('link', { name: 'Rooms' }))
+    const updatedCard = await screen.findByRole('button', { name: 'Room 01 details' })
+    expect(updatedCard).toHaveTextContent('Occupied · 2 current tenants')
+    expect(updatedCard).toHaveTextContent('Replacement Tenant')
+    expect(updatedCard).not.toHaveTextContent('Eduard Jeus')
   })
 
   it('blocks move-out while unresolved advance credit exists', async () => {

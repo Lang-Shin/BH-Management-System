@@ -380,23 +380,30 @@ export function prepareMoveInPayment(data: PrototypeAppState, input: {
     next = ensureFirstRentalPeriod(next, cycle, 'MOVE_IN_ADVANCE')
     const firstPeriod = rentalPeriodsForCycle(next, cycle.id).find(period => period.sequence === 1)
     const firstRent = firstPeriod ? rentObligationForPeriod(next, firstPeriod.id) : undefined
-    if (firstRent && !next.advanceApplications.some(application => application.advanceChargeId === advance.id && application.state === 'ACTIVE')) {
+    if (firstRent && !next.advanceApplications.some(application => application.occupancyCycleId === cycle.id && application.state === 'ACTIVE')) {
       const firstRentPaidCents = rentObligationPaidCents(next, firstRent.id, input.paidOn)
       if (firstRent.amountCents === advanceCents && firstRentPaidCents === 0) {
-        const applicationId = `advance-application-${cycle.id}`
+        const existingApplication = next.advanceApplications.find(application => application.occupancyCycleId === cycle.id)
         const application: AdvanceApplication = {
-          id: applicationId, occupancyCycleId: cycle.id, roomId: obligation.roomId,
+          id: existingApplication?.id ?? `advance-application-${cycle.id}`,
+          occupancyCycleId: cycle.id, roomId: obligation.roomId,
           advanceChargeId: advance.id, sourcePaymentId: paymentId, rentObligationId: firstRent.id,
           amountCents: advanceCents, appliedOn: input.paidOn, state: 'ACTIVE', reversalAuditEventId: null,
         }
         next = {
           ...next,
-          advanceApplications: [...next.advanceApplications, application],
+          advanceApplications: existingApplication
+            ? next.advanceApplications.map(item => item.id === existingApplication.id ? application : item)
+            : [...next.advanceApplications, application],
           auditEvents: [...next.auditEvents, {
-            id: `audit-${applicationId}`, actorId: 'demo-admin', occurredOn: input.paidOn, action: 'ADVANCE_APPLIED',
-            entityType: 'ADVANCE_APPLICATION', entityId: applicationId,
+            id: `audit-advance-${paymentId}`, actorId: 'demo-admin', occurredOn: input.paidOn, action: 'ADVANCE_APPLIED',
+            entityType: 'ADVANCE_APPLICATION', entityId: application.id,
             reason: `Mandatory advance settled the first anniversary rent period for Room ${data.rooms.find(room => room.id === obligation.roomId)?.name ?? obligation.roomId}.`,
-            beforeSnapshot: JSON.stringify({ advanceChargeId: advance.id, firstRentPaidCents }),
+            beforeSnapshot: JSON.stringify({
+              applicationId: application.id, previousState: existingApplication?.state ?? null,
+              previousSourcePaymentId: existingApplication?.sourcePaymentId ?? null,
+              advanceChargeId: advance.id, firstRentPaidCents,
+            }),
             afterSnapshot: JSON.stringify(application),
           }],
         }

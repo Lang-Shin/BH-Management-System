@@ -5,9 +5,7 @@ import { usePrototype } from '@/hooks/use-prototype'
 import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 
 import { activeMoveInPolicy } from '@/domain/calculations/move-in-policy'
-import {
-  moveInSummary, proposedMoveInAdjustment, selectMoveInObligations,
-} from '@/domain/calculations/move-in'
+import { moveInSummary, selectMoveInObligations } from '@/domain/calculations/move-in'
 import { formatMoney } from '@/lib/format'
 import { MoveInPaymentDialog } from './move-in-payment-dialog'
 import { MoveInRecords } from './move-in-records'
@@ -30,15 +28,6 @@ export function MoveInSection() {
   const views = useMemo(() => selectMoveInObligations(data, occupancyDate), [data, occupancyDate])
   const summary = useMemo(() => moveInSummary(data, occupancyDate), [data, occupancyDate])
   const selected = selectedId ? views.find(view => view.obligation.id === selectedId) : undefined
-  const proposals = useMemo(() => data.occupancyCycles
-    .filter(cycle => cycle.status === 'ACTIVE')
-    .flatMap(cycle => {
-      const room = data.rooms.find(item => item.id === cycle.roomId)
-      const proposal = room ? proposedMoveInAdjustment(data, room, cycle) : null
-      return room && proposal ? [{ cycle, room, proposal }] : []
-    }), [data])
-  const closedReviews = views.filter(view => view.cycle.status === 'CLOSED'
-    && (view.depositPaidCents > 0 || view.totalRemainingCents > 0))
 
   function toggleExpanded() {
     const next = !expanded
@@ -84,21 +73,6 @@ export function MoveInSection() {
       <p className="move-in-policy-static"><CircleDollarSign aria-hidden="true" />No deposit refund, forfeiture, or rental-income recognition is automatic. Deposits remain a separate room-level financial record.</p>
     </section>
     {notice && <p role="status" className="move-in-notice">{notice}</p>}
-    {proposals.length > 0 && <div className="move-in-proposals" role="note">
-      <strong>Transfer review proposals</strong>
-      <p>A tenant moved between rooms at different rent snapshots. Review any difference manually; nothing has been posted.</p>
-      <ul>{proposals.map(({ cycle, room, proposal }) => <li key={cycle.id}>
-        Room {room.name}: previous {formatMoney(proposal.previousRentCents)} / current {formatMoney(proposal.currentRentCents)}.
-        No advance or deposit top-up is collected. The original deposit stays unchanged; any paid-period rent difference requires manual review.
-      </li>)}</ul>
-    </div>}
-    {closedReviews.length > 0 && <div className="move-in-proposals" role="note">
-      <strong>Move-out deposit records</strong>
-      <p>Closed occupancies keep their deposit history. No refund, forfeiture, or rental-income recognition has been posted.</p>
-      <ul>{closedReviews.map(view => <li key={view.obligation.id}>
-        Room {view.room.name}: {view.obligation.depositDisposition === 'NON_REFUNDABLE' ? 'non-refundable deposit' : 'deposit with manual review'} held {formatMoney(view.depositPaidCents)}; advance outstanding {formatMoney(view.advanceRemainingCents)}; deposit outstanding {formatMoney(view.depositRemainingCents)}.
-      </li>)}</ul>
-    </div>}
     <section className="move-in-records" aria-labelledby="move-in-records-title">
     <div className="move-in-subheading"><div><h3 id="move-in-records-title">Room payment records</h3><p>Advance, deposit, and settlement status for each room occupancy.</p></div></div>
     {views.length === 0

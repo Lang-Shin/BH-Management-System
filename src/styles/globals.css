@@ -1185,6 +1185,15 @@ textarea { background-color: var(--input-bg); }
   transition: background-color 180ms ease, box-shadow 180ms ease;
 }
 .notification-item-unread { background: color-mix(in srgb, var(--tint) 5%, var(--card)); }
+button.notification-item {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+button.notification-item.notification-item-unread { background: color-mix(in srgb, var(--tint) 5%, var(--card)); }
 .notification-item:hover,
 .notification-item:focus-visible {
   background: var(--fill-2);
@@ -1591,10 +1600,7 @@ li:nth-child(n + 5) > .notification-item { animation-delay: 120ms; }
 .move-in-policy-static { display: flex; align-items: flex-start; gap: 10px; padding-top: 18px; border-top: 1px solid var(--border); color: var(--muted-foreground); font-size: 13px; line-height: 1.65; }
 .move-in-policy-static svg { width: 18px; height: 18px; flex: none; margin-top: 2px; color: var(--tint); }
 .move-in-notice { margin-top: 12px; padding: 9px 12px; border: 1px solid color-mix(in srgb, var(--tint) 20%, var(--border)); border-radius: 11px; background: color-mix(in srgb, var(--tint) 6%, var(--card)); color: var(--tint); font-size: 13px; font-weight: 650; }
-.move-in-details-content > .move-in-notice, .move-in-details-content > .move-in-proposals { margin-top: 0; }
-.move-in-proposals { margin-top: 14px; padding: 13px 14px; border: 1px solid color-mix(in srgb, var(--red) 20%, var(--border)); border-radius: 15px; background: color-mix(in srgb, var(--red) 4%, var(--card)); font-size: 12px; line-height: 1.5; }
-.move-in-proposals > p { margin-top: 3px; color: var(--muted-foreground); }
-.move-in-proposals ul { display: grid; gap: 5px; margin-top: 8px; padding-left: 18px; }
+.move-in-details-content > .move-in-notice { margin-top: 0; }
 .move-in-empty { display: flex; align-items: flex-start; gap: 10px; margin-top: 16px; padding: 15px; border: 1px dashed var(--border); border-radius: 15px; color: var(--muted-foreground); font-size: 13px; line-height: 1.55; }
 .move-in-empty svg { width: 20px; height: 20px; flex: none; color: var(--tint); }
 .move-in-records { min-width: 0; }
@@ -1741,12 +1747,6 @@ li:nth-child(n + 5) > .notification-item { animation-delay: 120ms; }
 .room-change-timeline li[data-state="REVIEW"]::before { border-color: #9a6400; background: #9a6400; }
 .room-change-timeline strong { color: var(--label); font-size: 12px; }
 .room-change-timeline span { overflow-wrap: anywhere; }
-.room-change-billing-review { margin-bottom: 24px; padding: 14px 16px; border: 1px solid color-mix(in srgb, #9a6400 24%, var(--border)); border-radius: 14px; background: color-mix(in srgb, #9a6400 5%, var(--card)); font-size: 13px; line-height: 1.55; }
-.room-change-billing-review > p, .room-change-billing-review > div > div > p { margin-top: 4px; color: var(--muted-foreground); }
-.room-change-billing-review ul { display: grid; gap: 4px; margin-top: 8px; padding-left: 18px; }
-.room-change-review-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.room-change-review-item > span:first-child { min-width: 0; }
-.room-change-review-dismissed { flex: none; color: var(--muted-foreground); font-size: 11px; font-weight: 750; text-transform: uppercase; letter-spacing: 0.04em; }
 .financial-review-summary { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 24px; padding: 12px 14px; border: 1px solid color-mix(in srgb, #9a6400 24%, var(--border)); border-radius: 14px; background: color-mix(in srgb, #9a6400 5%, var(--card)); font-size: 13px; line-height: 1.5; }
 .financial-review-summary-icon { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 999px; background: color-mix(in srgb, #9a6400 12%, var(--card)); color: color-mix(in srgb, #9a6400 80%, var(--tint)); }
 .financial-review-summary-icon svg { width: 18px; height: 18px; }

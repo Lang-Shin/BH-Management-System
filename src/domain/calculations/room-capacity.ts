@@ -1,4 +1,5 @@
 import type { PrototypeAppState, RoomAssignment, Tenant } from '@/domain/types/models'
+import { assignmentIsCurrentAt } from './assignment-occupancy'
 
 export interface RoomReservation {
   assignment: RoomAssignment
@@ -13,10 +14,6 @@ export interface RoomCapacityConflict {
 }
 
 const END_OF_TIME = '9999-12-31'
-
-function activeAt(assignment: RoomAssignment, date: string): boolean {
-  return assignment.startDate <= date && (assignment.endDate === null || assignment.endDate >= date)
-}
 
 /** Approved or scheduled future assignments are reservations; pending requests never appear here. */
 export function futureRoomReservations(data: PrototypeAppState, roomId: string, asOf: string): RoomReservation[] {
@@ -58,7 +55,7 @@ export function roomCapacityConflict(data: PrototypeAppState, input: {
     .map(assignment => assignment.startDate)])].sort()
 
   for (const date of boundaries) {
-    const tenantIds = new Set(relevant.filter(assignment => activeAt(assignment, date)).map(assignment => assignment.tenantId))
+    const tenantIds = new Set(relevant.filter(assignment => assignmentIsCurrentAt(data, assignment, date)).map(assignment => assignment.tenantId))
     tenantIds.add(input.tenantId)
     if (tenantIds.size > input.capacity) {
       return { date, occupants: tenantIds.size, capacity: input.capacity }
@@ -73,7 +70,7 @@ export function roomPeakOccupancy(data: PrototypeAppState, roomId: string): numb
   const dates = [...new Set(assignments.map(assignment => assignment.startDate))]
   let peak = 0
   for (const date of dates) {
-    peak = Math.max(peak, new Set(assignments.filter(assignment => activeAt(assignment, date)).map(assignment => assignment.tenantId)).size)
+    peak = Math.max(peak, new Set(assignments.filter(assignment => assignmentIsCurrentAt(data, assignment, date)).map(assignment => assignment.tenantId)).size)
   }
   return peak
 }

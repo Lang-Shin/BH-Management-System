@@ -8,7 +8,7 @@ import { PrototypeProvider } from '@/app/providers/prototype-provider'
 import { TENANT_DEMO_STORAGE_KEY } from '@/app/providers/tenant-demo'
 import { createDemoData, DEMO_DATE, OCCUPANCY_DATE } from '@/data/fixtures/demo'
 import { localStorageRepository, STORAGE_KEY } from '@/data/repositories/local-storage-repository'
-import { DISMISSED_NOTICES_STORAGE_KEY } from '@/hooks/use-dismissed-notices'
+import { loadReadIds } from '@/features/notifications/read-state'
 import { approveRoomChangeRequest, submitRoomChangeRequest } from '@/domain/calculations/room-change-requests'
 import { prepareMoveInPayment } from '@/domain/calculations/move-in'
 import { prototypeReducer } from '@/app/state/prototype-reducer'
@@ -17,6 +17,9 @@ import type { PrototypeAppState } from '@/domain/types/models'
 
 function renderApp(route: string) {
   return render(<StrictMode><PrototypeProvider repository={localStorageRepository}><MemoryRouter initialEntries={[route]}><AppRouter /></MemoryRouter></PrototypeProvider></StrictMode>)
+}
+function renderAppAt(route: string, now: () => Date) {
+  return render(<StrictMode><PrototypeProvider repository={localStorageRepository} now={now}><MemoryRouter initialEntries={[route]}><AppRouter /></MemoryRouter></PrototypeProvider></StrictMode>)
 }
 const stored = () => JSON.parse(localStorage.getItem(STORAGE_KEY)!).data
 function payRoomMoveIn(data: PrototypeAppState, roomId: string) {
@@ -105,62 +108,53 @@ describe('tenant room change request UI', () => {
   })
 })
 
-describe('billing room change review flag', () => {
-  it('shows and dismisses approved mid-period transfer notes without changing records', async () => {
+describe('billing room change review notifications', () => {
+  it('shows a future transfer in the bell, marks it read on close, and expires it when effective', async () => {
     const user = userEvent.setup()
-    const first = submitRoomChangeRequest(createDemoData(), { tenantId: 'tenant-1', requestedRoomId: 'room-13', requestedStartDate: DEMO_DATE, reason: 'Need more space' }, DEMO_DATE)
+    const effectiveDate = addDays(DEMO_DATE, 7)
+    const first = submitRoomChangeRequest(createDemoData(), { tenantId: 'tenant-1', requestedRoomId: 'room-13', requestedStartDate: effectiveDate, reason: 'Need more space' }, DEMO_DATE)
     if (!first.ok) throw new Error('request failed')
-    const approved = approveRoomChangeRequest(first.data, first.request.id, { effectiveDate: DEMO_DATE, note: 'Approved after review', billingReviewAcknowledged: true, decidedAt: DEMO_DATE })
+    const approved = approveRoomChangeRequest(first.data, first.request.id, { effectiveDate, note: 'Approved after review', billingReviewAcknowledged: true, decidedAt: DEMO_DATE })
     if (!approved.ok) throw new Error('approval failed')
     await localStorageRepository.save(approved.data)
-    const before = JSON.stringify(approved.data.charges)
+    const beforeCharges = JSON.stringify(approved.data.charges)
     const beforePayments = JSON.stringify(approved.data.payments)
-    const view = renderApp('/billing')
-    expect(await screen.findByText('Room change billing review')).toBeInTheDocument()
-    expect(screen.getByText(/Alex Rivera: Room 1.*Room 06.*effective Nov 13, 2026/)).toBeInTheDocument()
-    const notice = screen.getByText('Room change billing review').closest('.room-change-billing-review')!
-    await user.click(within(notice as HTMLElement).getByRole('button', { name: /Dismiss transfer note for Alex Rivera/ }))
-    expect(await screen.findByRole('button', { name: 'View transfer notes (1)' })).toBeInTheDocument()
-    const dismissedIds = JSON.parse(localStorage.getItem(DISMISSED_NOTICES_STORAGE_KEY) ?? '{}').ids as string[]
-    expect(dismissedIds).toContain(`billing-room-change:period-nov:${first.request.id}`)
-    expect(JSON.stringify(stored().charges)).toBe(before)
+    const beforeReceipts = JSON.stringify(approved.data.receipts)
+
+    const view = renderAppAt('/billing', () => new Date(DEMO_DATE + 'T04:00:00.000Z'))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Billing' })).toBeInTheDocument()
+    expect(screen.queryByText('Room change billing review')).not.toBeInTheDocument()
+
+    await user.click(await screen.findByRole('button', { name: 'Notifications, 5 unread' }))
+    const panel = await screen.findByRole('dialog', { name: 'Notifications' })
+    await user.click(within(panel).getByRole('button', { name: /1 room change billing review pending/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Room change billing review' })
+    expect(dialog).toHaveTextContent('Alex Rivera')
+    expect(dialog).toHaveTextContent('Room 1 → Room 06')
+    expect(dialog).toHaveTextContent('effective Nov 20, 2026')
+    expect(loadReadIds()).not.toContain('room-change-billing-review:' + first.request.id + ':' + effectiveDate)
+
+    await user.click(within(dialog).getByRole('button', { name: 'Done' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Notifications, 4 unread' })).toBeInTheDocument())
+    expect(loadReadIds()).toContain('room-change-billing-review:' + first.request.id + ':' + effectiveDate)
+    expect(JSON.stringify(stored().charges)).toBe(beforeCharges)
     expect(JSON.stringify(stored().payments)).toBe(beforePayments)
+    expect(JSON.stringify(stored().receipts)).toBe(beforeReceipts)
+
+    await user.click(screen.getByRole('button', { name: 'Notifications, 4 unread' }))
+    const readPanel = await screen.findByRole('dialog', { name: 'Notifications' })
+    const readItem = within(readPanel).getByRole('button', { name: /1 room change billing review pending/ })
+    expect(within(readItem).queryByText(/Unread:/)).not.toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Notifications' })).not.toBeInTheDocument())
 
     view.unmount()
-    renderApp('/billing')
-    expect(await screen.findByRole('button', { name: 'View transfer notes (1)' })).toBeInTheDocument()
-    expect(screen.queryByText('Room change billing review')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'View transfer notes (1)' }))
-    expect(screen.getByText('Room change billing review')).toBeInTheDocument()
-  })
-
-  it('dismisses unrelated transfer notes independently', async () => {
-    const user = userEvent.setup()
-    const base = createDemoData()
-    const first = submitRoomChangeRequest(base, { tenantId: 'tenant-1', requestedRoomId: 'room-13', requestedStartDate: DEMO_DATE, reason: 'Need more space' }, DEMO_DATE)
-    if (!first.ok) throw new Error('first request failed')
-    const firstApproved = approveRoomChangeRequest(first.data, first.request.id, { effectiveDate: DEMO_DATE, note: 'Approved', billingReviewAcknowledged: true, decidedAt: DEMO_DATE })
-    if (!firstApproved.ok) throw new Error('first approval failed')
-    const withTenant = prototypeReducer(firstApproved.data, { type: 'tenant/created', asOf: DEMO_DATE, draft: {
-      name: 'Second Transfer Tenant', email: 'second.transfer@example.com', phone: '', address: '', notes: '', roomId: 'room-14', moveInDate: DEMO_DATE,
-    } })
-    const secondTenant = withTenant.tenants.find(tenant => tenant.email === 'second.transfer@example.com')!
-    const secondObligation = withTenant.moveInObligations.find(item => item.roomId === 'room-14')!
-    const paidSecond = prepareMoveInPayment(withTenant, { obligationId: secondObligation.id, categories: ['ADVANCE', 'SECURITY_DEPOSIT'], paidOn: DEMO_DATE })
-    if (!paidSecond.ok) throw new Error(paidSecond.reason)
-    const second = submitRoomChangeRequest(paidSecond.data, { tenantId: secondTenant.id, requestedRoomId: 'room-15', requestedStartDate: '2026-11-14', reason: 'Need different space' }, DEMO_DATE)
-    if (!second.ok) throw new Error('second request failed')
-    const secondApproved = approveRoomChangeRequest(second.data, second.request.id, { effectiveDate: '2026-11-14', note: 'Approved', billingReviewAcknowledged: true, decidedAt: DEMO_DATE })
-    if (!secondApproved.ok) throw new Error('second approval failed')
-    await localStorageRepository.save(secondApproved.data)
-    renderApp('/billing')
-    await screen.findByText('Room change billing review')
-    await user.click(screen.getByRole('button', { name: /Dismiss transfer note for Alex Rivera/ }))
-    expect(screen.queryByRole('button', { name: /Dismiss transfer note for Alex Rivera/ })).not.toBeInTheDocument()
-    expect(screen.getByText(/Second Transfer Tenant: Room 07/)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'View dismissed (1)' }))
-    expect(screen.getAllByText('Dismissed')).toHaveLength(1)
-  })
+    renderAppAt('/billing', () => new Date(effectiveDate + 'T04:00:00.000Z'))
+    const laterBell = await screen.findByRole('button', { name: /^Notifications(,|$)/ })
+    await user.click(laterBell)
+    const laterPanel = await screen.findByRole('dialog', { name: 'Notifications' })
+    expect(within(laterPanel).queryByText(/room change billing review/i)).not.toBeInTheDocument()
+  }, 15000)
 })
 
 describe('landlord room change review UI', () => {

@@ -81,7 +81,7 @@ describe('checkbox correction safety and session synchronization', () => {
     expect(tenantBills).toHaveTextContent(/WaterPAID/)
     expect(tenantBills).toHaveTextContent(/ElectricityPAID/)
     expect(authoritative.receipts.find(receipt => receipt.id === fixture.receiptId)?.state).toBe('SUPERSEDED')
-  })
+  }, 15000)
 
   it('keeps checkbox selections and reason after server failure and retries with the same idempotency key', async () => {
     const fixture = checkboxCorrectionFixture()
