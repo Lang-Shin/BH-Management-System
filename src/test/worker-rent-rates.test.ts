@@ -67,6 +67,10 @@ function rateAction(intent: 'SCHEDULE' | 'EDIT' | 'CANCEL', categoryId: string, 
   return { action: { type: 'rates/scheduledChange', intent, categoryId, ...extra } }
 }
 
+function utilityAction(intent: 'SCHEDULE' | 'EDIT' | 'CANCEL', rateKind: string, extra: Record<string, unknown> = {}) {
+  return { action: { type: 'rates/utilityChange', intent, rateKind, ...extra } }
+}
+
 describe('authoritative Worker/D1 scheduled rent rates', () => {
   it('schedules, edits, cancels, audits, persists, and replays idempotently', async () => {
     const initial = await bootstrap()
@@ -178,6 +182,55 @@ describe('authoritative Worker/D1 scheduled rent rates', () => {
     const history = final.data.roomRentRates.filter((rate: any) => rate.categoryId === 'RATE_4000' && rate.monthlyRentCents === 450_000)
     expect(history.length).toBeGreaterThanOrEqual(1)
     expect(history.some((rate: any) => rate.canceledOn || rate.supersededOn)).toBe(true)
+  }, 30_000)
+
+  it('schedules, edits, cancels, audits, and persists electricity, water, and washing rates', async () => {
+    const initial = await bootstrap()
+    const scheduledResponse = await command(utilityAction('SCHEDULE', 'ELECTRICITY', { amountCents: 1_400 }), 'utility-electric-schedule')
+    expect(scheduledResponse.status).toBe(200)
+    const scheduled = await scheduledResponse.json() as { data: any; revision: number }
+    const pending = scheduled.data.electricityRates.find((rate: any) => rate.rateCentsPerKwh === 1_400)
+    expect(pending).toMatchObject({ effectiveFrom: expect.any(String), revision: 1, recordedBy: 'local-dev' })
+
+    const editedResponse = await command(utilityAction('EDIT', 'ELECTRICITY', {
+      amountCents: 1_350, reason: 'Lower electricity increase', expectedRateId: pending.id, expectedRateRevision: pending.revision,
+    }), 'utility-electric-edit')
+    expect(editedResponse.status).toBe(200)
+    const edited = await editedResponse.json() as { data: any; revision: number }
+    const replacement = edited.data.electricityRates.find((rate: any) => rate.rateCentsPerKwh === 1_350)
+    expect(replacement).toMatchObject({ revision: 2, supersedesRateId: pending.id, recordedBy: 'local-dev' })
+    expect(edited.data.electricityRates.find((rate: any) => rate.id === pending.id)).toMatchObject({
+      supersededOn: initial.serverDate, supersededReason: 'Lower electricity increase', supersededBy: 'local-dev',
+    })
+
+    const canceledResponse = await command(utilityAction('CANCEL', 'ELECTRICITY', {
+      reason: 'Keep electricity rate unchanged', expectedRateId: replacement.id, expectedRateRevision: replacement.revision,
+    }), 'utility-electric-cancel')
+    expect(canceledResponse.status).toBe(200)
+    const canceled = await canceledResponse.json() as { data: any; revision: number }
+    expect(canceled.data.electricityRates.find((rate: any) => rate.id === replacement.id)).toMatchObject({
+      canceledOn: initial.serverDate, cancelReason: 'Keep electricity rate unchanged', canceledBy: 'local-dev',
+    })
+
+    const waterResponse = await command(utilityAction('SCHEDULE', 'WATER', { amountCents: 12_500 }), 'utility-water-schedule')
+    const washingResponse = await command(utilityAction('SCHEDULE', 'WASHING_MACHINE', { amountCents: 15_000 }), 'utility-washing-schedule')
+    expect(waterResponse.status).toBe(200)
+    expect(washingResponse.status).toBe(200)
+    const final = await bootstrap()
+    expect(final.data.waterRates.some((rate: any) => rate.rateCents === 12_500 && !rate.canceledOn)).toBe(true)
+    expect(final.data.washingRates.some((rate: any) => rate.rateCents === 15_000 && !rate.canceledOn)).toBe(true)
+    expect(final.data.electricityRates.some((rate: any) => rate.rateCentsPerKwh === 1_350 && !rate.canceledOn && !rate.supersededOn)).toBe(false)
+
+    const db = await worker.getD1Database('DB')
+    const actions = await db.prepare(`SELECT action, COUNT(*) AS count FROM audit_events
+      WHERE workspace_id = ? AND entity_type = 'UTILITY_RATE' GROUP BY action ORDER BY action`)
+      .bind(workspaceId).all<{ action: string; count: number }>()
+    expect(Object.fromEntries(actions.results.map(row => [row.action, row.count]))).toMatchObject({
+      UTILITY_RATE_SCHEDULED: 3, UTILITY_RATE_EDITED: 1, UTILITY_RATE_CANCELED: 1,
+    })
+    const persisted = await bootstrap()
+    expect(persisted.revision).toBe(canceled.revision + 2)
+    expect(persisted.data.auditEvents.filter((event: any) => event.entityType === 'UTILITY_RATE').every((event: any) => event.actorId === 'local-dev')).toBe(true)
   }, 30_000)
 
   it('rejects rate management by a provisioned tenant identity and requires valid reasons', async () => {

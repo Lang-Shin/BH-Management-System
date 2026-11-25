@@ -48,6 +48,9 @@ const changeLabels: Record<AuditEvent['action'], string> = {
   RENT_RATE_SCHEDULED: 'Future rent rate scheduled',
   RENT_RATE_EDITED: 'Pending rent rate replaced',
   RENT_RATE_CANCELED: 'Scheduled rent rate canceled',
+  UTILITY_RATE_SCHEDULED: 'Future utility rate scheduled',
+  UTILITY_RATE_EDITED: 'Pending utility rate replaced',
+  UTILITY_RATE_CANCELED: 'Scheduled utility rate canceled',
 }
 
 export default function Reports() {

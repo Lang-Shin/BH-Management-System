@@ -7,6 +7,7 @@ import { activeAssignments } from '@/domain/calculations/summary'
 import { futureReservationCount } from '@/domain/calculations/room-capacity'
 import { applyRateChange } from '@/domain/calculations/billing-rates'
 import { applyRentRateChange } from '@/domain/calculations/rent-rate-management'
+import { applyUtilityRateChange } from '@/domain/calculations/utility-rate-management'
 import { prepareElectricityPayment } from '@/domain/calculations/electricity-payment'
 import { prepareMeterInitialization } from '@/domain/calculations/meter-initialization'
 import { prepareRoomPayment } from '@/domain/calculations/room-payment'
@@ -93,6 +94,10 @@ export function prototypeReducer(state: PrototypeData, action: StateAction): Pro
       return applyRateChange(state, action.plan)
     case 'rates/scheduledChange': {
       const result = applyRentRateChange(state, action, action.asOf ?? DEFAULT_ACTION_DATE)
+      return result.ok ? result.data : state
+    }
+    case 'rates/utilityChange': {
+      const result = applyUtilityRateChange(state, action, action.asOf ?? DEFAULT_ACTION_DATE)
       return result.ok ? result.data : state
     }
     case 'room/created': {

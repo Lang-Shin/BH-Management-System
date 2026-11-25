@@ -63,33 +63,41 @@ function earliestFuture<T extends { effectiveFrom: string }>(records: T[], asOf:
     .sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom))[0]
 }
 
+export function rateRecordIsEligible(rate: { canceledOn?: string; supersededOn?: string }): boolean {
+  return !rate.canceledOn && !rate.supersededOn
+}
+
 export function activeElectricityRate(data: PrototypeAppState, asOf: string): ElectricityRate | undefined {
-  return latestEffective(data.electricityRates, asOf)
+  return latestEffective(data.electricityRates.filter(rateRecordIsEligible), asOf)
 }
 
 export function scheduledElectricityRate(data: PrototypeAppState, asOf: string): ElectricityRate | undefined {
-  return earliestFuture(data.electricityRates, asOf)
+  return earliestFuture(data.electricityRates.filter(rateRecordIsEligible), asOf)
 }
 
 export function activeWaterRate(data: PrototypeAppState, asOf: string): UtilityRate | undefined {
-  return latestEffective(data.waterRates, asOf)
+  return latestEffective(data.waterRates.filter(rateRecordIsEligible), asOf)
 }
 
 export function scheduledWaterRate(data: PrototypeAppState, asOf: string): UtilityRate | undefined {
-  return earliestFuture(data.waterRates, asOf)
+  return earliestFuture(data.waterRates.filter(rateRecordIsEligible), asOf)
 }
 
 export function activeWashingRate(data: PrototypeAppState, asOf: string): UtilityRate | undefined {
-  return latestEffective(data.washingRates, asOf)
+  return latestEffective(data.washingRates.filter(rateRecordIsEligible), asOf)
 }
 
 export function scheduledWashingRate(data: PrototypeAppState, asOf: string): UtilityRate | undefined {
-  return earliestFuture(data.washingRates, asOf)
+  return earliestFuture(data.washingRates.filter(rateRecordIsEligible), asOf)
 }
 
 /** Canceled and replaced schedules remain in history but are never eligible to become active. */
+export function eligibleUtilityRate(rate: ElectricityRate | UtilityRate): boolean {
+  return rateRecordIsEligible(rate)
+}
+
 export function eligibleRoomRentRate(rate: RoomRentRate): boolean {
-  return !rate.canceledOn && !rate.supersededOn
+  return rateRecordIsEligible(rate)
 }
 
 export function activeRoomRentRate(data: PrototypeAppState, categoryId: RoomCategoryId, asOf: string): RoomRentRate | undefined {
@@ -209,10 +217,10 @@ export function planRateChange(data: PrototypeAppState, input: RatePlanInput, as
   if (!active) return { ok: false, errors: { general: 'The current rate configuration is incomplete.' } }
   const currentCents = 'rateCentsPerKwh' in active ? active.rateCentsPerKwh : active.rateCents
   const scheduled = input.kind === 'ELECTRICITY'
-    ? data.electricityRates.find(rate => rate.effectiveFrom === effectiveFrom)
+    ? data.electricityRates.find(rate => rate.effectiveFrom === effectiveFrom && eligibleUtilityRate(rate))
     : input.kind === 'WATER'
-      ? data.waterRates.find(rate => rate.effectiveFrom === effectiveFrom)
-      : data.washingRates.find(rate => rate.effectiveFrom === effectiveFrom)
+      ? data.waterRates.find(rate => rate.effectiveFrom === effectiveFrom && eligibleUtilityRate(rate))
+      : data.washingRates.find(rate => rate.effectiveFrom === effectiveFrom && eligibleUtilityRate(rate))
   const scheduledCents = scheduled
     ? input.kind === 'ELECTRICITY' ? (scheduled as ElectricityRate).rateCentsPerKwh : (scheduled as UtilityRate).rateCents
     : null
@@ -231,10 +239,10 @@ export function planRateChange(data: PrototypeAppState, input: RatePlanInput, as
   }
 }
 
-function upsertScheduled<T extends { id: string; effectiveFrom: string; recordedOn: string }>(
+function upsertScheduled<T extends { id: string; effectiveFrom: string; recordedOn: string; canceledOn?: string; supersededOn?: string }>(
   records: T[], effectiveFrom: string, idPrefix: string, create: (id: string) => T, update: (record: T) => T,
 ): T[] {
-  const scheduled = records.find(record => record.effectiveFrom === effectiveFrom)
+  const scheduled = records.find(record => record.effectiveFrom === effectiveFrom && !record.canceledOn && !record.supersededOn)
   return scheduled
     ? records.map(record => record.id === scheduled.id ? update(record) : record)
     : [...records, create(`${idPrefix}-${effectiveFrom}`)]

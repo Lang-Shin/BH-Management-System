@@ -137,7 +137,7 @@ export class D1StateRepository {
 
   async command(rawAction: PrototypeAction, actor: Actor, idempotencyKey: string, requestId: string, serverDate: string): Promise<CommandOutcome> {
     if (rawAction.type === 'payment/corrected' || rawAction.type.startsWith('prepaidRefund/')
-      || rawAction.type === 'rates/scheduledChange' || rawAction.type === 'rates/planned') {
+      || rawAction.type === 'rates/scheduledChange' || rawAction.type === 'rates/utilityChange' || rawAction.type === 'rates/planned') {
       await this.requireFinancialAdministrator(actor)
     }
     if (!idempotencyKey || idempotencyKey.length < 8 || idempotencyKey.length > 200) {
@@ -233,13 +233,15 @@ export class D1StateRepository {
         !priorAuditIds.has(event.id) && event.actorId === 'landlord' ? { ...event, actorId: actor.id } : event)
     }
     let rateAuditEvents: AuditEvent[] = []
-    if (action.type === 'rates/scheduledChange' && next !== current.data) {
+    if ((action.type === 'rates/scheduledChange' || action.type === 'rates/utilityChange') && next !== current.data) {
       const priorAuditIds = new Set(current.data.auditEvents.map(event => event.id))
-      const priorRates = new Map(current.data.roomRentRates.map(rate => [rate.id, rate]))
+      const priorRates = new Map([...current.data.roomRentRates, ...current.data.electricityRates, ...current.data.waterRates, ...current.data.washingRates]
+        .map(rate => [rate.id, rate]))
       next.auditEvents = next.auditEvents.map(event =>
         !priorAuditIds.has(event.id) && event.actorId === 'landlord' ? { ...event, actorId: actor.id } : event)
-      rateAuditEvents = next.auditEvents.filter(event => !priorAuditIds.has(event.id) && event.entityType === 'RENT_RATE')
-      next.roomRentRates = next.roomRentRates.map(rate => {
+      rateAuditEvents = next.auditEvents.filter(event => !priorAuditIds.has(event.id)
+        && (event.entityType === 'RENT_RATE' || event.entityType === 'UTILITY_RATE'))
+      const stampActor = <T extends { id: string; canceledOn?: string; supersededOn?: string }>(rates: T[]): T[] => rates.map(rate => {
         const prior = priorRates.get(rate.id)
         if (!prior) return { ...rate, recordedBy: actor.id }
         return {
@@ -248,6 +250,10 @@ export class D1StateRepository {
           ...(rate.supersededOn && !prior.supersededOn ? { supersededBy: actor.id } : {}),
         }
       })
+      next.roomRentRates = stampActor(next.roomRentRates)
+      next.electricityRates = stampActor(next.electricityRates)
+      next.waterRates = stampActor(next.waterRates)
+      next.washingRates = stampActor(next.washingRates)
     }
     if (next === current.data) {
       if (action.type === 'occupancy/dateChanged') {

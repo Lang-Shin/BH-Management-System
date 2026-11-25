@@ -70,24 +70,9 @@ export interface MeterReading {
   initializedOn?: string
 }
 
-export interface ElectricityRate {
-  id: string
-  rateCentsPerKwh: number
-  effectiveFrom: string
-  /** When the configuration change was recorded, distinct from its effective date. */
-  recordedOn: string
-  /** New effective-dated records replace rates; issued charges retain snapshots. */
-  label: string
-}
-
-export interface RoomRentRate {
-  id: string
-  /** Stable category identity; the amount is never used as a room reference. */
-  categoryId: RoomCategoryId
-  monthlyRentCents: number
-  effectiveFrom: string
-  recordedOn: string
-  /** Version identity for a category/effective-date schedule. Older snapshots default to 1. */
+/** Versioned lifecycle shared by effective-dated rate schedules. */
+export interface RateRecordLifecycle {
+  /** Version identity for one effective date. Older snapshots default to 1. */
   revision?: number
   /** Administrator identity captured by the server for new changes. */
   recordedBy?: string
@@ -106,7 +91,28 @@ export interface RoomRentRate {
   cancelReason?: string
 }
 
-export interface UtilityRate {
+export type UtilityRateKind = 'ELECTRICITY' | 'WATER' | 'WASHING_MACHINE'
+
+export interface ElectricityRate extends RateRecordLifecycle {
+  id: string
+  rateCentsPerKwh: number
+  effectiveFrom: string
+  /** When the configuration change was recorded, distinct from its effective date. */
+  recordedOn: string
+  /** New effective-dated records replace rates; issued charges retain snapshots. */
+  label: string
+}
+
+export interface RoomRentRate extends RateRecordLifecycle {
+  id: string
+  /** Stable category identity; the amount is never used as a room reference. */
+  categoryId: RoomCategoryId
+  monthlyRentCents: number
+  effectiveFrom: string
+  recordedOn: string
+}
+
+export interface UtilityRate extends RateRecordLifecycle {
   id: string
   rateCents: number
   effectiveFrom: string
@@ -464,8 +470,8 @@ export interface AuditEvent {
   id: string
   actorId: string
   occurredOn: string
-  action: 'DEMO_SEEDED' | 'READING_CORRECTED' | 'CHARGE_CORRECTED' | 'PAYMENT_CORRECTED' | 'ALLOCATION_REVERSED' | 'ELECTRICITY_PAYMENT_RECORDED' | 'ROOM_PAYMENT_RECORDED' | 'MOVE_IN_PAYMENT_RECORDED' | 'MOVE_IN_POLICY_UPDATED' | 'METER_INITIALIZED' | 'ROOM_CHANGE_REQUESTED' | 'ROOM_CHANGE_CANCELLED' | 'ROOM_CHANGE_APPROVED' | 'ROOM_CHANGE_REJECTED' | 'ROOM_CHANGE_EXPIRED' | 'ROOM_CHANGE_RESERVATION_CANCELLED' | 'ROOM_CHANGE_RESCHEDULED' | 'ADVANCE_REFUNDED' | 'ADVANCE_APPLIED' | 'ADVANCE_APPLICATION_REVERSED' | 'RENT_PREPAYMENT_RECORDED' | 'PREPAID_RENT_REFUND_PROPOSED' | 'PREPAID_RENT_REFUND_APPROVED' | 'PREPAID_RENT_REFUND_COMPLETED' | 'PREPAID_RENT_REFUND_REVERSED' | 'FINANCIAL_REVIEW_OPENED' | 'WORKSPACE_RESET' | 'RENT_PERIODS_ENSURED' | 'RENT_RATE_SCHEDULED' | 'RENT_RATE_EDITED' | 'RENT_RATE_CANCELED'
-  entityType: 'PROTOTYPE' | 'METER_READING' | 'CHARGE' | 'PAYMENT' | 'PAYMENT_ALLOCATION' | 'ROOM_CHANGE_REQUEST' | 'RENT_OBLIGATION' | 'ADVANCE_APPLICATION' | 'RENT_PREPAYMENT' | 'PREPAID_RENT_REFUND' | 'FINANCIAL_REVIEW_CASE' | 'RENT_RATE'
+  action: 'DEMO_SEEDED' | 'READING_CORRECTED' | 'CHARGE_CORRECTED' | 'PAYMENT_CORRECTED' | 'ALLOCATION_REVERSED' | 'ELECTRICITY_PAYMENT_RECORDED' | 'ROOM_PAYMENT_RECORDED' | 'MOVE_IN_PAYMENT_RECORDED' | 'MOVE_IN_POLICY_UPDATED' | 'METER_INITIALIZED' | 'ROOM_CHANGE_REQUESTED' | 'ROOM_CHANGE_CANCELLED' | 'ROOM_CHANGE_APPROVED' | 'ROOM_CHANGE_REJECTED' | 'ROOM_CHANGE_EXPIRED' | 'ROOM_CHANGE_RESERVATION_CANCELLED' | 'ROOM_CHANGE_RESCHEDULED' | 'ADVANCE_REFUNDED' | 'ADVANCE_APPLIED' | 'ADVANCE_APPLICATION_REVERSED' | 'RENT_PREPAYMENT_RECORDED' | 'PREPAID_RENT_REFUND_PROPOSED' | 'PREPAID_RENT_REFUND_APPROVED' | 'PREPAID_RENT_REFUND_COMPLETED' | 'PREPAID_RENT_REFUND_REVERSED' | 'FINANCIAL_REVIEW_OPENED' | 'WORKSPACE_RESET' | 'RENT_PERIODS_ENSURED' | 'RENT_RATE_SCHEDULED' | 'RENT_RATE_EDITED' | 'RENT_RATE_CANCELED' | 'UTILITY_RATE_SCHEDULED' | 'UTILITY_RATE_EDITED' | 'UTILITY_RATE_CANCELED'
+  entityType: 'PROTOTYPE' | 'METER_READING' | 'CHARGE' | 'PAYMENT' | 'PAYMENT_ALLOCATION' | 'ROOM_CHANGE_REQUEST' | 'RENT_OBLIGATION' | 'ADVANCE_APPLICATION' | 'RENT_PREPAYMENT' | 'PREPAID_RENT_REFUND' | 'FINANCIAL_REVIEW_CASE' | 'RENT_RATE' | 'UTILITY_RATE'
   entityId: string
   reason: string
   /** Serialized before/after snapshots preserve a future correction trail. */

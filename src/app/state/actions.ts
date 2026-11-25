@@ -1,6 +1,7 @@
-import type { ChargeCategory, CorrectionSettlementStatus, DepositDisposition, PrototypeData } from '@/domain/types/models'
+import type { ChargeCategory, CorrectionSettlementStatus, DepositDisposition, PrototypeData, UtilityRateKind } from '@/domain/types/models'
 import type { RatePlan } from '@/domain/calculations/billing-rates'
 import type { RentRateChangeIntent } from '@/domain/calculations/rent-rate-management'
+import type { UtilityRateChangeIntent } from '@/domain/calculations/utility-rate-management'
 import type { RoomDraft } from '@/domain/calculations/room-management'
 import type { TenantDraft } from '@/domain/calculations/tenant-management'
 import type { MeterInitializationInput } from '@/domain/calculations/meter-initialization'
@@ -20,6 +21,16 @@ export type PrototypeAction =
       type: 'rates/scheduledChange'
       intent: RentRateChangeIntent
       categoryId: 'RATE_3500' | 'RATE_4000' | 'RATE_5000'
+      amountCents?: number
+      reason?: string
+      expectedRateId?: string
+      expectedRateRevision?: number
+      asOf?: string
+    }
+  | {
+      type: 'rates/utilityChange'
+      intent: UtilityRateChangeIntent
+      rateKind: UtilityRateKind
       amountCents?: number
       reason?: string
       expectedRateId?: string
