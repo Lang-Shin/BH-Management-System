@@ -83,7 +83,7 @@ export function AuthPasswordConfirmation(props: Omit<FieldProps, 'label'>) {
 }
 
 export function AuthCodeField(props: Omit<FieldProps, 'label'>) {
-  return <AuthField {...props} label="Verification code" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} className="auth-code-input" />
+  return <AuthField {...props} label="Verification code" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={20} className="auth-code-input" />
 }
 
 export function AuthMessage({ children, tone = 'error' }: { children: ReactNode; tone?: 'error' | 'success' }) {
@@ -91,8 +91,8 @@ export function AuthMessage({ children, tone = 'error' }: { children: ReactNode;
   return <div className={`auth-message auth-message-${tone}`} role={tone === 'error' ? 'alert' : 'status'}><Icon aria-hidden="true" /><span>{children}</span></div>
 }
 
-export function AuthSubmit({ children, pending, pendingLabel = 'Please wait…', disabled }: { children: ReactNode; pending?: boolean; pendingLabel?: string; disabled?: boolean }) {
-  return <Button type="submit" variant="secondary" className="auth-submit" disabled={disabled || pending} aria-busy={pending}>{pending && <LoaderCircle className="motion-safe:animate-spin" aria-hidden="true" />}<span aria-live="polite">{pending ? pendingLabel : children}</span></Button>
+export function AuthSubmit({ children, pending, pendingLabel = 'Please wait?', disabled, type = 'submit', onClick }: { children: ReactNode; pending?: boolean; pendingLabel?: string; disabled?: boolean; type?: 'button' | 'submit'; onClick?: ComponentProps<typeof Button>['onClick'] }) {
+  return <Button type={type} variant="secondary" className="auth-submit" disabled={disabled || pending} aria-busy={pending} onClick={onClick}>{pending && <LoaderCircle className="motion-safe:animate-spin" aria-hidden="true" />}<span aria-live="polite">{pending ? pendingLabel : children}</span></Button>
 }
 
 export function AuthProgress({ steps, current }: { steps: string[]; current: number }) {

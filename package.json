@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "dev:server": "vite --mode server --host 127.0.0.1",
+    "dev:demo": "vite --mode demo --host 127.0.0.1",
     "dev:worker": "wrangler dev",
     "build": "tsc -b && vite build",
     "worker:build": "wrangler deploy --dry-run --outdir dist-worker",
@@ -25,6 +26,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.72.0",
+    "qrcode.react": "^4.2.0",
     "radix-ui": "^1.8.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

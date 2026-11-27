@@ -1,7 +1,8 @@
 import { useState, type MouseEvent, type ReactNode, type RefObject } from 'react'
 import { useOptionalAuth } from '@/app/providers/auth'
+import { demoControlsVisible } from '@/lib/demo-mode'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { ArrowLeftRight, Building2, LogOut } from 'lucide-react'
+import { ArrowLeftRight, Building2, LogOut, ShieldCheck } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -16,7 +17,8 @@ function isTenantWorkspace(pathname: string) {
 
 /** Route-based workspace switch: /tenant hosts the tenant routes, everything else is landlord/admin. */
 export function WorkspaceSwitchButton({ onNavigate }: { onNavigate?: () => void }) {
-  return import.meta.env.DEV ? <WorkspaceSwitchButtonInner onNavigate={onNavigate} /> : null
+  const auth = useOptionalAuth()
+  return demoControlsVisible() && !auth?.enabled ? <WorkspaceSwitchButtonInner onNavigate={onNavigate} /> : null
 }
 
 function WorkspaceSwitchButtonInner({ onNavigate }: { onNavigate?: () => void }) {
@@ -43,6 +45,7 @@ function Brand() {
 }
 
 export function SidebarContent({ navItems, onNavigate, onLogout, topContent }: { navItems: SidebarNavItem[]; onNavigate?: () => void; onLogout: (event: MouseEvent<HTMLButtonElement>) => void; topContent?: ReactNode }) {
+  const auth = useOptionalAuth()
   return <div className="sidebar-surface flex h-full min-h-full flex-col px-3 py-5">
     <Brand />
     {topContent}
@@ -51,6 +54,7 @@ export function SidebarContent({ navItems, onNavigate, onLogout, topContent }: {
     <div className="mt-auto pt-12">
       <div className="space-y-0.5">
         <WorkspaceSwitchButton onNavigate={onNavigate} />
+        {auth?.enabled && auth.status === 'authenticated' && <NavLink to="/account-security" onClick={onNavigate} className="sidebar-link flex min-h-11 items-center gap-3 px-3 py-2.5 text-sm font-medium"><ShieldCheck className="size-[18px] shrink-0" aria-hidden="true" /><span>Account security</span></NavLink>}
         <button type="button" className="sidebar-link sidebar-logout flex min-h-11 w-full items-center gap-3 px-3 py-2.5 text-sm font-medium" onClick={onLogout}><LogOut className="size-[18px] shrink-0" aria-hidden="true" /><span>Log out</span></button>
       </div>
       <p className="mt-3 border-t px-3 pt-4 text-xs text-muted-foreground">Boarding house management</p>
@@ -62,11 +66,20 @@ export function SidebarContent({ navItems, onNavigate, onLogout, topContent }: {
 export function LogoutDialog({ open, onOpenChange, triggerRef }: { open: boolean; onOpenChange: (open: boolean) => void; triggerRef: RefObject<HTMLButtonElement | null> }) {
   const auth = useOptionalAuth()
   const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const signedIn = auth?.status === 'authenticated'
   const signOut = async () => {
     if (!auth || pending) return
     setPending(true)
-    try { await auth.signOut() } finally { setPending(false); onOpenChange(false); window.location.reload() }
+    setError(null)
+    try {
+      await auth.signOut()
+      onOpenChange(false)
+      window.location.replace('/sign-in')
+    } catch {
+      setPending(false)
+      setError('Sign-out could not be completed. Check your connection and try again.')
+    }
   }
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="max-w-md text-center" onCloseAutoFocus={event => {
@@ -79,6 +92,7 @@ export function LogoutDialog({ open, onOpenChange, triggerRef }: { open: boolean
         <DialogTitle>Log out of BHMS?</DialogTitle>
         <DialogDescription className="text-base leading-relaxed">{signedIn ? 'You will be signed out on this device. Your account records stay on the server.' : 'Sign in is not available in this local preview. Your saved records will stay in this browser.'}</DialogDescription>
       </DialogHeader>
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       <DialogFooter className="sm:justify-center">{signedIn ? <><Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button onClick={signOut} disabled={pending}>{pending ? 'Signing out...' : 'Sign out'}</Button></> : <Button onClick={() => onOpenChange(false)}>Got it</Button>}</DialogFooter>
     </DialogContent>
   </Dialog>

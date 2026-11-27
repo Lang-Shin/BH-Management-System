@@ -31,13 +31,13 @@ function bearer(request: Request): string | null {
 export async function authenticateRequest(request: Request, env: WorkerEnv): Promise<AuthenticatedRequest> {
   const url = new URL(request.url)
   if (env.ENVIRONMENT === 'development' && isLoopback(url.hostname)) {
-    const actor: Actor = { id: 'local-dev', email: 'local-dev@example.invalid', source: 'DEV', role: 'OWNER', aal: 2, authMethod: 'DEV' }
+    const actor: Actor = { id: 'local-dev', email: 'local-dev@example.invalid', emailVerified: false, source: 'DEV', role: 'OWNER', aal: 2, authMethod: 'DEV' }
     return { actor, claims: devClaims('local-dev'), tokens: { access_token: '', refresh_token: '' }, setCookies: [] }
   }
   if (env.ENVIRONMENT !== 'production' && env.BHMS_DEV_TOKEN) {
     const token = bearer(request)
     if (token && secureEqual(token, env.BHMS_DEV_TOKEN)) {
-      const actor: Actor = { id: 'dev-token', email: null, source: 'DEV', role: 'OWNER', aal: 2, authMethod: 'DEV' }
+      const actor: Actor = { id: 'dev-token', email: null, emailVerified: false, source: 'DEV', role: 'OWNER', aal: 2, authMethod: 'DEV' }
       return { actor, claims: devClaims('dev-token'), tokens: { access_token: '', refresh_token: '' }, setCookies: [] }
     }
   }
@@ -71,8 +71,8 @@ function devClaims(sub: string): SupabaseClaims {
 export async function resolveActor(env: WorkerEnv, claims: SupabaseClaims): Promise<Actor> {
   const workspaceId = env.WORKSPACE_ID ?? 'demo-workspace'
   const user = await env.DB.prepare(
-    'SELECT id, email, status, auth_user_id, session_invalid_after FROM users WHERE auth_user_id = ?',
-  ).bind(claims.sub).first<{ id: string; email: string; status: string; auth_user_id: string; session_invalid_after: string }>()
+    'SELECT id, email, email_verified, status, auth_user_id, session_invalid_after FROM users WHERE auth_user_id = ?',
+  ).bind(claims.sub).first<{ id: string; email: string; email_verified: number; status: string; auth_user_id: string; session_invalid_after: string }>()
   if (!user) throw new ApiError(403, 'ACCOUNT_NOT_PROVISIONED', 'This account is not provisioned in BHMS.')
   if (user.status !== 'ACTIVE') throw new ApiError(403, 'ACCOUNT_DISABLED', 'This account is not available.')
   if (claims.iat < Math.floor(Date.parse(user.session_invalid_after) / 1000)) {
@@ -99,6 +99,7 @@ export async function resolveActor(env: WorkerEnv, claims: SupabaseClaims): Prom
   return {
     id: user.id,
     email: user.email,
+    emailVerified: user.email_verified === 1,
     source: 'ACCESS',
     role: membership.role,
     aal: claims.aal === 'aal2' ? 2 : 1,

@@ -18,6 +18,7 @@ import { formatDate, formatMoney, previousCalendarDate } from '@/lib/format'
 import { ACCOUNT_STATUS_LABELS, TENANT_STATUS_LABELS } from '@/lib/labels'
 import type { Tenant } from '@/domain/types/models'
 import { TenantFormFields } from './tenant-form-fields'
+import { TenantAccountAccess } from './tenant-account-access'
 
 export function TenantDetailsDialog({ tenant, onClose, onReturnFocus, onNotice }: {
   tenant: Tenant
@@ -154,6 +155,7 @@ export function TenantDetailsDialog({ tenant, onClose, onReturnFocus, onNotice }
           <div className="min-w-0 sm:col-span-2"><dt className="text-muted-foreground">Contact details</dt><dd className="mt-2 break-all">{tenant.email || 'No email recorded'}</dd><dd className="mt-1 break-words">{tenant.phone || 'No phone recorded'}</dd><dd className="mt-2 leading-relaxed">{tenant.address || 'No home address recorded'}</dd></div>
         </dl>
         <section><h2 className="mb-3 text-lg font-semibold">Rooms rented</h2><p className="mb-3 text-sm text-muted-foreground">Room rent is charged once per occupied room, not once per tenant.</p>{assignments.length > 0 ? <ul className="space-y-3">{assignments.map(a => <li key={a.id} className="rounded-lg border p-4 text-base"><p className="font-semibold">Room {data.rooms.find(r => r.id === a.roomId)?.name ?? 'Room needs review'}</p><p className="mt-2">Room rent: <AnimatedNumber value={formatMoney(a.agreedRentCents)} /></p><p className="mt-2 text-sm text-muted-foreground">{formatDate(a.startDate)} – {a.endDate ? formatDate(a.endDate) : 'Still renting'}</p></li>)}</ul> : <p className="text-sm text-muted-foreground">No room assignments are recorded.</p>}</section>
+        <TenantAccountAccess tenant={tenant} />
         <div className="tenant-details-management">
           <Button type="button" variant="outline" onClick={startEdit}><Pencil aria-hidden="true" />Edit Tenant</Button>
           <Button type="button" variant="outline" onClick={() => { submitting.current = false; setMode('moveOut') }}><Archive aria-hidden="true" />Move Out / Archive</Button>

@@ -1,3 +1,5 @@
+import type { PrototypeData, RoomCategoryId } from '@/domain/types/models'
+
 export type AuthRole = 'OWNER' | 'ADMIN' | 'TENANT' | 'VIEWER'
 export type AssuranceLevel = 'aal1' | 'aal2'
 
@@ -8,6 +10,8 @@ export interface AuthSession {
   tenantId: string | null
   mfaRequired: boolean
   csrfToken: string
+  email?: string | null
+  emailVerified?: boolean
 }
 
 export interface TenantBootstrap {
@@ -19,6 +23,7 @@ export interface TenantBootstrap {
     cycleId: string | null
     billingPeriods: { id: string; label: string; startDate: string; endDate: string; status: string }[]
   }
+  state: PrototypeData
   revision: number
   serverDate: string
   timezone: string
@@ -37,6 +42,16 @@ export interface AuthAccount {
   role: string
   tenant_id: string | null
   access_expires_at: string | null
+}
+
+export interface AuthInvitation {
+  id: string
+  kind: string
+  tenant_id: string | null
+  target_user_id: string | null
+  state: string
+  expires_at: string
+  created_at: string
 }
 
 export interface AccountInvitation {
@@ -65,6 +80,14 @@ function baseUrl(): string {
   return typeof configured === 'string' && configured.trim() ? configured.replace(/\/$/, '') : '/api/v1'
 }
 
+function canRefreshOn401(path: string): boolean {
+  if (path === '/auth/refresh') return false
+  if (path.startsWith('/auth/operator/')) return false
+  return !path.startsWith('/auth/') || path === '/auth/session' || path === '/auth/sign-out'
+    || path.startsWith('/auth/mfa/') || path.startsWith('/auth/accounts')
+    || path.startsWith('/auth/tenants/') || path.startsWith('/auth/invitations/')
+}
+
 function csrfFromCookie(): string {
   if (typeof document === 'undefined') return ''
   const names = ['__Host-bhms_csrf', 'bhms_csrf']
@@ -75,12 +98,13 @@ function csrfFromCookie(): string {
   return ''
 }
 
-async function request<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
+async function request<T>(path: string, init: { method?: string; body?: unknown; headers?: Record<string, string> } = {}, retried = false): Promise<T> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 20_000)
   const headers = new Headers({ accept: 'application/json' })
   const method = init.method ?? 'GET'
   if (init.body !== undefined) headers.set('content-type', 'application/json')
+  for (const [name, value] of Object.entries(init.headers ?? {})) headers.set(name, value)
   if (method !== 'GET') {
     const csrf = csrfFromCookie()
     if (csrf) headers.set('x-bhms-csrf', csrf)
@@ -105,6 +129,17 @@ async function request<T>(path: string, init: { method?: string; body?: unknown 
   } finally {
     clearTimeout(timeout)
   }
+  if (response.status === 401 && canRefreshOn401(path)) {
+    if (!retried) {
+      try {
+        await refreshAuthSession()
+        return request(path, init, true)
+      } catch {
+        // The refresh failed; fall through so the original 401 is reported.
+      }
+    }
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('bhms:auth-expired'))
+  }
   const body: unknown = await response.json().catch(() => null)
   if (!response.ok) {
     const envelope = body && typeof body === 'object'
@@ -128,8 +163,14 @@ export function getAuthSession(): Promise<AuthSession> {
   return request<AuthSession>('/auth/session')
 }
 
+let refreshInFlight: Promise<AuthSession & { refreshed: true }> | null = null
+
 export function refreshAuthSession(): Promise<AuthSession & { refreshed: true }> {
-  return request<AuthSession & { refreshed: true }>('/auth/refresh', { method: 'POST', body: {} })
+  if (!refreshInFlight) {
+    refreshInFlight = request<AuthSession & { refreshed: true }>('/auth/refresh', { method: 'POST', body: {} })
+      .finally(() => { refreshInFlight = null })
+  }
+  return refreshInFlight
 }
 
 export function signOut(): Promise<{ signedOut: true; provider: string }> {
@@ -137,7 +178,7 @@ export function signOut(): Promise<{ signedOut: true; provider: string }> {
 }
 
 export function acceptInvitation(token: string, email: string, password: string) {
-  return request<{ provisioned: true; authenticated: boolean; role?: AuthRole; aal?: AssuranceLevel; tenantId?: string | null; csrfToken?: string }>(
+  return request<{ provisioned: true; authenticated: boolean; role?: AuthRole; aal?: AssuranceLevel; tenantId?: string | null; csrfToken?: string; email?: string | null; emailVerified?: boolean }>(
     '/auth/accept', { method: 'POST', body: { token, email, password } },
   )
 }
@@ -158,11 +199,76 @@ export function verifyMfa(factorId: string, challengeId: string, code: string) {
   return request<AuthSession>('/auth/mfa/verify', { method: 'POST', body: { factorId, challengeId, code } })
 }
 
+export function getInvitationStatus(token: string) {
+  return request<{ valid: true; kind: string; state: string; expiresAt: string }>('/auth/invitation-status', { method: 'POST', body: { token } })
+}
+
+export function getMfaStatus() {
+  return request<{ enrolled: boolean; factors: { id?: string; friendlyName?: string; status?: string; factorType?: string }[] }>('/auth/mfa/status')
+}
+
 export function getTenantBootstrap(): Promise<TenantBootstrap> {
   return request<TenantBootstrap>('/tenant/bootstrap')
 }
 
-export function listAccounts(): Promise<{ accounts: AuthAccount[] }> {
+export interface TenantRoomChangeOption {
+  id: string
+  name: string
+  floor: number
+  kind: string
+  capacity: number
+  categoryId: RoomCategoryId
+  monthlyRentCents: number
+}
+
+export interface TenantRoomChangeRequest {
+  id: string
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'EXPIRED'
+  currentRoomId: string
+  currentRoomName: string
+  requestedRoomId: string
+  requestedRoomName: string
+  requestedStartDate: string
+  reason: string
+  createdAt: string
+  decidedAt: string | null
+  decisionReason: string | null
+  approvedStartDate: string | null
+  billingReviewPeriodIds: string[]
+}
+
+export interface TenantRoomChangeOptions {
+  current: { roomId: string; name: string; agreedRentCents: number } | null
+  options: TenantRoomChangeOption[]
+  requests: TenantRoomChangeRequest[]
+  revision: number
+  serverDate: string
+}
+
+export function getTenantRoomChangeOptions(): Promise<TenantRoomChangeOptions> {
+  return request<TenantRoomChangeOptions>('/tenant/room-change-options')
+}
+
+export function requestTenantRoomChange(input: {
+  requestedRoomId: string
+  requestedStartDate: string
+  reason: string
+}): Promise<{ request: TenantRoomChangeRequest; revision: number; replayed: boolean; serverDate: string }> {
+  return request('/tenant/room-change-requests', {
+    method: 'POST',
+    headers: { 'idempotency-key': crypto.randomUUID() },
+    body: input,
+  })
+}
+
+export function cancelTenantRoomChangeRequest(requestId: string, reason = 'Cancelled by tenant.') {
+  return request<{ cancelled: true; revision: number; replayed: boolean; serverDate: string }>(
+    `/tenant/room-change-requests/${encodeURIComponent(requestId)}/cancel`,
+    { method: 'POST', headers: { 'idempotency-key': crypto.randomUUID() }, body: { reason } },
+  )
+}
+
+export function listAccounts(): Promise<{ accounts: AuthAccount[]; invitations: AuthInvitation[] }> {
   return request('/auth/accounts')
 }
 

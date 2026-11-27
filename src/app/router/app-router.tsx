@@ -4,6 +4,11 @@ import { TenantShell } from '@/components/layout/tenant-shell'
 import { TenantDemoProvider } from '@/app/providers/tenant-demo'
 import { RequireAuth } from '@/features/auth/require-auth'
 import SignInPage from '@/features/auth/sign-in-page'
+import AcceptPage from '@/features/auth/accept-page'
+import MfaPage from '@/features/auth/mfa-page'
+import ForgotPasswordPage from '@/features/auth/forgot-password-page'
+import ResetPasswordPage from '@/features/auth/reset-password-page'
+import AccountSecurityPage from '@/features/auth/account-security-page'
 import { AuthPendingPage } from '@/features/auth/auth-pending-page'
 import { WorkspaceBoundary } from '@/app/providers/workspace-boundary'
 import { NotFound } from './not-found'
@@ -21,11 +26,12 @@ import TenantRoom from '@/features/tenant/tenant-room-page'
 export function AppRouter() {
   return <Routes>
     <Route path="sign-in" element={<SignInPage />} />
-    <Route path="auth/mfa" element={<AuthPendingPage kind="mfa" />} />
+    <Route path="auth/mfa" element={<MfaPage />} />
     <Route path="auth/restricted" element={<AuthPendingPage kind="restricted" />} />
-    <Route path="forgot-password" element={<AuthPendingPage kind="recovery" />} />
-    <Route path="reset-password" element={<AuthPendingPage kind="recovery" />} />
-    <Route path="accept" element={<AuthPendingPage kind="setup" />} />
+    <Route path="forgot-password" element={<ForgotPasswordPage />} />
+    <Route path="reset-password" element={<ResetPasswordPage />} />
+    <Route path="accept" element={<AcceptPage />} />
+    <Route path="account-security" element={<RequireAuth><AccountSecurityPage /></RequireAuth>} />
     <Route element={<RequireAuth roles={['OWNER', 'ADMIN']}><WorkspaceBoundary><AdminShell /></WorkspaceBoundary></RequireAuth>}>
       <Route index element={<Navigate to="/dashboard" replace />} />
       <Route path="dashboard" element={<Dashboard />} />

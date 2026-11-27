@@ -20,8 +20,8 @@ describe('tenant workspace layout', () => {
     expect(within(main).getAllByText('Active').length).toBeGreaterThan(0)
     expect(screen.getByLabelText('Billing month')).toHaveValue('period-nov')
     expect(within(screen.getByRole('region', { name: 'Monthly room billing' })).getByRole('status')).toHaveTextContent('PAID')
-    expect(screen.getByText(/previews one tenant's existing records/)).toBeInTheDocument()
-    expect(screen.getByText(/Tenant sign-in is not part of this phase/)).toBeInTheDocument()
+    expect(screen.getByText(/This is a demo preview of one tenant's existing records/)).toBeInTheDocument()
+    expect(screen.queryByText(/Tenant sign-in is not part of this phase/)).not.toBeInTheDocument()
   })
 
   it('summarizes the sample tenant payments without inventing values', async () => {
@@ -71,7 +71,8 @@ describe('tenant workspace layout', () => {
     expect(within(card).getAllByText('Occupied').length).toBeGreaterThan(0)
     expect(within(card).getByText('Shared-capacity room')).toBeInTheDocument()
     expect(within(card).getByText('Included')).toBeInTheDocument()
-    expect(screen.getByText('More room details are coming soon')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Request a room change' })).toBeInTheDocument()
+    expect(screen.getByText(/No room change requests yet/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Edit Room|Delete Room|Add Room/ })).not.toBeInTheDocument()
   })
 

@@ -1,6 +1,7 @@
 import type { PrototypeAction } from '@/app/state/actions'
 import type { CollectibleItem, RentPrepaymentCatalog } from '@/domain/calculations/payment-collection'
 import { isPrototypeData } from '@/domain/validation/prototype-data'
+import { refreshAuthSession } from '@/features/auth/auth-api'
 import type { PrototypeCommandResult, PrototypeRepository, PrototypeSnapshot } from './prototype-repository'
 
 export class ApiRepositoryError extends Error {
@@ -19,8 +20,7 @@ export class ApiRepositoryError extends Error {
 
 function apiBaseUrl(): string {
   const configured = import.meta.env.VITE_BHMS_API_BASE_URL
-  if (typeof configured !== 'string' || configured.trim() === '') throw new Error('VITE_BHMS_API_BASE_URL is not configured.')
-  return configured.replace(/\/$/, '')
+  return typeof configured === 'string' && configured.trim() ? configured.replace(/\/$/, '') : '/api/v1'
 }
 
 function csrfToken(): string {
@@ -32,7 +32,7 @@ function csrfToken(): string {
   return ''
 }
 
-async function request(path: string, init: RequestInit): Promise<Record<string, unknown>> {
+async function request(path: string, init: RequestInit, retried = false): Promise<Record<string, unknown>> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 15_000)
   const headers = new Headers(init.headers)
@@ -57,6 +57,14 @@ async function request(path: string, init: RequestInit): Promise<Record<string, 
   const contentType = response.headers.get('content-type') ?? ''
   if (contentType.includes('application/json')) {
     try { body = await response.json() } catch { body = null }
+  }
+  if (response.status === 401 && !retried && !path.startsWith('/auth/')) {
+    try {
+      await refreshAuthSession()
+      return request(path, init, true)
+    } catch {
+      window.dispatchEvent(new Event('bhms:auth-expired'))
+    }
   }
   if (!response.ok) {
     const envelope = body && typeof body === 'object' ? body as { error?: { code?: unknown; message?: unknown } } : null

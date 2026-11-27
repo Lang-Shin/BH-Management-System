@@ -29,6 +29,7 @@ export type AppRole = 'OWNER' | 'ADMIN' | 'VIEWER' | 'TENANT'
 export interface Actor {
   id: string
   email: string | null
+  emailVerified: boolean
   /** Legacy financial-audit source; non-dev authenticated users are recorded as ACCESS. */
   source: 'DEV' | 'ACCESS'
   role: AppRole

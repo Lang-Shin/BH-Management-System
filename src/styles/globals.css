@@ -1717,6 +1717,7 @@ li:nth-child(n + 5) > .notification-item { animation-delay: 120ms; }
 .room-change-status[data-status="APPROVED"] { color: #0f7b5a; background: color-mix(in srgb, #0f7b5a 8%, var(--card)); border-color: color-mix(in srgb, #0f7b5a 24%, var(--border)); }
 .room-change-status[data-status="REJECTED"] { color: color-mix(in srgb, var(--red) 78%, var(--label)); background: color-mix(in srgb, var(--red) 6%, var(--card)); border-color: color-mix(in srgb, var(--red) 22%, var(--border)); }
 .dark .room-change-status[data-status="APPROVED"] { color: #7dd8b6; }
+.dark .room-change-status[data-status="PENDING"] { color: #f0c674; }
 .room-change-notice { margin-bottom: 14px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--tint) 20%, var(--border)); border-radius: 10px; color: var(--tint); font-size: 13px; line-height: 1.5; }
 .room-change-empty { display: flex; align-items: flex-start; gap: 8px; color: var(--muted-foreground); font-size: 13px; line-height: 1.55; }
 .room-change-empty svg { width: 18px; height: 18px; flex: none; color: var(--tint); }

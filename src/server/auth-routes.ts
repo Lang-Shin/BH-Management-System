@@ -12,6 +12,7 @@ import {
   deleteSupabaseUser,
   enrollTotp,
   getSupabaseUser,
+  listSupabaseFactors,
   openTokens,
   randomToken,
   readCookie,
@@ -380,7 +381,7 @@ async function handleAccept(request: Request, env: WorkerEnv): Promise<Response>
   const csrf = randomToken(32)
   const cookies = await sessionCookieHeaders(env, tokens, csrf)
   return withCookies({
-    provisioned: true, authenticated: true, role: actor.role, aal: aalLabel(actor.aal), tenantId: actor.tenantId ?? null,
+    provisioned: true, authenticated: true, role: actor.role, email: actor.email, emailVerified: actor.emailVerified, aal: aalLabel(actor.aal), tenantId: actor.tenantId ?? null,
     mfaRequired: (actor.role === 'OWNER' || actor.role === 'ADMIN') && actor.aal !== 2, csrfToken: csrf,
   }, 201, cookies, requestId(request))
 }
@@ -404,7 +405,8 @@ async function handleSignIn(request: Request, env: WorkerEnv): Promise<Response>
     action: 'SIGN_IN', entityType: 'USER', entityId: actor.id, metadata: { aal: actor.aal },
   })
   return withCookies({
-    authenticated: true, role: actor.role, aal: actor.aal, tenantId: actor.tenantId ?? null,
+    authenticated: true, role: actor.role, email: actor.email, emailVerified: actor.emailVerified,
+    aal: actor.aal, tenantId: actor.tenantId ?? null,
     mfaRequired: (actor.role === 'OWNER' || actor.role === 'ADMIN') && actor.aal !== 2, csrfToken: csrf,
   }, 200, cookies, requestId(request))
 }
@@ -415,7 +417,7 @@ async function handleSession(request: Request, env: WorkerEnv): Promise<Response
   const names = authCookieNames(env)
   const csrf = readCookie(request, names.csrf) ?? ''
   return withCookies({
-    authenticated: true, role: auth.actor.role, aal: aalLabel(auth.actor.aal), tenantId: auth.actor.tenantId ?? null,
+    authenticated: true, role: auth.actor.role, email: auth.actor.email, emailVerified: auth.actor.emailVerified, aal: aalLabel(auth.actor.aal), tenantId: auth.actor.tenantId ?? null,
     mfaRequired: (auth.actor.role === 'OWNER' || auth.actor.role === 'ADMIN') && auth.actor.aal !== 2, csrfToken: csrf,
   }, 200, auth.setCookies, requestId(request))
 }
@@ -441,7 +443,8 @@ async function handleRefresh(request: Request, env: WorkerEnv): Promise<Response
   const csrf = randomToken(32)
   const cookies = await sessionCookieHeaders(env, tokens, csrf)
   return withCookies({
-    refreshed: true, role: actor.role, aal: actor.aal, tenantId: actor.tenantId ?? null,
+    authenticated: true, refreshed: true, role: actor.role, email: actor.email,
+    emailVerified: actor.emailVerified, aal: actor.aal, tenantId: actor.tenantId ?? null,
     mfaRequired: (actor.role === 'OWNER' || actor.role === 'ADMIN') && actor.aal !== 2, csrfToken: csrf,
   }, 200, cookies, requestId(request))
 }
@@ -516,7 +519,7 @@ async function handleMfaVerify(request: Request, env: WorkerEnv): Promise<Respon
     request, actorType: 'OWNER', actorId: auth.actor.id, action: 'MFA_VERIFIED', entityType: 'USER',
     entityId: auth.actor.id, metadata: { method: 'totp' },
   })
-  return withCookies({ authenticated: true, role: auth.actor.role, aal: 'aal2', tenantId: auth.actor.tenantId ?? null, mfaRequired: false, csrfToken: csrf }, 200, cookies, requestId(request))
+  return withCookies({ authenticated: true, role: auth.actor.role, email: auth.actor.email, emailVerified: auth.actor.emailVerified, aal: 'aal2', tenantId: auth.actor.tenantId ?? null, mfaRequired: false, csrfToken: csrf }, 200, cookies, requestId(request))
 }
 
 async function handleTenantInvitation(request: Request, env: WorkerEnv, tenantId: string): Promise<Response> {
@@ -556,6 +559,34 @@ async function handleCancelInvitation(request: Request, env: WorkerEnv, invitati
   return json({ cancelled: true }, {}, requestId(request))
 }
 
+async function handleInvitationStatus(request: Request, env: WorkerEnv): Promise<Response> {
+  requireSameOrigin(request, env)
+  if (request.method !== 'POST') throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use POST.')
+  const body = await readJson(request)
+  const token = text(body.token, 'token', 32, 256)
+  const tokenDigest = await digest(env, token)
+  const invite = await env.DB.prepare('SELECT kind, state, expires_at FROM auth_invitations WHERE token_digest = ?')
+    .bind(tokenDigest).first<{ kind: string; state: string; expires_at: string }>()
+  if (!invite) throw new ApiError(404, 'INVITATION_INVALID', 'This invitation is not valid.')
+  if (invite.state === 'CONSUMED') throw new ApiError(410, 'INVITATION_USED', 'This invitation has already been used.')
+  if (invite.state === 'CANCELLED' || invite.state === 'EXPIRED' || (invite.state === 'PENDING' && Date.parse(invite.expires_at) <= Date.now())) {
+    throw new ApiError(410, 'INVITATION_EXPIRED', 'This invitation has expired.')
+  }
+  if (invite.state !== 'PENDING' && invite.state !== 'PROVISIONING') throw new ApiError(409, 'INVITATION_INVALID', 'This invitation is not available.')
+  return json({ valid: true, kind: invite.kind, state: invite.state, expiresAt: invite.expires_at }, {}, requestId(request))
+}
+
+async function handleMfaStatus(request: Request, env: WorkerEnv): Promise<Response> {
+  if (request.method !== 'GET') throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use GET.')
+  const auth = await currentAuth(request, env)
+  requireAdministrator(auth.actor, false)
+  if (!auth.actor.authUserId) throw new ApiError(403, 'FORBIDDEN', 'This account has no authentication identity.')
+  const result = await listSupabaseFactors(env, auth.actor.authUserId, clientIp(request))
+  if (result.status !== 200) throw new ApiError(503, 'MFA_UNAVAILABLE', 'Authenticator status is unavailable. Try again shortly.')
+  const factors = Array.isArray(result.data) ? result.data as { id?: string; friendly_name?: string; status?: string; factor_type?: string }[] : []
+  return json({ enrolled: factors.some(factor => factor.status === 'verified'), factors: factors.map(factor => ({ id: factor.id, friendlyName: factor.friendly_name, status: factor.status, factorType: factor.factor_type })) }, {}, requestId(request))
+}
+
 async function handleAccounts(request: Request, env: WorkerEnv): Promise<Response> {
   if (request.method !== 'GET') throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use GET.')
   const auth = await currentAuth(request, env)
@@ -566,7 +597,11 @@ async function handleAccounts(request: Request, env: WorkerEnv): Promise<Respons
      LEFT JOIN tenant_account_links t ON t.user_id = u.id
      WHERE m.workspace_id = ? ORDER BY u.created_at`,
   ).bind(workspaceId(env)).all<AccountRow>()
-  return json({ accounts: users.results }, {}, requestId(request))
+  const invitations = await env.DB.prepare(
+    `SELECT id, kind, tenant_id, target_user_id, state, expires_at, created_at FROM auth_invitations
+     WHERE workspace_id = ? AND state IN ('PENDING', 'PROVISIONING') ORDER BY created_at DESC`,
+  ).bind(workspaceId(env)).all()
+  return json({ accounts: users.results, invitations: invitations.results }, {}, requestId(request))
 }
 
 async function handleAccountAction(request: Request, env: WorkerEnv, userId: string, action: 'suspend' | 'reactivate' | 'recovery'): Promise<Response> {
@@ -656,6 +691,8 @@ export async function handleAuthRequest(request: Request, env: WorkerEnv): Promi
   try {
     if (path === '/auth/operator/setup-invitation') return await handleOperatorSetup(request, env)
     if (path === '/auth/operator/landlord-recovery') return await handleOperatorLandlordRecovery(request, env)
+    if (path === '/auth/invitation-status') return await handleInvitationStatus(request, env)
+    if (path === '/auth/mfa/status') return await handleMfaStatus(request, env)
     if (path === '/auth/accept') return await handleAccept(request, env)
     if (path === '/auth/sign-in') return await handleSignIn(request, env)
     if (path === '/auth/session') return await handleSession(request, env)

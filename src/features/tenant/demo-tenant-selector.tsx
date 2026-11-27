@@ -4,12 +4,15 @@ import { usePrototype } from '@/hooks/use-prototype'
 import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { useTenantDemo } from '@/app/providers/tenant-demo'
 import { activeAssignments } from '@/domain/calculations/summary'
+import { demoControlsVisible } from '@/lib/demo-mode'
+import { useOptionalAuth } from '@/app/providers/auth'
 
 const statusLabel = (status: 'ACTIVE' | 'MOVED_OUT') => status === 'ACTIVE' ? 'Active' : 'Moved out'
 
 /** Clearly labeled prototype-only selector; it never creates accounts or changes tenant records. */
 export function DemoTenantSelector() {
-  return import.meta.env.DEV ? <DemoTenantSelectorInner /> : null
+  const auth = useOptionalAuth()
+  return demoControlsVisible() && !auth?.enabled ? <DemoTenantSelectorInner /> : null
 }
 
 function DemoTenantSelectorInner() {

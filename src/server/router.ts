@@ -2,8 +2,15 @@
 import { isPrototypeData } from '@/domain/validation/prototype-data'
 import { quoteRentPrepayment } from '@/domain/calculations/rent-schedule'
 import { collectionCatalog, rentPrepaymentCatalog } from '@/domain/calculations/payment-collection'
-import type { PrototypeAppState } from '@/domain/types/models'
-import { authenticateRequest, requireAdministrator, requireTenant } from './auth'
+import { activeAssignments } from '@/domain/calculations/summary'
+import { roomMonthlyRentCents } from '@/domain/calculations/billing-rates'
+import {
+  cancelRoomChangeRequest, eligibleRoomChangeTargets, roomChangeRequestsForTenant, submitRoomChangeRequest,
+  type RoomChangeRequestErrors,
+} from '@/domain/calculations/room-change-requests'
+import type { PrototypeAction } from '@/app/state/actions'
+import type { PrototypeAppState, RoomChangeRequest } from '@/domain/types/models'
+import { authenticateRequest, requireAdministrator, requireCsrf, requireSameOrigin, requireTenant } from './auth'
 import { handleAuthRequest } from './auth-routes'
 import { assertTimeZone, businessDate } from './date'
 import { buildTenantBootstrap } from './tenant-bootstrap'
@@ -22,6 +29,28 @@ function idempotencyKey(request: Request): string {
   const value = request.headers.get('Idempotency-Key')
   if (!value) throw new ApiError(400, 'IDEMPOTENCY_KEY_REQUIRED', 'Provide an Idempotency-Key header for this command.')
   return value
+}
+
+function roomChangeError(errors: RoomChangeRequestErrors): string {
+  return errors.general ?? errors.roomId ?? errors.startDate ?? errors.reason ?? 'The room change request could not be saved.'
+}
+
+function tenantRoomChangeView(data: PrototypeAppState, request: RoomChangeRequest) {
+  return {
+    id: request.id,
+    status: request.status,
+    currentRoomId: request.currentRoomId,
+    currentRoomName: data.rooms.find(room => room.id === request.currentRoomId)?.name ?? 'Room needs review',
+    requestedRoomId: request.requestedRoomId,
+    requestedRoomName: data.rooms.find(room => room.id === request.requestedRoomId)?.name ?? 'Room needs review',
+    requestedStartDate: request.requestedStartDate,
+    reason: request.reason,
+    createdAt: request.createdAt,
+    decidedAt: request.decidedAt,
+    decisionReason: request.decisionReason,
+    approvedStartDate: request.approvedStartDate,
+    billingReviewPeriodIds: request.billingReviewPeriodIds,
+  }
 }
 
 export async function handleRequest(request: Request, env: WorkerEnv): Promise<Response> {
@@ -47,6 +76,89 @@ export async function handleRequest(request: Request, env: WorkerEnv): Promise<R
       requireTenant(actor)
       const state = await repo.load()
       return json(buildTenantBootstrap(state.data, state.revision, actor.tenantId!, serverDate, timezone, env.WORKSPACE_ID ?? 'demo-workspace'), {}, requestKey)
+    }
+
+    if (route === '/tenant/room-change-options') {
+      if (request.method !== 'GET') throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use GET.')
+      requireTenant(actor)
+      const tenantId = actor.tenantId!
+      const state = await repo.load()
+      const assignment = activeAssignments(state.data, serverDate).find(item => item.tenantId === tenantId)
+      const currentRoom = assignment ? state.data.rooms.find(room => room.id === assignment.roomId) ?? null : null
+      const options = assignment
+        ? eligibleRoomChangeTargets(state.data, tenantId, serverDate).map(room => ({
+          id: room.id, name: room.name, floor: room.floor, kind: room.kind, capacity: room.capacity,
+          categoryId: room.categoryId, monthlyRentCents: roomMonthlyRentCents(state.data, room, serverDate),
+        }))
+        : []
+      return json({
+        current: currentRoom && assignment ? {
+          roomId: currentRoom.id, name: currentRoom.name,
+          agreedRentCents: assignment.agreedRentCents,
+        } : null,
+        options,
+        requests: roomChangeRequestsForTenant(state.data, tenantId).map(request => tenantRoomChangeView(state.data, request)),
+        revision: state.revision, serverDate,
+      }, {}, requestKey)
+    }
+
+    if (route === '/tenant/room-change-requests') {
+      if (request.method !== 'POST') throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use POST.')
+      requireSameOrigin(request, env)
+      requireCsrf(request, env)
+      requireTenant(actor)
+      const tenantId = actor.tenantId!
+      const body = await readJson(request)
+      const requestId = crypto.randomUUID()
+      const action = parseAction({
+        type: 'roomChange/requested',
+        asOf: serverDate,
+        draft: {
+          tenantId, requestId,
+          requestedRoomId: body.requestedRoomId,
+          requestedStartDate: body.requestedStartDate,
+          reason: body.reason,
+        },
+      }) as Extract<PrototypeAction, { type: 'roomChange/requested' }>
+      const current = await repo.load()
+      const preview = submitRoomChangeRequest(current.data, action.draft, serverDate)
+      if (!preview.ok) {
+        throw new ApiError(422, 'ROOM_CHANGE_REJECTED', roomChangeError(preview.errors), preview.errors)
+      }
+      const outcome = await repo.command(action, actor, idempotencyKey(request), requestKey, serverDate)
+      const saved = outcome.data.roomChangeRequests.find(item => item.id === requestId)
+      if (!saved) throw new ApiError(409, 'ROOM_CHANGE_CHANGED', 'The room or your current assignment changed. Refresh and try again.')
+      return json({
+        request: tenantRoomChangeView(outcome.data, saved),
+        revision: outcome.revision, replayed: outcome.replayed, serverDate,
+      }, { status: 201 }, requestKey)
+    }
+
+    const tenantCancelMatch = route.match(/^\/tenant\/room-change-requests\/([^/]+)\/cancel$/)
+    if (tenantCancelMatch?.[1]) {
+      if (request.method !== 'POST') throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use POST.')
+      requireSameOrigin(request, env)
+      requireCsrf(request, env)
+      requireTenant(actor)
+      const tenantId = actor.tenantId!
+      const requestId = decodeURIComponent(tenantCancelMatch[1])
+      const body = await readJson(request)
+      const reason = typeof body.reason === 'string' ? body.reason : 'Cancelled by tenant.'
+      const action = parseAction({
+        type: 'roomChange/cancelled', requestId, tenantId, reason, asOf: serverDate,
+      }) as Extract<PrototypeAction, { type: 'roomChange/cancelled' }>
+      const current = await repo.load()
+      const preview = cancelRoomChangeRequest(current.data, requestId, tenantId, reason, serverDate)
+      if (!preview.ok) {
+        const message = roomChangeError(preview.errors)
+        throw new ApiError(422, 'ROOM_CHANGE_CANNOT_CANCEL', message, preview.errors)
+      }
+      const outcome = await repo.command(action, actor, idempotencyKey(request), requestKey, serverDate)
+      const saved = outcome.data.roomChangeRequests.find(item => item.id === requestId)
+      if (!saved || saved.status !== 'CANCELLED') {
+        throw new ApiError(409, 'ROOM_CHANGE_CHANGED', 'The request changed before it could be cancelled. Refresh and try again.')
+      }
+      return json({ cancelled: true, revision: outcome.revision, replayed: outcome.replayed, serverDate }, {}, requestKey)
     }
 
     requireAdministrator(actor)

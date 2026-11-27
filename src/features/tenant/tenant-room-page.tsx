@@ -6,17 +6,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { usePrototype } from '@/hooks/use-prototype'
 import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { useTenantDemo } from '@/app/providers/tenant-demo'
+import { useOptionalAuth } from '@/app/providers/auth'
 import { roomOccupancy } from '@/domain/calculations/summary'
 import { formatDate } from '@/lib/format'
 import { selectTenantPersona } from './tenant-persona'
 import { RoomChangeRequestSection } from './room-change-request-status'
+import { TenantRoomChangeRequestSection } from './tenant-room-change-request'
 
 const occupancyLabels = { OCCUPIED: 'Occupied', RESERVED: 'Reserved', AVAILABLE: 'Available', UNDER_REPAIR: 'Under repair' } as const
 
-/** Layout-phase room summary; service requests and management arrive in a later phase. */
 export default function TenantRoom() {
   const { data } = usePrototype()
   const { tenantId } = useTenantDemo()
+  const auth = useOptionalAuth()
   const occupancyDate = useOccupancyDate()
   const persona = selectTenantPersona(data, tenantId, occupancyDate)
   const room = persona?.room ?? null
@@ -28,7 +30,7 @@ export default function TenantRoom() {
     {!room || !assignment ? <EmptyState
       title={movedOut ? 'Moved out of Halili BH' : 'No room to show'}
       description={movedOut
-        ? 'This tenant no longer has an active room assignment. Historical room details arrive in a later phase.'
+        ? 'This tenant no longer has an active room assignment. Historical payments and receipts remain available.'
         : 'The selected tenant does not have an active room assignment yet.'}
     /> : <Card>
       <CardHeader>
@@ -47,7 +49,7 @@ export default function TenantRoom() {
         </dl>
       </CardContent>
     </Card>}
-    {room && persona && <div className="mt-6"><RoomChangeRequestSection tenantId={persona.tenant.id} room={room} /></div>}
-    {room && <div className="mt-6"><EmptyState title="More room details are coming soon" description="Maintenance requests and additional stay details arrive in a later phase. The landlord workspace still manages rooms for now." /></div>}
+    {room && persona && !auth?.enabled && <div className="mt-6"><RoomChangeRequestSection tenantId={persona.tenant.id} room={room} /></div>}
+    {room && persona && auth?.enabled && <div className="mt-6"><TenantRoomChangeRequestSection /></div>}
   </>
 }

@@ -110,6 +110,11 @@ async function fakeSupabase(request: Request): Promise<Response> {
     }
     return Response.json({ user: userPayload(user.id) })
   }
+  const factorList = pathName.match(/^\/auth\/v1\/admin\/users\/([^/]+)\/factors$/)
+  if (factorList?.[1]) {
+    const id = decodeURIComponent(factorList[1])
+    return Response.json((factors.get(id) ?? []).map(factorId => ({ id: factorId, status: 'verified', factor_type: 'totp', friendly_name: 'BHMS landlord' })))
+  }
   const adminUser = pathName.match(/^\/auth\/v1\/admin\/users\/([^/]+)$/)
   if (adminUser?.[1]) {
     const id = decodeURIComponent(adminUser[1])
@@ -249,6 +254,8 @@ describe('Supabase BFF integration and authorization', () => {
     const setup = await operator('/api/v1/auth/operator/setup-invitation')
     expect(setup.status).toBe(201)
     const setupToken = new URL(setup.data.setupUrl).searchParams.get('token')
+    const setupStatus = await new Client().request('/api/v1/auth/invitation-status', { method: 'POST', csrf: false, body: { token: setupToken } })
+    expect(setupStatus).toMatchObject({ status: 200, data: { valid: true, kind: 'LANDLORD_SETUP' } })
     const landlord = new Client()
     const accepted = await landlord.request('/api/v1/auth/accept', { method: 'POST', csrf: false, body: { token: setupToken, email: landlordEmail, password: landlordPassword } })
     expect(accepted.status).toBe(201)
@@ -258,6 +265,7 @@ describe('Supabase BFF integration and authorization', () => {
     expect((await landlord.request('/api/v1/bootstrap')).status).toBe(403)
     const enroll = await landlord.request('/api/v1/auth/mfa/enroll', { method: 'POST', body: {} })
     expect(enroll.status).toBe(200)
+    expect((await landlord.request('/api/v1/auth/mfa/status')).data.enrolled).toBe(true)
     const challenge = await landlord.request('/api/v1/auth/mfa/challenge', { method: 'POST', body: { factorId: enroll.data.id } })
     expect(challenge.status).toBe(200)
     const verified = await landlord.request('/api/v1/auth/mfa/verify', { method: 'POST', body: { factorId: enroll.data.id, challengeId: challenge.data.id, code: '123456' } })
@@ -272,6 +280,7 @@ describe('Supabase BFF integration and authorization', () => {
     const landlord = new Client()
     const signIn = await landlord.request('/api/v1/auth/sign-in', { method: 'POST', csrf: false, body: { email: landlordEmail, password: landlordPassword } })
     expect(signIn.status).toBe(200)
+    expect(signIn.data).toMatchObject({ email: landlordEmail, emailVerified: false })
     const enroll = await landlord.request('/api/v1/auth/mfa/enroll', { method: 'POST', body: {} })
     const challenge = await landlord.request('/api/v1/auth/mfa/challenge', { method: 'POST', body: { factorId: enroll.data.id } })
     await landlord.request('/api/v1/auth/mfa/verify', { method: 'POST', body: { factorId: enroll.data.id, challengeId: challenge.data.id, code: '123456' } })
@@ -285,16 +294,39 @@ describe('Supabase BFF integration and authorization', () => {
     const tenantId = createTenant.data.data.tenants[0].id as string
     const invitation = await landlord.request(`/api/v1/auth/tenants/${tenantId}/invitation`, { method: 'POST', body: {} })
     expect(invitation.status).toBe(201)
+    const invitationStatus = await new Client().request('/api/v1/auth/invitation-status', { method: 'POST', csrf: false, body: { token: new URL(invitation.data.inviteUrl).searchParams.get('token') } })
+    expect(invitationStatus).toMatchObject({ status: 200, data: { valid: true, kind: 'TENANT' } })
+    expect((await landlord.request('/api/v1/auth/accounts')).data.invitations.some((item: any) => item.tenant_id === tenantId)).toBe(true)
     const inviteToken = new URL(invitation.data.inviteUrl).searchParams.get('token')
     const tenant = new Client()
     const accepted = await tenant.request('/api/v1/auth/accept', { method: 'POST', csrf: false, body: { token: inviteToken, email: tenantEmail, password: tenantPassword } })
     expect(accepted.status).toBe(201)
     const replay = await new Client().request('/api/v1/auth/accept', { method: 'POST', csrf: false, body: { token: inviteToken, email: tenantEmail, password: tenantPassword } })
     expect(replay.status).toBe(409)
+    expect((await new Client().request('/api/v1/auth/invitation-status', { method: 'POST', csrf: false, body: { token: inviteToken } })).status).toBe(410)
     const scoped = await tenant.request('/api/v1/tenant/bootstrap')
     expect(scoped.status).toBe(200)
     expect(scoped.data).toMatchObject({ role: 'TENANT', tenantId, data: { tenant: { id: tenantId, name: 'Tenant One' } } })
     expect(JSON.stringify(scoped.data)).not.toContain('tenantEmail')
+    const roomOptions = await tenant.request('/api/v1/tenant/room-change-options')
+    expect(roomOptions.status).toBe(200)
+    expect(roomOptions.data.current).toMatchObject({ roomId: 'room-1' })
+    expect(roomOptions.data.options.some((room: any) => room.id === 'room-2')).toBe(true)
+    const moveDate = new Date(`${scoped.data.serverDate}T00:00:00Z`)
+    moveDate.setUTCDate(moveDate.getUTCDate() + 1)
+    const roomChange = await tenant.request('/api/v1/tenant/room-change-requests', {
+      method: 'POST', headers: { 'idempotency-key': 'tenant-room-change-0001' },
+      body: { requestedRoomId: 'room-2', requestedStartDate: moveDate.toISOString().slice(0, 10), reason: 'Need a quieter room.' },
+    })
+    expect(roomChange.status).toBe(201)
+    expect(roomChange.data.request).toMatchObject({ status: 'PENDING', requestedRoomName: '2' })
+    const afterRequest = await tenant.request('/api/v1/tenant/bootstrap')
+    expect(afterRequest.data.data.assignment).toMatchObject({ id: expect.any(String) })
+    expect(afterRequest.data.state.roomAssignments.find((item: any) => item.tenantId === tenantId)).toMatchObject({ roomId: 'room-1' })
+    const cancelRequest = await tenant.request(`/api/v1/tenant/room-change-requests/${roomChange.data.request.id}/cancel`, {
+      method: 'POST', headers: { 'idempotency-key': 'tenant-room-change-cancel-0001' }, body: {},
+    })
+    expect(cancelRequest.status).toBe(200)
     expect((await tenant.request('/api/v1/bootstrap')).status).toBe(403)
     expect((await tenant.request('/api/v1/commands', { method: 'POST', body: {} })).status).toBe(403)
     expect((await tenant.request('/api/v1/auth/sign-out', { method: 'POST', origin: 'https://evil.example' })).status).toBe(403)
@@ -364,6 +396,7 @@ describe('Supabase BFF integration and authorization', () => {
     await landlord.request('/api/v1/auth/mfa/verify', { method: 'POST', body: { factorId: enroll.data.id, challengeId: challenge.data.id, code: '123456' } })
     const refreshed = await landlord.request('/api/v1/auth/refresh', { method: 'POST', body: {} })
     expect(refreshed.status).toBe(200)
+    expect(refreshed.data).toMatchObject({ refreshed: true, authenticated: true, email: landlordEmail, emailVerified: false })
     expect((await landlord.request('/api/v1/bootstrap')).status).toBe(200)
     const accounts = await landlord.request('/api/v1/auth/accounts')
     const tenantAccount = accounts.data.accounts.find((item: any) => item.role === 'TENANT')

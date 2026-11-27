@@ -33,6 +33,20 @@ describe('server-authoritative API repository', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/bootstrap', expect.objectContaining({ method: 'GET', credentials: 'same-origin' }))
   })
 
+  it('refreshes once after an expired session and retries the protected request', async () => {
+    const data = createDemoData()
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/auth/refresh')) return jsonResponse({ authenticated: true, role: 'OWNER', aal: 'aal2', tenantId: null, mfaRequired: false, csrfToken: 'csrf' })
+      if (url.endsWith('/bootstrap')) return fetchMock.mock.calls.filter(call => String(call[0]).endsWith('/bootstrap')).length === 1 ? jsonResponse({ error: { code: 'UNAUTHENTICATED' } }, 401) : jsonResponse({ data, revision: 12, serverDate: '2026-11-22' })
+      return jsonResponse({})
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const repository = createApiRepository()
+    await expect(repository.load()).resolves.toMatchObject({ revision: 12 })
+    expect(fetchMock.mock.calls.filter(call => String(call[0]).endsWith('/auth/refresh'))).toHaveLength(1)
+  })
+
   it('sends typed commands with an idempotency key and accepts a replay', async () => {
     const data = createDemoData()
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ data, revision: 13, replayed: true }))

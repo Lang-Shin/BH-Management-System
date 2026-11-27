@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, DoorOpen, Download, User } from 'lucide-react'
+import { ArrowRight, DoorOpen, User } from 'lucide-react'
 import { EmptyState } from '@/components/shared/states'
 import { PageHeader, PreviewNotice } from '@/components/shared/page'
 import { AnimatedNumber } from '@/components/shared/animated-number'
@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { usePrototype } from '@/hooks/use-prototype'
 import { useOccupancyDate } from '@/hooks/use-occupancy-date'
 import { useTenantDemo } from '@/app/providers/tenant-demo'
+import { useOptionalAuth } from '@/app/providers/auth'
 import { roomOccupants, roomOccupancy, tenantAccount } from '@/domain/calculations/summary'
 import { selectMoveInObligations } from '@/domain/calculations/move-in'
 import { selectRentCycleReport } from '@/domain/calculations/rent-reporting'
@@ -25,6 +26,7 @@ import { CATEGORY_LABELS } from '@/lib/labels'
 export default function TenantOverview() {
   const { data } = usePrototype()
   const { tenantId } = useTenantDemo()
+  const auth = useOptionalAuth()
   const occupancyDate = useOccupancyDate()
   const persona = selectTenantPersona(data, tenantId, occupancyDate)
   const defaultPeriod = data.billingPeriods.find(item => item.startDate <= occupancyDate && item.endDate >= occupancyDate) ?? data.billingPeriods.at(-1)
@@ -58,7 +60,7 @@ export default function TenantOverview() {
 
   return <>
     <PageHeader title="Overview" description={`${monthLabel} · Your stay at Halili BH at a glance.`} />
-    <PreviewNotice>This tenant workspace previews one tenant's existing records. Tenant sign-in is not part of this phase.</PreviewNotice>
+    {!auth?.enabled && <PreviewNotice>This is a demo preview of one tenant's existing records.</PreviewNotice>}
     {persona.tenant.status === 'MOVED_OUT' && <p className="mb-6 max-w-3xl text-sm leading-relaxed text-muted-foreground">This tenant has moved out. The payments and tenancy details below are retained historical records.</p>}
     <section aria-label="Room overview" className="mb-6">
       <Card>
@@ -142,14 +144,13 @@ export default function TenantOverview() {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Coming in a later phase</CardTitle>
-          <CardDescription>The tenant workspace keeps growing after this layout phase.</CardDescription>
+          <CardTitle>Account &amp; support</CardTitle>
+          <CardDescription>Manage your access or ask your landlord about your stay.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <ul className="space-y-4 text-sm text-muted-foreground">
-            <li className="flex items-start gap-3"><Download className="mt-0.5 size-4 shrink-0 text-[var(--tint)]" aria-hidden="true" /><span><strong className="font-semibold text-foreground">Receipt downloads.</strong> Save or print a copy of each receipt.</span></li>
-            <li className="flex items-start gap-3"><DoorOpen className="mt-0.5 size-4 shrink-0 text-[var(--tint)]" aria-hidden="true" /><span><strong className="font-semibold text-foreground">Room services.</strong> Request maintenance and manage your stay details.</span></li>
-          </ul>
+        <CardContent className="grid gap-3">
+          <Button variant="outline" asChild><Link to="/account-security">Account security <ArrowRight /></Link></Button>
+          <Button variant="outline" asChild><Link to="/tenant/room"><DoorOpen /> Request a room change</Link></Button>
+          <p className="text-sm text-muted-foreground">For billing questions or other account help, contact your landlord directly.</p>
         </CardContent>
       </Card>
     </div>

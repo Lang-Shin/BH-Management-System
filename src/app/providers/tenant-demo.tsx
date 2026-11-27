@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import { usePrototype } from '@/hooks/use-prototype'
+import { useOptionalAuth } from './auth'
 
 export const TENANT_DEMO_STORAGE_KEY = 'bhms:tenant-demo:v1'
 
@@ -25,21 +26,24 @@ function readStoredTenantId(): string | null {
  */
 export function TenantDemoProvider({ children }: { children: ReactNode }) {
   const { data } = usePrototype()
-  const [tenantId, setTenantId] = useState(() => {
+  const auth = useOptionalAuth()
+  const authenticatedTenantId = auth?.enabled ? auth.session?.tenantId ?? null : null
+  const [demoTenantId, setDemoTenantId] = useState(() => {
     const stored = readStoredTenantId()
     if (stored && data.tenants.some(item => item.id === stored)) return stored
     return data.tenants.find(item => item.status === 'ACTIVE')?.id ?? data.tenants[0]?.id ?? ''
   })
+  const tenantId = authenticatedTenantId ?? demoTenantId
 
   const selectTenant = useCallback((id: string) => {
-    if (!data.tenants.some(item => item.id === id)) return
-    setTenantId(id)
+    if (authenticatedTenantId || !data.tenants.some(item => item.id === id)) return
+    setDemoTenantId(id)
     try {
       window.localStorage.setItem(TENANT_DEMO_STORAGE_KEY, id)
     } catch {
       // A blocked storage API should not break the prototype.
     }
-  }, [data.tenants])
+  }, [authenticatedTenantId, data.tenants])
 
   const value = useMemo(() => ({ tenantId, selectTenant }), [tenantId, selectTenant])
   return <TenantDemoContext.Provider value={value}>{children}</TenantDemoContext.Provider>

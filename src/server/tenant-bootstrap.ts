@@ -1,10 +1,74 @@
 import { STORAGE_SCHEMA_VERSION } from '@/data/repositories/prototype-storage'
 import { selectMoveInObligations } from '@/domain/calculations/move-in'
 import { selectRentCycleReport } from '@/domain/calculations/rent-reporting'
-import type { PrototypeAppState } from '@/domain/types/models'
+import type { PrototypeAppState, Tenant } from '@/domain/types/models'
+import { tenantHasCycleAccess, tenantOccupiedRoomAt } from '@/domain/calculations/tenant-access'
 import { selectTenantReceipts } from '@/features/tenant/tenant-receipts'
 import { tenantRoomBilling } from '@/features/tenant/tenant-room-billing'
 import { ApiError } from './http'
+
+function authorizedTenantState(data: PrototypeAppState, tenantId: string): PrototypeAppState {
+  const own = data.tenants.find(item => item.id === tenantId)
+  if (!own) throw new ApiError(404, 'TENANT_NOT_FOUND', 'The tenant record was not found.')
+  const ownAssignments = data.roomAssignments.filter(item => item.tenantId === tenantId)
+  const roomIds = new Set(ownAssignments.map(item => item.roomId))
+  const currentRoomIds = new Set(ownAssignments.filter(item => item.endDate === null).map(item => item.roomId))
+  const roommateAssignments = data.roomAssignments.filter(item => item.tenantId !== tenantId && currentRoomIds.has(item.roomId) && item.endDate === null)
+  const roommateIds = new Set(roommateAssignments.map(item => item.tenantId))
+  const sanitize = (tenant: Tenant): Tenant => ({ id: tenant.id, name: tenant.name, email: '', phone: '', address: '', notes: '', status: tenant.status })
+  const tenants = data.tenants.filter(item => item.id === tenantId || roommateIds.has(item.id)).map(item => item.id === tenantId ? item : sanitize(item))
+  const cycles = data.occupancyCycles.filter(cycle => roomIds.has(cycle.roomId))
+  const cycleIds = new Set(cycles.map(cycle => cycle.id))
+  const rentalPeriods = data.rentalPeriods.filter(period => cycleIds.has(period.occupancyCycleId))
+  const periodIds = new Set(rentalPeriods.map(period => period.id))
+  const ownPayment = (payment: typeof data.payments[number]) => payment.tenantId === tenantId
+  const sharedPayment = (payment: typeof data.payments[number]) => {
+    if (payment.scope !== 'ROOM') return false
+    const cycle = payment.occupancyCycleId ? cycles.find(item => item.id === payment.occupancyCycleId) : undefined
+    if (cycle && tenantHasCycleAccess(data, tenantId, cycle, payment.paidOn)) return true
+    return Boolean(payment.roomId && tenantOccupiedRoomAt(data, tenantId, payment.roomId, payment.paidOn))
+  }
+  const payments = data.payments.filter(payment => ownPayment(payment) || sharedPayment(payment))
+  const paymentIds = new Set(payments.map(payment => payment.id))
+  const allocations = data.paymentAllocations.filter(allocation => paymentIds.has(allocation.paymentId))
+  const receiptPaymentIds = new Set(payments.map(payment => payment.id))
+  const receipts = data.receipts.filter(receipt => receiptPaymentIds.has(receipt.paymentId))
+  const authorizedMoveInIds = new Set(data.moveInObligations.filter(item => roomIds.has(item.roomId)).map(item => item.id))
+  const charges = data.charges.filter(charge => {
+    if (charge.tenantId === tenantId) return true
+    if (!charge.roomId || !roomIds.has(charge.roomId)) return false
+    if (charge.category === 'RENT' || charge.category === 'ELECTRICITY' || charge.category === 'WASHING_MACHINE') return true
+    if (charge.category === 'ADVANCE' || charge.category === 'SECURITY_DEPOSIT') return authorizedMoveInIds.has(charge.moveInObligationId)
+    return false
+  })
+  const meters = data.electricityMeters.filter(meter => meter.roomId !== undefined && roomIds.has(meter.roomId))
+  const meterIds = new Set(meters.map(meter => meter.id))
+  const correctionPaymentIds = new Set([...paymentIds, ...receipts.map(receipt => receipt.paymentId)])
+  return {
+    ...data,
+    tenants, rooms: data.rooms.filter(room => roomIds.has(room.id)),
+    roomAssignments: [...ownAssignments, ...roommateAssignments],
+    electricityMeters: meters,
+    meterReadings: data.meterReadings.filter(reading => meterIds.has(reading.meterId)),
+    electricityBillObligations: data.electricityBillObligations.filter(item => roomIds.has(item.roomId)),
+    billingPeriods: data.billingPeriods,
+    charges, payments, paymentAllocations: allocations,
+    tenantCredits: data.tenantCredits.filter(item => item.tenantId === tenantId),
+    receipts,
+    paymentCorrections: data.paymentCorrections.filter(item => correctionPaymentIds.has(item.originalPaymentId) || correctionPaymentIds.has(item.correctedPaymentId)),
+    auditEvents: [],
+    occupancyCycles: cycles,
+    moveInObligations: data.moveInObligations.filter(item => roomIds.has(item.roomId)),
+    roomChangeRequests: data.roomChangeRequests.filter(item => item.tenantId === tenantId),
+    advanceRefunds: data.advanceRefunds.filter(item => item.tenantId === tenantId),
+    rentalPeriods,
+    rentObligations: data.rentObligations.filter(item => periodIds.has(item.rentalPeriodId)),
+    advanceApplications: data.advanceApplications.filter(item => cycleIds.has(item.occupancyCycleId)),
+    rentPrepayments: data.rentPrepayments.filter(item => cycleIds.has(item.occupancyCycleId)),
+    prepaidRentRefunds: (data.prepaidRentRefunds ?? []).filter(item => item.tenantId === tenantId),
+    financialReviewCases: [],
+  }
+}
 
 export function buildTenantBootstrap(
   data: PrototypeAppState,
@@ -85,6 +149,7 @@ export function buildTenantBootstrap(
       receipts,
       refunds,
     },
+    state: authorizedTenantState(data, tenantId),
     revision, serverDate, timezone, workspaceId,
     role: 'TENANT' as const, tenantId, schemaVersion: STORAGE_SCHEMA_VERSION,
   }

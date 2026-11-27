@@ -245,6 +245,10 @@ export async function deleteSupabaseUser(env: WorkerEnv, id: string, forwardedIp
   return supabaseRequest(env, `/auth/v1/admin/users/${encodeURIComponent(id)}`, { method: 'DELETE', forwardedIp })
 }
 
+export async function listSupabaseFactors(env: WorkerEnv, userId: string, forwardedIp: string) {
+  return supabaseRequest(env, `/auth/v1/admin/users/${encodeURIComponent(userId)}/factors`, { forwardedIp })
+}
+
 export async function updateSupabaseUser(env: WorkerEnv, id: string, body: Record<string, unknown>, forwardedIp: string) {
   return supabaseRequest(env, `/auth/v1/admin/users/${encodeURIComponent(id)}`, { method: 'PUT', body, forwardedIp })
 }
