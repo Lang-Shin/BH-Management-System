@@ -7,7 +7,7 @@ import { AppProviders } from '@/app/providers/app-providers'
 import { AppearanceProvider } from '@/app/providers/appearance'
 import { localStorageRepository } from '@/data/repositories/local-storage-repository'
 import SignInPage from '@/features/auth/sign-in-page'
-import { AuthCodeField, AuthPasswordConfirmation, AuthProgress } from '@/features/auth/auth-components'
+import { AuthCodeField, AuthPasswordConfirmation, AuthProgress, AuthTypewriter } from '@/features/auth/auth-components'
 import { AuthPendingPage } from '@/features/auth/auth-pending-page'
 import { RequireAuth } from '@/features/auth/require-auth'
 import { AuthApiError, getAuthSession, signIn, type AuthSession } from '@/features/auth/auth-api'
@@ -101,6 +101,40 @@ describe('authentication UI foundation', () => {
     await user.click(screen.getByRole('button', { name: /^sign in/i }))
     expect(await screen.findByText(heading)).toBeVisible()
     if (aal !== 'aal2') expect(screen.queryByText('Authorized dashboard')).not.toBeInTheDocument()
+  })
+
+  it('types the desktop eyebrow, holds for five seconds, deletes, and reserves the full text', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })))
+    const { container, unmount } = render(<AuthTypewriter text="Hi" />)
+    const visual = container.querySelector('[data-typed-eyebrow]')!
+    expect(screen.getByText('Hi', { selector: '.sr-only' })).toBeInTheDocument()
+    act(() => vi.advanceTimersByTime(179))
+    expect(visual).toBeEmptyDOMElement()
+    act(() => vi.advanceTimersByTime(1))
+    expect(visual).toHaveTextContent(/^H$/)
+    act(() => vi.advanceTimersByTime(95))
+    expect(visual).toHaveTextContent(/^Hi$/)
+    act(() => vi.advanceTimersByTime(4_999))
+    expect(visual).toHaveTextContent(/^Hi$/)
+    act(() => vi.advanceTimersByTime(1))
+    expect(visual).toHaveTextContent(/^H$/)
+    act(() => vi.advanceTimersByTime(55))
+    expect(visual).toBeEmptyDOMElement()
+    act(() => vi.advanceTimersByTime(450))
+    expect(visual).toHaveTextContent(/^H$/)
+    unmount()
+    expect(vi.getTimerCount()).toBe(0)
+    vi.useRealTimers()
+  })
+
+  it('shows the complete eyebrow without timers when reduced motion is preferred', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })))
+    const { container } = render(<AuthTypewriter />)
+    expect(container.querySelector('[data-typed-eyebrow]')).toHaveTextContent('A place to call home')
+    expect(vi.getTimerCount()).toBe(0)
+    vi.useRealTimers()
   })
 
   it('provides accessible confirmation, OTP, and progress primitives', async () => {

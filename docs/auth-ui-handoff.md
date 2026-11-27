@@ -21,6 +21,7 @@
 - `AuthSubmit`: submit/loading/disabled action with stable minimum height; use existing Button `variant="outline"` for secondary actions.
 - `AuthMessage`: error alert or success status.
 - `AuthProgress`: ordered steps with `aria-current="step"`; current index is zero-based.
+- `AuthTypewriter`: desktop intro eyebrow types `A place to call home`, holds five seconds, deletes one character at a time, then restarts; reduced-motion shows the full phrase. The intro is hidden below 768px, so this is laptop/desktop-only.
 
 Use existing app tokens (`--label`, `--label-2`, input/border/focus/status variables) and font assets. Auth light canvas is Oat Milk `#EEE5D4`; structure/button is Forest Green `#1D4A35`; Tomato `#F2462E` is a small accent. Dark surfaces follow the existing `.dark` AppearanceProvider. Auth styles are scoped to `auth-*`; do not change financial/layout styles. Mobile uses one card; desktop (768px+) adds the simple text panel. No external images or new dependencies.
 
@@ -89,10 +90,10 @@ Additional authenticators are optional. No trusted-device exemptions, custom MFA
 
 ## Verification completed
 
-- Focused tests: **3 files / 21 passed** (11 new sign-in/foundation tests, 3 existing auth API tests, 7 workspace-switch regression tests).
+- Focused tests: **3 files / 23 passed** (13 sign-in/foundation/typewriter tests, 3 existing auth API tests, 7 workspace-switch regression tests).
 - ESLint and TypeScript checks passed.
 - Frontend production build passed; existing >500kB chunk warning remains.
-- Lightweight headless Chrome: 320/390/768/1280 × light/dark = **8 states**; no horizontal overflow/clipped controls, 48px inputs, contained visibility buttons, no page errors. Browser also exercised required errors, password toggle, Enter submit, email retention/password clearing, and forgot-password navigation.
+- Lightweight headless Chrome: 320/390/768/1280 × light/dark = **8 states**; no horizontal overflow/clipped controls, 48px inputs, contained visibility buttons, no page errors. Browser also exercised required errors, password toggle, Enter submit, email retention/password clearing, and forgot-password navigation; desktop typing reached the full phrase and began deleting after the five-second hold.
 - Theme/contrast visually reviewed using existing text-safe tokens; no formal accessibility audit claimed. Focus rings inherit existing controls; keyboard/error-focus behavior is tested.
 - Browser authentication was **mocked** (401); successful routing is covered by mocked API/provider tests. No actual hosted auth test performed.
 - Evidence: `%LOCALAPPDATA%\Temp\opencode\bhms-auth-ui-evidence\` (eight screenshots, error screenshot, `results.json`). Browser/server processes were closed by a bounded supervisor.

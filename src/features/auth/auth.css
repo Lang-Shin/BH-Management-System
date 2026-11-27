@@ -10,6 +10,13 @@
 .auth-intro { padding: 1rem 0; color: #1d4a35; }
 .dark .auth-intro { color: #eee5d4; }
 .auth-eyebrow { display: block; font-size: .75rem; font-weight: 650; letter-spacing: .16em; text-transform: uppercase; margin-bottom: 1.6rem; }
+.auth-typewriter-frame { display: inline-grid; min-height: 1.4em; }
+.auth-typewriter-frame > * { grid-area: 1 / 1; white-space: nowrap; }
+.auth-typewriter-reserve { visibility: hidden; user-select: none; pointer-events: none; }
+.auth-typewriter-live { display: inline-flex; align-items: center; }
+.auth-typewriter-caret { display: inline-block; width: 2px; height: .95em; margin-left: 3px; background: #f2462e; animation: auth-typewriter-caret 1s step-end infinite; }
+@keyframes auth-typewriter-caret { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .auth-typewriter-caret { display: none; animation: none; } }
 .auth-intro h2 { font-size: clamp(2.4rem, 4.5vw, 3.8rem); line-height: 1.08; font-weight: 700; letter-spacing: -.05em; }
 .auth-intro p { margin-top: 1.6rem; line-height: 1.8; font-size: 1rem; }
 .auth-intro-rule { height: 4px; width: 52px; border-radius: 9px; background: #f2462e; margin-top: 2rem; }
