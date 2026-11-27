@@ -1,4 +1,5 @@
-import type { MouseEvent, ReactNode, RefObject } from 'react'
+import { useState, type MouseEvent, type ReactNode, type RefObject } from 'react'
+import { useOptionalAuth } from '@/app/providers/auth'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeftRight, Building2, LogOut } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -15,6 +16,10 @@ function isTenantWorkspace(pathname: string) {
 
 /** Route-based workspace switch: /tenant hosts the tenant routes, everything else is landlord/admin. */
 export function WorkspaceSwitchButton({ onNavigate }: { onNavigate?: () => void }) {
+  return import.meta.env.DEV ? <WorkspaceSwitchButtonInner onNavigate={onNavigate} /> : null
+}
+
+function WorkspaceSwitchButtonInner({ onNavigate }: { onNavigate?: () => void }) {
   const location = useLocation()
   const navigate = useNavigate()
   const inTenant = isTenantWorkspace(location.pathname)
@@ -53,8 +58,16 @@ export function SidebarContent({ navItems, onNavigate, onLogout, topContent }: {
   </div>
 }
 
-/** Clarification-only log-out dialog shared by both workspaces; nothing is actually signed out. */
+/** Sign-out is wired to the real authentication API when the app is in server mode. */
 export function LogoutDialog({ open, onOpenChange, triggerRef }: { open: boolean; onOpenChange: (open: boolean) => void; triggerRef: RefObject<HTMLButtonElement | null> }) {
+  const auth = useOptionalAuth()
+  const [pending, setPending] = useState(false)
+  const signedIn = auth?.status === 'authenticated'
+  const signOut = async () => {
+    if (!auth || pending) return
+    setPending(true)
+    try { await auth.signOut() } finally { setPending(false); onOpenChange(false); window.location.reload() }
+  }
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="max-w-md text-center" onCloseAutoFocus={event => {
       event.preventDefault()
@@ -64,9 +77,9 @@ export function LogoutDialog({ open, onOpenChange, triggerRef }: { open: boolean
       <DialogHeader className="items-center">
         <span className="mb-1 flex size-12 items-center justify-center rounded-full bg-primary/15 text-[var(--tint)]"><LogOut className="size-6" aria-hidden="true" /></span>
         <DialogTitle>Log out of BHMS?</DialogTitle>
-        <DialogDescription className="text-base leading-relaxed">Signing out is not available in this version yet. Your saved records will stay in this browser.</DialogDescription>
+        <DialogDescription className="text-base leading-relaxed">{signedIn ? 'You will be signed out on this device. Your account records stay on the server.' : 'Sign in is not available in this local preview. Your saved records will stay in this browser.'}</DialogDescription>
       </DialogHeader>
-      <DialogFooter className="sm:justify-center"><Button onClick={() => onOpenChange(false)}>Got it</Button></DialogFooter>
+      <DialogFooter className="sm:justify-center">{signedIn ? <><Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button onClick={signOut} disabled={pending}>{pending ? 'Signing out...' : 'Sign out'}</Button></> : <Button onClick={() => onOpenChange(false)}>Got it</Button>}</DialogFooter>
     </DialogContent>
   </Dialog>
 }

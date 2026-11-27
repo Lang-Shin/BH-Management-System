@@ -186,7 +186,7 @@ describe('admin workspace integration', () => {
     expect(logout).toHaveAttribute('type', 'button')
     await user.click(logout)
     const dialog = await screen.findByRole('dialog', { name: 'Log out of BHMS?' })
-    expect(within(dialog).getByText(/Signing out is not available in this version yet/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/Sign in is not available in this local preview/)).toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Got it' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(screen.getByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument()

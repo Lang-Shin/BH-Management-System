@@ -298,6 +298,19 @@ export class D1StateRepository {
       this.db.prepare("UPDATE workspace_operations SET status = 'COMPLETED', completed_at = ? WHERE id = ?")
         .bind(now, `command-${requestId}`),
     ]
+    if (action.type === 'tenant/movedOut') {
+      const assignment = next.roomAssignments
+        .filter(item => item.tenantId === action.tenantId && item.endDate !== null)
+        .sort((a, b) => String(b.endDate).localeCompare(String(a.endDate)))[0]
+      if (assignment?.endDate) {
+        const expiry = new Date(`${assignment.endDate}T00:00:00.000Z`)
+        expiry.setUTCDate(expiry.getUTCDate() + 90)
+        expiry.setUTCHours(23, 59, 59, 999)
+        statements.push(this.db.prepare(
+          'UPDATE tenant_account_links SET access_expires_at = ? WHERE workspace_id = ? AND tenant_id = ?',
+        ).bind(expiry.toISOString(), this.workspaceId, action.tenantId))
+      }
+    }
     for (const event of [...rateAuditEvents, ...financialReviewAuditEvents]) {
       statements.push(this.db.prepare(`INSERT INTO audit_events
         (id, workspace_id, actor_id, actor_source, action, entity_type, entity_id, reason, occurred_on, request_id, idempotency_key, before_json, after_json, created_at)

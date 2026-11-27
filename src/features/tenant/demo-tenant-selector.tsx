@@ -9,6 +9,10 @@ const statusLabel = (status: 'ACTIVE' | 'MOVED_OUT') => status === 'ACTIVE' ? 'A
 
 /** Clearly labeled prototype-only selector; it never creates accounts or changes tenant records. */
 export function DemoTenantSelector() {
+  return import.meta.env.DEV ? <DemoTenantSelectorInner /> : null
+}
+
+function DemoTenantSelectorInner() {
   const { data } = usePrototype()
   const occupancyDate = useOccupancyDate()
   const { tenantId, selectTenant } = useTenantDemo()

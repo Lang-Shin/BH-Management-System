@@ -1,10 +1,12 @@
-import { parsePrototypeSnapshot, STORAGE_SCHEMA_VERSION } from '@/data/repositories/prototype-storage'
+﻿import { parsePrototypeSnapshot, STORAGE_SCHEMA_VERSION } from '@/data/repositories/prototype-storage'
 import { isPrototypeData } from '@/domain/validation/prototype-data'
 import { quoteRentPrepayment } from '@/domain/calculations/rent-schedule'
 import { collectionCatalog, rentPrepaymentCatalog } from '@/domain/calculations/payment-collection'
 import type { PrototypeAppState } from '@/domain/types/models'
-import { requireIdentity } from './auth'
+import { authenticateRequest, requireAdministrator, requireTenant } from './auth'
+import { handleAuthRequest } from './auth-routes'
 import { assertTimeZone, businessDate } from './date'
+import { buildTenantBootstrap } from './tenant-bootstrap'
 import { D1StateRepository } from './d1-state-repository'
 import type { WorkerEnv } from './env'
 import { ApiError, errorResponse, json, readJson, requestId, sha256 } from './http'
@@ -33,11 +35,21 @@ export async function handleRequest(request: Request, env: WorkerEnv): Promise<R
       if (env.ASSETS) return env.ASSETS.fetch(request)
       return json({ error: { code: 'NOT_FOUND', message: 'Not found.' }, requestId: requestKey }, { status: 404 }, requestKey)
     }
-    const actor = await requireIdentity(request, env)
+    const route = url.pathname.slice(API_PREFIX.length)
+    const authResponse = await handleAuthRequest(request, env)
+    if (authResponse) return authResponse
+    const { actor } = await authenticateRequest(request, env)
     const repo = repository(env)
     const timezone = assertTimeZone(env.APP_TIMEZONE)
     const serverDate = businessDate(new Date(), timezone)
-    const route = url.pathname.slice(API_PREFIX.length)
+
+    if (route === '/tenant/bootstrap' && request.method === 'GET') {
+      requireTenant(actor)
+      const state = await repo.load()
+      return json(buildTenantBootstrap(state.data, state.revision, actor.tenantId!, serverDate, timezone, env.WORKSPACE_ID ?? 'demo-workspace'), {}, requestKey)
+    }
+
+    requireAdministrator(actor)
 
     if (route === '/bootstrap' && request.method === 'GET') {
       await repo.ensureSeed(env.ENVIRONMENT === 'development' || env.ENVIRONMENT === 'staging')

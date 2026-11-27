@@ -1,5 +1,20 @@
-# Optional for non-loopback development only. Never use in production.
-# BHMS_DEV_TOKEN=replace-with-a-long-random-local-token
+# Local Worker secrets. Copy to .dev.vars; never commit real values.
+# Supabase project origin and server-only secret key.
+SUPABASE_URL=
+SUPABASE_SECRET_KEY=
+# One-off operator token for landlord setup/recovery; 32+ random bytes.
+AUTH_OPERATOR_TOKEN=
+# Independent random 32+ byte secrets.
+COOKIE_ENCRYPTION_KEY=
+INVITE_TOKEN_PEPPER=
+AUDIT_PEPPER=
+# Exact local frontend origin for invitation links, if different from the Worker origin.
+AUTH_APP_URL=http://127.0.0.1:5173
+# Set false only for local HTTP. Production always uses Secure __Host cookies.
+AUTH_COOKIE_SECURE=false
+
+# Optional development-only identity path. Leave unset in production.
+# BHMS_DEV_TOKEN=
 # ENVIRONMENT=development
 # ALLOW_IMPORT_APPLY=false
 # ALLOW_TEST_RESET=true

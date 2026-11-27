@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AdminShell } from '@/components/layout/admin-shell'
 import { TenantShell } from '@/components/layout/tenant-shell'
 import { TenantDemoProvider } from '@/app/providers/tenant-demo'
+import { RequireAuth } from '@/features/auth/require-auth'
 import { NotFound } from './not-found'
 
 import Dashboard from '@/features/dashboard/dashboard-page'
@@ -16,7 +17,7 @@ import TenantRoom from '@/features/tenant/tenant-room-page'
 
 export function AppRouter() {
   return <Routes>
-    <Route element={<AdminShell />}>
+    <Route element={<RequireAuth roles={['OWNER', 'ADMIN']}><AdminShell /></RequireAuth>}>
       <Route index element={<Navigate to="/dashboard" replace />} />
       <Route path="dashboard" element={<Dashboard />} />
       <Route path="tenants" element={<Tenants />} />
@@ -26,7 +27,7 @@ export function AppRouter() {
       <Route path="reports" element={<Reports />} />
       <Route path="*" element={<NotFound />} />
     </Route>
-    <Route path="tenant" element={<TenantDemoProvider><TenantShell /></TenantDemoProvider>}>
+    <Route path="tenant" element={<RequireAuth roles={['TENANT']}><TenantDemoProvider><TenantShell /></TenantDemoProvider></RequireAuth>}>
       <Route index element={<TenantOverview />} />
       <Route path="payments" element={<TenantPayments />} />
       <Route path="room" element={<TenantRoom />} />

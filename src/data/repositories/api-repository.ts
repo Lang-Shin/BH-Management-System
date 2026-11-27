@@ -23,9 +23,13 @@ function apiBaseUrl(): string {
   return configured.replace(/\/$/, '')
 }
 
-function devToken(): string | undefined {
-  const value = import.meta.env.VITE_BHMS_DEV_TOKEN
-  return typeof value === 'string' && value.length > 0 ? value : undefined
+function csrfToken(): string {
+  if (typeof document === 'undefined') return ''
+  for (const part of document.cookie.split(';')) {
+    const [name, ...rest] = part.trim().split('=')
+    if (name === '__Host-bhms_csrf' || name === 'bhms_csrf') return rest.join('=')
+  }
+  return ''
 }
 
 async function request(path: string, init: RequestInit): Promise<Record<string, unknown>> {
@@ -33,8 +37,10 @@ async function request(path: string, init: RequestInit): Promise<Record<string, 
   const timeout = setTimeout(() => controller.abort(), 15_000)
   const headers = new Headers(init.headers)
   headers.set('accept', 'application/json')
-  const token = devToken()
-  if (token) headers.set('authorization', `Bearer ${token}`)
+  if (init.method && init.method !== 'GET') {
+    const csrf = csrfToken()
+    if (csrf) headers.set('x-bhms-csrf', csrf)
+  }
   let response: Response
   try {
     response = await fetch(`${apiBaseUrl()}${path}`, {
