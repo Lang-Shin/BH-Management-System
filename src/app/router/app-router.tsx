@@ -3,6 +3,9 @@ import { AdminShell } from '@/components/layout/admin-shell'
 import { TenantShell } from '@/components/layout/tenant-shell'
 import { TenantDemoProvider } from '@/app/providers/tenant-demo'
 import { RequireAuth } from '@/features/auth/require-auth'
+import SignInPage from '@/features/auth/sign-in-page'
+import { AuthPendingPage } from '@/features/auth/auth-pending-page'
+import { WorkspaceBoundary } from '@/app/providers/workspace-boundary'
 import { NotFound } from './not-found'
 
 import Dashboard from '@/features/dashboard/dashboard-page'
@@ -17,7 +20,13 @@ import TenantRoom from '@/features/tenant/tenant-room-page'
 
 export function AppRouter() {
   return <Routes>
-    <Route element={<RequireAuth roles={['OWNER', 'ADMIN']}><AdminShell /></RequireAuth>}>
+    <Route path="sign-in" element={<SignInPage />} />
+    <Route path="auth/mfa" element={<AuthPendingPage kind="mfa" />} />
+    <Route path="auth/restricted" element={<AuthPendingPage kind="restricted" />} />
+    <Route path="forgot-password" element={<AuthPendingPage kind="recovery" />} />
+    <Route path="reset-password" element={<AuthPendingPage kind="recovery" />} />
+    <Route path="accept" element={<AuthPendingPage kind="setup" />} />
+    <Route element={<RequireAuth roles={['OWNER', 'ADMIN']}><WorkspaceBoundary><AdminShell /></WorkspaceBoundary></RequireAuth>}>
       <Route index element={<Navigate to="/dashboard" replace />} />
       <Route path="dashboard" element={<Dashboard />} />
       <Route path="tenants" element={<Tenants />} />
@@ -27,7 +36,7 @@ export function AppRouter() {
       <Route path="reports" element={<Reports />} />
       <Route path="*" element={<NotFound />} />
     </Route>
-    <Route path="tenant" element={<RequireAuth roles={['TENANT']}><TenantDemoProvider><TenantShell /></TenantDemoProvider></RequireAuth>}>
+    <Route path="tenant" element={<RequireAuth roles={['TENANT']}><WorkspaceBoundary tenant><TenantDemoProvider><TenantShell /></TenantDemoProvider></WorkspaceBoundary></RequireAuth>}>
       <Route index element={<TenantOverview />} />
       <Route path="payments" element={<TenantPayments />} />
       <Route path="room" element={<TenantRoom />} />

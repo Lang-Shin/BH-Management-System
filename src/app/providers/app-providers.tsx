@@ -12,5 +12,6 @@ const repository = configuredApiRepository() ?? localStorageRepository
 /** Composition root: server mode is selected by VITE_BHMS_API_BASE_URL; otherwise local demo mode remains. */
 export function AppProviders({ children }: { children: ReactNode }) {
   const authEnabled = Boolean(import.meta.env.VITE_BHMS_API_BASE_URL)
-  return <AuthProvider enabled={authEnabled}><AppearanceProvider><ErrorBoundary><PrototypeProvider repository={repository}><BrowserRouter>{children}</BrowserRouter></PrototypeProvider></ErrorBoundary></AppearanceProvider></AuthProvider>
+  const content = authEnabled ? children : <PrototypeProvider repository={repository}>{children}</PrototypeProvider>
+  return <AuthProvider enabled={authEnabled}><AppearanceProvider><ErrorBoundary><BrowserRouter>{content}</BrowserRouter></ErrorBoundary></AppearanceProvider></AuthProvider>
 }
